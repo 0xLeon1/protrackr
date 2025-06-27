@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import Header from '@/components/protracker/Header';
 import BottomNav from '@/components/protracker/BottomNav';
+import { AuthProvider } from '@/contexts/auth-context';
 
 export const metadata: Metadata = {
   title: 'ProTracker',
@@ -22,14 +23,16 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></link>
       </head>
       <body className="font-body antialiased">
-        <div className="relative flex flex-col min-h-screen bg-background">
-          <Header />
-          <main className="flex-1 p-4 sm:p-6 md:p-8 pb-20">
-            {children}
-          </main>
-          <BottomNav />
-        </div>
-        <Toaster />
+        <AuthProvider>
+          <div className="relative flex flex-col min-h-screen bg-background">
+            <Header />
+            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-20">
+              {children}
+            </main>
+            <BottomNav />
+          </div>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -9,12 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function ActiveWorkoutPage() {
   const params = useParams();
   const router = useRouter();
   const workoutId = params.id as string;
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [programName, setProgramName] = useState<string>('');
@@ -22,7 +24,13 @@ export default function ActiveWorkoutPage() {
   const [lastWorkout, setLastWorkout] = useState<Workout | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && workoutId) {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (user && typeof window !== 'undefined' && workoutId) {
       // Load Programs
       const storedPrograms = localStorage.getItem('protracker-programs');
       if (storedPrograms) {
@@ -73,9 +81,9 @@ export default function ActiveWorkoutPage() {
           console.error("Failed to parse data from localStorage", error);
         }
       }
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [workoutId]);
+  }, [workoutId, user]);
   
   const handleWorkoutChange = (updatedWorkout: Workout) => {
     setWorkout(updatedWorkout);
@@ -106,7 +114,7 @@ export default function ActiveWorkoutPage() {
     router.push('/programs');
   };
 
-  if (isLoading) {
+  if (isLoading || authLoading || !user) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

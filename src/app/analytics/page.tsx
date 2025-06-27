@@ -9,10 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { History, TrendingUp, Scale, Bed } from "lucide-react";
+import { History, TrendingUp, Scale, Bed, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
 
 interface DailyVolume {
   day: string;
@@ -53,116 +55,125 @@ export default function AnalyticsPage() {
   const [workoutDays, setWorkoutDays] = useState(0);
   const [nutritionDays, setNutritionDays] = useState(0);
   const [weeklyAdherence, setWeeklyAdherence] = useState(0);
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    // Load Workout Logs
-    const storedLogs = localStorage.getItem('protracker-logs');
-    const workoutLogs: WorkoutLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
-    if (workoutLogs.length > 0) {
-      try {
-        const sortedLogs = [...workoutLogs].sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
-        setLogs(sortedLogs);
-        calculateDailyVolume(sortedLogs);
-      } catch (error) {
-        console.error("Failed to parse logs from localStorage", error);
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    if (user) {
+      // Load Workout Logs
+      const storedLogs = localStorage.getItem('protracker-logs');
+      const workoutLogs: WorkoutLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
+      if (workoutLogs.length > 0) {
+        try {
+          const sortedLogs = [...workoutLogs].sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
+          setLogs(sortedLogs);
+          calculateDailyVolume(sortedLogs);
+        } catch (error) {
+          console.error("Failed to parse logs from localStorage", error);
+        }
+      } else {
+          calculateDailyVolume([]);
       }
-    } else {
-        calculateDailyVolume([]);
-    }
-    
-    // Load Body Weight Logs
-    const storedBodyWeight = localStorage.getItem('protracker-bodyweight');
-    if (storedBodyWeight) {
-        try {
-            const parsedBodyWeight: BodyWeightLogEntry[] = JSON.parse(storedBodyWeight);
-            const sortedBodyWeight = parsedBodyWeight.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-            setBodyWeightLogs(sortedBodyWeight);
-        } catch (e) {
-            console.error("Failed to parse body weight logs", e);
-        }
-    } else {
-        const exampleBodyWeightData: BodyWeightLogEntry[] = [
-            { id: 'bw-ex1', weight: 185, date: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString() },
-            { id: 'bw-ex2', weight: 184.5, date: new Date(new Date().setDate(new Date().getDate() - 21)).toISOString() },
-            { id: 'bw-ex3', weight: 183, date: new Date(new Date().setDate(new Date().getDate() - 14)).toISOString() },
-            { id: 'bw-ex4', weight: 182.5, date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString() },
-            { id: 'bw-ex5', weight: 181, date: new Date().toISOString() },
-        ].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-        setBodyWeightLogs(exampleBodyWeightData);
-        localStorage.setItem('protracker-bodyweight', JSON.stringify(exampleBodyWeightData));
-    }
-    
-    // Load Sleep Logs
-    const storedSleep = localStorage.getItem('protracker-sleep-logs');
-    let sleepLogsData: SleepLogEntry[] = [];
-    if (storedSleep) {
-        try {
-            sleepLogsData = JSON.parse(storedSleep);
-            setSleepLogs(sleepLogsData);
-        } catch (e) {
-            console.error("Failed to parse sleep logs", e);
-        }
-    } else {
-        const exampleSleepData: SleepLogEntry[] = [
-            { id: 'sl-ex1', hours: 7.5, date: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString() },
-            { id: 'sl-ex2', hours: 8, date: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString() },
-            { id: 'sl-ex3', hours: 6, date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString() },
-            { id: 'sl-ex4', hours: 7, date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString() },
-        ];
-        sleepLogsData = exampleSleepData;
-        setSleepLogs(exampleSleepData);
-        localStorage.setItem('protracker-sleep-logs', JSON.stringify(exampleSleepData));
-    }
-    calculateWeeklySleep(sleepLogsData);
-
-
-    // --- Weekly Adherence Data ---
-    const today = new Date();
-    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
-    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-
-    const getUniqueDaysInWeek = (logs: any[], dateKey: 'date' | 'completedAt'): number => {
-      if (!logs) return 0;
-      try {
-        const uniqueDays = new Set<string>();
-        logs.forEach(log => {
-          const dateValue = log[dateKey];
-          if (dateValue && typeof dateValue === 'string') {
-              const logDate = parseISO(dateValue);
-              if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
-                  uniqueDays.add(logDate.toISOString().split('T')[0]);
-              }
+      
+      // Load Body Weight Logs
+      const storedBodyWeight = localStorage.getItem('protracker-bodyweight');
+      if (storedBodyWeight) {
+          try {
+              const parsedBodyWeight: BodyWeightLogEntry[] = JSON.parse(storedBodyWeight);
+              const sortedBodyWeight = parsedBodyWeight.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+              setBodyWeightLogs(sortedBodyWeight);
+          } catch (e) {
+              console.error("Failed to parse body weight logs", e);
           }
-        });
-        return uniqueDays.size;
-      } catch (error) {
-        console.error("Error processing logs for analytics:", error);
-        return 0;
+      } else {
+          const exampleBodyWeightData: BodyWeightLogEntry[] = [
+              { id: 'bw-ex1', weight: 185, date: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString() },
+              { id: 'bw-ex2', weight: 184.5, date: new Date(new Date().setDate(new Date().getDate() - 21)).toISOString() },
+              { id: 'bw-ex3', weight: 183, date: new Date(new Date().setDate(new Date().getDate() - 14)).toISOString() },
+              { id: 'bw-ex4', weight: 182.5, date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString() },
+              { id: 'bw-ex5', weight: 181, date: new Date().toISOString() },
+          ].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+          setBodyWeightLogs(exampleBodyWeightData);
+          localStorage.setItem('protracker-bodyweight', JSON.stringify(exampleBodyWeightData));
       }
-    };
+      
+      // Load Sleep Logs
+      const storedSleep = localStorage.getItem('protracker-sleep-logs');
+      let sleepLogsData: SleepLogEntry[] = [];
+      if (storedSleep) {
+          try {
+              sleepLogsData = JSON.parse(storedSleep);
+              setSleepLogs(sleepLogsData);
+          } catch (e) {
+              console.error("Failed to parse sleep logs", e);
+          }
+      } else {
+          const exampleSleepData: SleepLogEntry[] = [
+              { id: 'sl-ex1', hours: 7.5, date: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString() },
+              { id: 'sl-ex2', hours: 8, date: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString() },
+              { id: 'sl-ex3', hours: 6, date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString() },
+              { id: 'sl-ex4', hours: 7, date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString() },
+          ];
+          sleepLogsData = exampleSleepData;
+          setSleepLogs(exampleSleepData);
+          localStorage.setItem('protracker-sleep-logs', JSON.stringify(exampleSleepData));
+      }
+      calculateWeeklySleep(sleepLogsData);
 
-    // Check-ins
-    const storedCheckins = localStorage.getItem('protracker-checkins');
-    const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
-    const checkinsCount = getUniqueDaysInWeek(checkinLogs, 'date');
-    setCheckinDays(checkinsCount);
 
-    // Workouts (using already loaded workoutLogs)
-    const workoutsCount = getUniqueDaysInWeek(workoutLogs, 'completedAt');
-    setWorkoutDays(workoutsCount);
-    
-    // Nutrition
-    const storedMealLogs = localStorage.getItem('protracker-meal-logs');
-    const mealLogs: FoodLogEntry[] = storedMealLogs ? JSON.parse(storedMealLogs) : [];
-    const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
-    setNutritionDays(nutritionCount);
+      // --- Weekly Adherence Data ---
+      const today = new Date();
+      const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+      const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
 
-    // Adherence
-    const totalActivities = checkinsCount + workoutsCount + nutritionCount;
-    const adherencePercentage = totalActivities > 0 ? Math.round((totalActivities / (3 * 7)) * 100) : 0;
-    setWeeklyAdherence(adherencePercentage);
+      const getUniqueDaysInWeek = (logs: any[], dateKey: 'date' | 'completedAt'): number => {
+        if (!logs) return 0;
+        try {
+          const uniqueDays = new Set<string>();
+          logs.forEach(log => {
+            const dateValue = log[dateKey];
+            if (dateValue && typeof dateValue === 'string') {
+                const logDate = parseISO(dateValue);
+                if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+                    uniqueDays.add(logDate.toISOString().split('T')[0]);
+                }
+            }
+          });
+          return uniqueDays.size;
+        } catch (error) {
+          console.error("Error processing logs for analytics:", error);
+          return 0;
+        }
+      };
 
-  }, []);
+      // Check-ins
+      const storedCheckins = localStorage.getItem('protracker-checkins');
+      const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
+      const checkinsCount = getUniqueDaysInWeek(checkinLogs, 'date');
+      setCheckinDays(checkinsCount);
+
+      // Workouts (using already loaded workoutLogs)
+      const workoutsCount = getUniqueDaysInWeek(workoutLogs, 'completedAt');
+      setWorkoutDays(workoutsCount);
+      
+      // Nutrition
+      const storedMealLogs = localStorage.getItem('protracker-meal-logs');
+      const mealLogs: FoodLogEntry[] = storedMealLogs ? JSON.parse(storedMealLogs) : [];
+      const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
+      setNutritionDays(nutritionCount);
+
+      // Adherence
+      const totalActivities = checkinsCount + workoutsCount + nutritionCount;
+      const adherencePercentage = totalActivities > 0 ? Math.round((totalActivities / (3 * 7)) * 100) : 0;
+      setWeeklyAdherence(adherencePercentage);
+    }
+  }, [user]);
 
   const bodyWeightChartData = useMemo(() => {
     if (bodyWeightLogs.length < 2) return [];
@@ -270,6 +281,14 @@ export default function AnalyticsPage() {
 
   const hasLiftedThisWeek = dailyVolume.some(d => d.volume > 0);
   const hasSleptThisWeek = weeklySleep.some(d => d.hours > 0);
+
+  if (loading || !user) {
+    return (
+      <div className="flex justify-center items-center h-full min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

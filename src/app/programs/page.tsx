@@ -35,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAuth } from '@/contexts/auth-context';
 
 const initialPrograms: Program[] = [
   {
@@ -92,24 +93,33 @@ export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[] | null>(null);
   const [newProgramName, setNewProgramName] = useState('');
   const router = useRouter();
+  const { user, loading } = useAuth();
 
   // State for the rename dialog
   const [itemToRename, setItemToRename] = useState<{ type: 'program' | 'workout'; id: string; programId?: string; name: string; } | null>(null);
   const [newName, setNewName] = useState('');
 
   useEffect(() => {
-    const storedPrograms = localStorage.getItem('protracker-programs');
-    if (storedPrograms) {
-        try {
-            setPrograms(JSON.parse(storedPrograms));
-        } catch (error) {
-            console.error("Failed to parse programs from localStorage", error);
-            setPrograms(initialPrograms);
-        }
-    } else {
-        setPrograms(initialPrograms);
+    if (!loading && !user) {
+      router.push('/login');
     }
-  }, []);
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    if (user) {
+      const storedPrograms = localStorage.getItem('protracker-programs');
+      if (storedPrograms) {
+          try {
+              setPrograms(JSON.parse(storedPrograms));
+          } catch (error) {
+              console.error("Failed to parse programs from localStorage", error);
+              setPrograms(initialPrograms);
+          }
+      } else {
+          setPrograms(initialPrograms);
+      }
+    }
+  }, [user]);
 
   const updatePrograms = (updatedPrograms: Program[]) => {
     setPrograms(updatedPrograms);
@@ -213,7 +223,7 @@ export default function ProgramsPage() {
   };
 
 
-  if (!programs) {
+  if (!programs || loading || !user) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -237,46 +247,44 @@ export default function ProgramsPage() {
           {programs.map((program) => (
             <Card key={program.id} className="overflow-hidden">
               <AccordionItem value={program.id} className="border-none">
-                <div className="flex items-center bg-card p-4">
-                    <AccordionTrigger className="flex-1 p-0 hover:no-underline text-lg font-semibold">
-                        {program.name}
-                    </AccordionTrigger>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="shrink-0 ml-4" onClick={(e) => e.stopPropagation()}>
-                          <MoreVertical className="h-5 w-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
-                          <DropdownMenuItem onSelect={() => handleOpenRenameDialog({ type: 'program', id: program.id, name: program.name })}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span>Rename</span>
-                          </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Delete Program</span>
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the "{program.name}" program and all of its workouts.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteProgram(program.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
+                <AccordionTrigger className="flex items-center p-4 hover:no-underline text-lg font-semibold w-full">
+                  {program.name}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                        <MoreVertical className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
+                        <DropdownMenuItem onSelect={() => handleOpenRenameDialog({ type: 'program', id: program.id, name: program.name })}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>Rename</span>
+                        </DropdownMenuItem>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete Program</span>
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the "{program.name}" program and all of its workouts.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteProgram(program.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </AccordionTrigger>
                 <AccordionContent className="p-4 border-t">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
