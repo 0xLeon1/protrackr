@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { History, TrendingUp, Scale, Bed, Loader2 } from "lucide-react";
+import { History, TrendingUp, Scale, Bed, Loader2, List } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -17,6 +17,16 @@ import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, setDoc } from "firebase/firestore";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
 
 interface DailyVolume {
   day: string;
@@ -346,9 +356,44 @@ export default function AnalyticsPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
-                <CardHeader>
-                    <CardTitle>Body Weight Trend</CardTitle>
-                    <CardDescription>Log your weight to track changes. Click a point to see details.</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div>
+                        <CardTitle>Body Weight Trend</CardTitle>
+                        <CardDescription>Log your weight to track changes. Click a point to see details.</CardDescription>
+                    </div>
+                     <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="icon" className="shrink-0">
+                                <List className="h-4 w-4" />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Full Weight History</DialogTitle>
+                                <DialogDescription>
+                                    All your recorded body weight entries, sorted by most recent.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <ScrollArea className="h-72">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead className="text-right">Weight (lbs)</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {bodyWeightLogs.map(log => (
+                                            <TableRow key={log.id}>
+                                                <TableCell>{format(parseISO(log.date), 'MMM d, yyyy')}</TableCell>
+                                                <TableCell className="text-right font-medium">{log.weight.toFixed(1)} lbs</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[180px] -ml-2 pr-2">
