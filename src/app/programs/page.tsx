@@ -38,6 +38,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 const initialPrograms: Program[] = [
   {
@@ -96,6 +97,7 @@ export default function ProgramsPage() {
   const [newProgramName, setNewProgramName] = useState('');
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { toast } = useToast();
 
   const [itemToRename, setItemToRename] = useState<{ type: 'program' | 'workout'; id: string; programId?: string; name: string; } | null>(null);
   const [newName, setNewName] = useState('');
@@ -109,24 +111,34 @@ export default function ProgramsPage() {
   useEffect(() => {
     if (user) {
       const fetchPrograms = async () => {
-        const programsCollection = collection(db, 'users', user.uid, 'programs');
-        const querySnapshot = await getDocs(programsCollection);
-        if (querySnapshot.empty) {
-          const batch = writeBatch(db);
-          initialPrograms.forEach(program => {
-            const programRef = doc(db, 'users', user.uid, 'programs', program.id);
-            batch.set(programRef, program);
-          });
-          await batch.commit();
-          setPrograms(initialPrograms);
-        } else {
-          const userPrograms = querySnapshot.docs.map(doc => ({ ...doc.data() } as Program));
-          setPrograms(userPrograms);
+        try {
+          const programsCollection = collection(db, 'users', user.uid, 'programs');
+          const querySnapshot = await getDocs(programsCollection);
+          if (querySnapshot.empty) {
+            const batch = writeBatch(db);
+            initialPrograms.forEach(program => {
+              const programRef = doc(db, 'users', user.uid, 'programs', program.id);
+              batch.set(programRef, program);
+            });
+            await batch.commit();
+            setPrograms(initialPrograms);
+          } else {
+            const userPrograms = querySnapshot.docs.map(doc => ({ ...doc.data() } as Program));
+            setPrograms(userPrograms);
+          }
+        } catch (error) {
+            console.error("Error fetching programs:", error);
+            toast({
+              title: "Error Loading Programs",
+              description: "There was a problem fetching your data from the server.",
+              variant: "destructive",
+            });
+            setPrograms([]);
         }
       };
       fetchPrograms();
     }
-  }, [user]);
+  }, [user, toast]);
 
   const handleAddProgram = async () => {
     if (newProgramName.trim() === '' || !programs || !user) return;
@@ -237,7 +249,7 @@ export default function ProgramsPage() {
   };
 
 
-  if (!programs || loading || !user) {
+  if (!programs || loading) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
