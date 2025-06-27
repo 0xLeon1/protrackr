@@ -1,37 +1,62 @@
 import type { FoodDataItem } from "@/types";
 
-// A mock food database and search service.
-// In a real app, this would be a call to an external API.
+interface Nutrient {
+    nutrientName: string;
+    unitName: string;
+    value: number;
+}
 
-const mockFoodDatabase: FoodDataItem[] = [
-    { id: 'food_1', name: 'Chicken Breast, grilled', calories: 165, protein: 31, carbs: 0, fats: 3.6 },
-    { id: 'food_2', name: 'Brown Rice, cooked', calories: 123, protein: 2.7, carbs: 25.6, fats: 1 },
-    { id: 'food_3', name: 'Olive Oil', calories: 884, protein: 0, carbs: 0, fats: 100 },
-    { id: 'food_4', name: 'Apple, raw', calories: 52, protein: 0.3, carbs: 14, fats: 0.2 },
-    { id: 'food_5', name: 'Banana, raw', calories: 89, protein: 1.1, carbs: 23, fats: 0.3 },
-    { id: 'food_6', name: 'Salmon, baked', calories: 206, protein: 22, carbs: 0, fats: 12 },
-    { id: 'food_7', name: 'Broccoli, steamed', calories: 35, protein: 2.4, carbs: 7.2, fats: 0.4 },
-    { id: 'food_8', name: 'Almonds, raw', calories: 579, protein: 21, carbs: 22, fats: 49 },
-    { id: 'food_9', name: 'Egg, large', calories: 155, protein: 13, carbs: 1.1, fats: 11 },
-    { id: 'food_10', name: 'Whole Milk', calories: 61, protein: 3.2, carbs: 4.8, fats: 3.3 },
-    { id: 'food_11', name: 'Greek Yogurt, plain, non-fat', calories: 59, protein: 10, carbs: 3.6, fats: 0.4 },
-    { id: 'food_12', name: 'Oats, rolled', calories: 389, protein: 16.9, carbs: 66.3, fats: 6.9 },
-    { id: 'food_13', name: 'White Bread', calories: 265, protein: 9, carbs: 49, fats: 3.2 },
-    { id: 'food_14', name: 'Peanut Butter, smooth', calories: 588, protein: 25, carbs: 20, fats: 50 },
-    { id: 'food_15', name: 'Cheddar Cheese', calories: 404, protein: 25, carbs: 1.3, fats: 33 },
-];
+interface FoodFromAPI {
+    fdcId: number;
+    description: string;
+    foodNutrients: Nutrient[];
+}
+
+// A helper to safely find a nutrient from the array and return its value or 0
+const getNutrientValue = (nutrients: Nutrient[], name: string): number => {
+    // The nutrient names can vary slightly, so we check for common variations.
+    const normalizedName = name.toLowerCase();
+    const nutrient = nutrients.find(n => n.nutrientName.toLowerCase().includes(normalizedName));
+    return nutrient ? nutrient.value : 0;
+};
 
 export async function searchFoods(query: string): Promise<FoodDataItem[]> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 200));
+    const apiKey = process.env.NEXT_PUBLIC_USDA_API_KEY;
+
+    if (!apiKey || apiKey === "YOUR_API_KEY_HERE") {
+        console.error("USDA API key is missing. Please add it to your .env file.");
+        return [];
+    }
     
-    if (!query) {
-        return mockFoodDatabase;
+    if (!query.trim()) {
+        return [];
     }
 
-    const lowercasedQuery = query.toLowerCase();
-    const results = mockFoodDatabase.filter(food => 
-        food.name.toLowerCase().includes(lowercasedQuery)
-    );
-    return results;
+    const API_URL = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${encodeURIComponent(query)}&dataType=Foundation,SR%20Legacy,Branded&pageSize=50`;
+
+    try {
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+            console.error("Failed to fetch from USDA API:", response.statusText);
+            return [];
+        }
+
+        const data = await response.json();
+        
+        const foods: FoodDataItem[] = (data.foods || []).map((food: FoodFromAPI) => ({
+            id: String(food.fdcId),
+            name: food.description,
+            // All values from USDA API are per 100g serving
+            calories: getNutrientValue(food.foodNutrients, 'Energy'),
+            protein: getNutrientValue(food.foodNutrients, 'Protein'),
+            carbs: getNutrientValue(food.foodNutrients, 'Carbohydrate, by difference'),
+            fats: getNutrientValue(food.foodNutrients, 'Total lipid (fat)'),
+        }));
+
+        return foods;
+
+    } catch (error) {
+        console.error("Error searching for foods:", error);
+        return [];
+    }
 }

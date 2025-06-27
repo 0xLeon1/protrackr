@@ -45,30 +45,25 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
   // Effect to handle searching
   useEffect(() => {
-    // Show full list initially when dialog opens
-    if (isDialogOpen && searchQuery === '' && view === 'search' && !selectedFood) {
-      const fetchInitialList = async () => {
-        setIsSearching(true);
-        const results = await searchFoods('');
-        setSearchResults(results);
-        setIsSearching(false);
-      };
-      fetchInitialList();
+    if (view !== 'search' || !isDialogOpen || selectedFood) {
       return;
     }
-    
-    // Debounced search for user input
+
     const handler = setTimeout(async () => {
-      if (view === 'search') {
+      // Only start searching after 2 characters have been typed
+      if (searchQuery.trim().length > 1) {
         setIsSearching(true);
         const results = await searchFoods(searchQuery);
         setSearchResults(results);
         setIsSearching(false);
+      } else {
+        setSearchResults([]);
       }
-    }, 300);
+    }, 300); // 300ms debounce
 
     return () => clearTimeout(handler);
-  }, [searchQuery, isDialogOpen, view, selectedFood]);
+  }, [searchQuery, view, isDialogOpen, selectedFood]);
+
 
   const resetDialogState = () => {
     setSearchQuery("");
@@ -259,7 +254,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       <div className="space-y-4">
         <div className="relative">
           <Input
-            placeholder="e.g., Grilled Chicken"
+            placeholder="Search the food database..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -271,14 +266,14 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
               {searchResults.map(food => (
                 <button key={food.id} onClick={() => setSelectedFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
                   <p>{food.name}</p>
-                  <p className="text-xs text-muted-foreground">{food.calories} kcal per 100g</p>
+                  <p className="text-xs text-muted-foreground">{Math.round(food.calories)} kcal per 100g</p>
                 </button>
               ))}
             </div>
           ) : (
-            !isSearching && (
-              <p className="text-center text-sm text-muted-foreground py-4">No results found.</p>
-            )
+            <p className="text-center text-sm text-muted-foreground py-4">
+              {searchQuery.trim().length > 1 ? (isSearching ? 'Searching...' : 'No results found.') : 'Type at least 2 characters to search.'}
+            </p>
           )}
         </ScrollArea>
         <Separator />
