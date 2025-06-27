@@ -1,9 +1,11 @@
+
 "use client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function DailyCheckin() {
   return (
@@ -49,6 +51,10 @@ export default function DailyCheckin() {
               <span>4</span>
               <span>5</span>
             </div>
+        </div>
+        <div className="space-y-4">
+          <Label htmlFor="sleep">Hours of Sleep</Label>
+          <Input id="sleep" type="number" placeholder="e.g., 8" />
         </div>
         <Button className="w-full bg-accent hover:bg-accent/90">Submit Check-in</Button>
       </CardContent>
