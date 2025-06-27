@@ -1,12 +1,15 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
-import type { WorkoutLogEntry, FoodLogEntry, CheckinLogEntry } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { CheckCircle2, Dumbbell, UtensilsCrossed } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
+interface ConsistencyTrackerProps {
+    checkinDays: number;
+    workoutDays: number;
+    nutritionDays: number;
+}
 
 const ConsistencyItem = ({ icon: Icon, title, value }: { icon: React.ElementType, title: string, value: number }) => (
     <div className="space-y-3">
@@ -25,59 +28,7 @@ const ConsistencyItem = ({ icon: Icon, title, value }: { icon: React.ElementType
     </div>
 );
 
-
-export default function ConsistencyTracker() {
-    const [checkinDays, setCheckinDays] = useState(0);
-    const [workoutDays, setWorkoutDays] = useState(0);
-    const [nutritionDays, setNutritionDays] = useState(0);
-    const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(true);
-
-        const today = new Date();
-        const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
-        const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-
-        const getUniqueDaysInWeek = (logs: { date: string }[] | { completedAt: string }[], dateKey: 'date' | 'completedAt'): number => {
-            if (!logs) return 0;
-            try {
-                const uniqueDays = new Set<string>();
-                logs.forEach(log => {
-                    const logDate = parseISO(log[dateKey]);
-                    if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
-                        uniqueDays.add(logDate.toISOString().split('T')[0]);
-                    }
-                });
-                return uniqueDays.size;
-            } catch (error) {
-                console.error("Error processing logs for consistency tracker:", error);
-                return 0;
-            }
-        };
-
-        // Check-ins
-        const storedCheckins = localStorage.getItem('protracker-checkins');
-        const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
-        setCheckinDays(getUniqueDaysInWeek(checkinLogs, 'date'));
-
-        // Workouts
-        const storedWorkoutLogs = localStorage.getItem('protracker-logs');
-        const workoutLogs: WorkoutLogEntry[] = storedWorkoutLogs ? JSON.parse(storedWorkoutLogs) : [];
-        setWorkoutDays(getUniqueDaysInWeek(workoutLogs, 'completedAt'));
-        
-        // Nutrition
-        const storedMealLogs = localStorage.getItem('protracker-meal-logs');
-        const mealLogs: FoodLogEntry[] = storedMealLogs ? JSON.parse(storedMealLogs) : [];
-        setNutritionDays(getUniqueDaysInWeek(mealLogs, 'date'));
-
-    }, []);
-    
-    // Prevent hydration mismatch by rendering null on server
-    if (!isClient) {
-        return null;
-    }
-
+export default function ConsistencyTracker({ checkinDays, workoutDays, nutritionDays }: ConsistencyTrackerProps) {
     return (
         <Card>
             <CardHeader>

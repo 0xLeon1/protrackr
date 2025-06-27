@@ -1,19 +1,29 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FoodLogEntry } from '@/types';
+import type { FoodLogEntry, MacroGoals } from '@/types';
 import { startOfToday } from 'date-fns';
 import MacroTracker from "@/components/protracker/MacroTracker";
 import MealDiary from "@/components/protracker/MealDiary";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2 } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
-const exampleMealData: FoodLogEntry[] = [
-    { id: 'food-1', date: startOfToday().toISOString(), mealType: 'Breakfast', name: 'Scrambled Eggs & Toast', calories: 329, protein: 19, carbs: 33, fats: 12 },
-    { id: 'food-2', date: startOfToday().toISOString(), mealType: 'Lunch', name: 'Chicken Wrap', calories: 341, protein: 16, carbs: 26, fats: 18 }
+const exampleMealData: Omit<FoodLogEntry, 'id' | 'date'>[] = [
+    { mealType: 'Breakfast', name: 'Scrambled Eggs & Toast', calories: 329, protein: 19, carbs: 33, fats: 12 },
+    { mealType: 'Lunch', name: 'Chicken Wrap', calories: 341, protein: 16, carbs: 26, fats: 18 }
 ];
+
+const defaultGoals: MacroGoals = {
+  calories: 2500,
+  protein: 180,
+  carbs: 250,
+  fats: 70,
+};
 
 export default function NutritionPage() {
   const [allMealLogs, setAllMealLogs] = useState<FoodLogEntry[]>([]);
@@ -27,45 +37,63 @@ export default function NutritionPage() {
     }
   }, [user, loading, router]);
 
+  useEffect(() => {
+    if (user) {
+        const fetchMealLogs = async () => {
+            const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
+            const mealLogsSnapshot = await getDocs(mealLogsCollection);
+            
+            if (mealLogsSnapshot.empty) {
+                // Seed data for new user
+                const today = startOfToday().toISOString();
+                const batch = writeBatch(db);
+                const seededLogs: FoodLogEntry[] = [];
+                exampleMealData.forEach(meal => {
+                    const docRef = doc(mealLogsCollection);
+                    const newLog = { ...meal, date: today, id: docRef.id };
+                    batch.set(docRef, newLog);
+                    seededLogs.push(newLog);
+                });
+                await batch.commit();
+                setAllMealLogs(seededLogs);
+            } else {
+                const logs = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
+                setAllMealLogs(logs);
+            }
+        };
+        fetchMealLogs();
+    }
+  }, [user]);
+
   const todaysLogs = useMemo(() => {
     const todayISO = startOfToday().toISOString();
     const todayDateString = todayISO.split('T')[0];
     return allMealLogs.filter(log => log.date.startsWith(todayDateString));
   }, [allMealLogs]);
 
-  useEffect(() => {
-    if (user) {
-        const storedLogs = localStorage.getItem('protracker-meal-logs');
-        if (storedLogs) {
-            try {
-                setAllMealLogs(JSON.parse(storedLogs));
-            } catch (e) {
-                console.error("Failed to parse meal logs", e);
-                setAllMealLogs(exampleMealData);
-            }
-        } else {
-            setAllMealLogs(exampleMealData);
-            localStorage.setItem('protracker-meal-logs', JSON.stringify(exampleMealData));
-        }
-    }
-  }, [user]);
-
-  const updateMealLogs = (newLogs: FoodLogEntry[]) => {
-    setAllMealLogs(newLogs);
-    localStorage.setItem('protracker-meal-logs', JSON.stringify(newLogs));
-  }
-
-  const handleAddMeal = (meal: Omit<FoodLogEntry, 'id' | 'date'>) => {
-    const newLogEntry: FoodLogEntry = {
+  const handleAddMeal = async (meal: Omit<FoodLogEntry, 'id' | 'date'>) => {
+    if (!user) return;
+    
+    const newLogEntryData = {
         ...meal,
-        id: `food-${Date.now()}`,
         date: startOfToday().toISOString(),
     };
-    updateMealLogs([...allMealLogs, newLogEntry]);
+    
+    const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
+    const newDocRef = await addDoc(mealLogsCollection, newLogEntryData);
+    
+    const newLogEntry: FoodLogEntry = {
+        ...newLogEntryData,
+        id: newDocRef.id,
+    };
+    
+    setAllMealLogs(prev => [...prev, newLogEntry]);
   };
 
-  const handleDeleteMeal = (mealId: string) => {
-    updateMealLogs(allMealLogs.filter(log => log.id !== mealId));
+  const handleDeleteMeal = async (mealId: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'meal-logs', mealId));
+    setAllMealLogs(prev => prev.filter(log => log.id !== mealId));
   };
   
   const currentIntake = useMemo(() => {

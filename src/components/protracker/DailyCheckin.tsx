@@ -1,3 +1,4 @@
+
 "use client"
 import { useState } from 'react';
 import type { BodyWeightLogEntry, CheckinLogEntry, SleepLogEntry } from '@/types';
@@ -9,26 +10,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 
 export default function DailyCheckin() {
   const [morningWeight, setMorningWeight] = useState('');
   const [sleepHours, setSleepHours] = useState('');
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const handleSaveWeight = () => {
+  const handleSaveWeight = async () => {
+    if (!user) return;
     const weight = parseFloat(morningWeight);
     if (!isNaN(weight) && weight > 0) {
-      const newEntry: BodyWeightLogEntry = {
-        id: `bw-${Date.now()}`,
+      const newEntry: Omit<BodyWeightLogEntry, 'id'> = {
         weight: weight,
         date: new Date().toISOString(),
       };
       
-      const storedBodyWeight = localStorage.getItem('protracker-bodyweight');
-      const bodyWeightLogs: BodyWeightLogEntry[] = storedBodyWeight ? JSON.parse(storedBodyWeight) : [];
+      const bodyWeightCollection = collection(db, 'users', user.uid, 'bodyweight-logs');
+      await addDoc(bodyWeightCollection, newEntry);
       
-      const updatedLogs = [newEntry, ...bodyWeightLogs];
-      localStorage.setItem('protracker-bodyweight', JSON.stringify(updatedLogs));
       setMorningWeight('');
       toast({
         title: "Weight logged!",
@@ -43,59 +46,50 @@ export default function DailyCheckin() {
     }
   };
   
-  const handleSubmitCheckin = () => {
-    const newEntry: CheckinLogEntry = {
-      id: `checkin-${Date.now()}`,
-      date: new Date().toISOString(),
-    };
-
-    const storedCheckins = localStorage.getItem('protracker-checkins');
-    const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
+  const handleSubmitCheckin = async () => {
+    if (!user) return;
     
-    const todayStr = new Date().toISOString().split('T')[0];
-    const hasCheckedInToday = checkinLogs.some(log => log.date.startsWith(todayStr));
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const startOfToday = new Date(todayStr);
+    const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-    if (hasCheckedInToday) {
-         toast({
-            title: "Already Checked In!",
-            description: "You have already submitted your check-in for today.",
-            variant: "default"
-        });
-        return;
+    const checkinsCollection = collection(db, 'users', user.uid, 'checkins');
+    const q = query(checkinsCollection, where('date', '>=', startOfToday.toISOString()), where('date', '<=', endOfToday.toISOString()));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      toast({
+          title: "Already Checked In!",
+          description: "You have already submitted your check-in for today.",
+          variant: "default"
+      });
+      return;
     }
 
-    const updatedLogs = [newEntry, ...checkinLogs];
-    localStorage.setItem('protracker-checkins', JSON.stringify(updatedLogs));
+    const newCheckinEntry: Omit<CheckinLogEntry, 'id'> = {
+      date: today.toISOString(),
+    };
+    await addDoc(checkinsCollection, newCheckinEntry);
     
+    let sleepMessage = "";
     const hours = parseFloat(sleepHours);
     if (!isNaN(hours) && hours > 0) {
-        const newSleepEntry: SleepLogEntry = {
-            id: `sleep-${Date.now()}`,
+        const newSleepEntry: Omit<SleepLogEntry, 'id'> = {
             hours: hours,
-            date: new Date().toISOString(),
+            date: today.toISOString(),
         };
-        const storedSleep = localStorage.getItem('protracker-sleep-logs');
-        const sleepLogs: SleepLogEntry[] = storedSleep ? JSON.parse(storedSleep) : [];
-        
-        const todaysLogIndex = sleepLogs.findIndex(log => log.date.startsWith(todayStr));
-        let updatedSleepLogs;
-        if (todaysLogIndex > -1) {
-            sleepLogs[todaysLogIndex] = newSleepEntry;
-            updatedSleepLogs = [...sleepLogs];
-        } else {
-            updatedSleepLogs = [newSleepEntry, ...sleepLogs];
-        }
-        localStorage.setItem('protracker-sleep-logs', JSON.stringify(updatedSleepLogs));
+        const sleepLogsCollection = collection(db, 'users', user.uid, 'sleep-logs');
+        await addDoc(sleepLogsCollection, newSleepEntry);
+        sleepMessage = ` Sleep of ${hours} hours also logged.`;
     }
-
 
     toast({
       title: "Check-in Submitted!",
-      description: "Your daily check-in has been recorded." + (!isNaN(hours) && hours > 0 ? ` Sleep of ${hours} hours also logged.` : ""),
+      description: `Your daily check-in has been recorded.${sleepMessage}`,
     });
     setSleepHours('');
   };
-
 
   return (
     <Card className="transition-all duration-300 hover:shadow-lg">

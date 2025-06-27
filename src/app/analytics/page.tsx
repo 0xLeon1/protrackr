@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, doc, setDoc } from "firebase/firestore";
 
 interface DailyVolume {
   day: string;
@@ -66,112 +68,106 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (user) {
-      // Load Workout Logs
-      const storedLogs = localStorage.getItem('protracker-logs');
-      const workoutLogs: WorkoutLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
-      if (workoutLogs.length > 0) {
-        try {
-          const sortedLogs = [...workoutLogs].sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
-          setLogs(sortedLogs);
-          calculateDailyVolume(sortedLogs);
-        } catch (error) {
-          console.error("Failed to parse logs from localStorage", error);
+      const fetchData = async () => {
+        // --- Workout Logs ---
+        const workoutLogsCollection = collection(db, 'users', user.uid, 'logs');
+        const workoutLogsSnapshot = await getDocs(workoutLogsCollection);
+        const workoutLogs: WorkoutLogEntry[] = workoutLogsSnapshot.docs.map(doc => ({ ...doc.data(), logId: doc.id } as WorkoutLogEntry));
+        const sortedLogs = [...workoutLogs].sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
+        setLogs(sortedLogs);
+        calculateDailyVolume(sortedLogs);
+        
+        // --- Body Weight Logs ---
+        const bodyWeightCollection = collection(db, 'users', user.uid, 'bodyweight-logs');
+        const bodyWeightSnapshot = await getDocs(bodyWeightCollection);
+        let userBodyWeightLogs: BodyWeightLogEntry[];
+        if (bodyWeightSnapshot.empty) {
+            const exampleBodyWeightData: Omit<BodyWeightLogEntry, 'id'>[] = [
+                { weight: 185, date: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString() },
+                { weight: 184.5, date: new Date(new Date().setDate(new Date().getDate() - 21)).toISOString() },
+                { weight: 183, date: new Date(new Date().setDate(new Date().getDate() - 14)).toISOString() },
+                { weight: 182.5, date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString() },
+                { weight: 181, date: new Date().toISOString() },
+            ];
+            const newEntries: BodyWeightLogEntry[] = [];
+            for (const entry of exampleBodyWeightData) {
+              const newDocRef = await addDoc(bodyWeightCollection, entry);
+              newEntries.push({ ...entry, id: newDocRef.id });
+            }
+            userBodyWeightLogs = newEntries;
+        } else {
+            userBodyWeightLogs = bodyWeightSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as BodyWeightLogEntry));
         }
-      } else {
-          calculateDailyVolume([]);
-      }
-      
-      // Load Body Weight Logs
-      const storedBodyWeight = localStorage.getItem('protracker-bodyweight');
-      if (storedBodyWeight) {
-          try {
-              const parsedBodyWeight: BodyWeightLogEntry[] = JSON.parse(storedBodyWeight);
-              const sortedBodyWeight = parsedBodyWeight.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-              setBodyWeightLogs(sortedBodyWeight);
-          } catch (e) {
-              console.error("Failed to parse body weight logs", e);
-          }
-      } else {
-          const exampleBodyWeightData: BodyWeightLogEntry[] = [
-              { id: 'bw-ex1', weight: 185, date: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString() },
-              { id: 'bw-ex2', weight: 184.5, date: new Date(new Date().setDate(new Date().getDate() - 21)).toISOString() },
-              { id: 'bw-ex3', weight: 183, date: new Date(new Date().setDate(new Date().getDate() - 14)).toISOString() },
-              { id: 'bw-ex4', weight: 182.5, date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString() },
-              { id: 'bw-ex5', weight: 181, date: new Date().toISOString() },
-          ].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-          setBodyWeightLogs(exampleBodyWeightData);
-          localStorage.setItem('protracker-bodyweight', JSON.stringify(exampleBodyWeightData));
-      }
-      
-      // Load Sleep Logs
-      const storedSleep = localStorage.getItem('protracker-sleep-logs');
-      let sleepLogsData: SleepLogEntry[] = [];
-      if (storedSleep) {
-          try {
-              sleepLogsData = JSON.parse(storedSleep);
-              setSleepLogs(sleepLogsData);
-          } catch (e) {
-              console.error("Failed to parse sleep logs", e);
-          }
-      } else {
-          const exampleSleepData: SleepLogEntry[] = [
-              { id: 'sl-ex1', hours: 7.5, date: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString() },
-              { id: 'sl-ex2', hours: 8, date: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString() },
-              { id: 'sl-ex3', hours: 6, date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString() },
-              { id: 'sl-ex4', hours: 7, date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString() },
+        const sortedBodyWeight = userBodyWeightLogs.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+        setBodyWeightLogs(sortedBodyWeight);
+
+        // --- Sleep Logs ---
+        const sleepLogsCollection = collection(db, 'users', user.uid, 'sleep-logs');
+        const sleepLogsSnapshot = await getDocs(sleepLogsCollection);
+        let userSleepLogs: SleepLogEntry[];
+        if (sleepLogsSnapshot.empty) {
+          const exampleSleepData: Omit<SleepLogEntry, 'id'>[] = [
+              { hours: 7.5, date: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString() },
+              { hours: 8, date: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString() },
+              { hours: 6, date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString() },
+              { hours: 7, date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString() },
           ];
-          sleepLogsData = exampleSleepData;
-          setSleepLogs(exampleSleepData);
-          localStorage.setItem('protracker-sleep-logs', JSON.stringify(exampleSleepData));
-      }
-      calculateWeeklySleep(sleepLogsData);
+          const newEntries: SleepLogEntry[] = [];
+          for (const entry of exampleSleepData) {
+            const newDocRef = await addDoc(sleepLogsCollection, entry);
+            newEntries.push({ ...entry, id: newDocRef.id });
+          }
+          userSleepLogs = newEntries;
+        } else {
+          userSleepLogs = sleepLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SleepLogEntry));
+        }
+        setSleepLogs(userSleepLogs);
+        calculateWeeklySleep(userSleepLogs);
 
+        // --- Weekly Adherence Data ---
+        const today = new Date();
+        const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+        const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
 
-      // --- Weekly Adherence Data ---
-      const today = new Date();
-      const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
-      const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-
-      const getUniqueDaysInWeek = (logs: any[], dateKey: 'date' | 'completedAt'): number => {
-        if (!logs) return 0;
-        try {
+        const getUniqueDaysInWeek = (logs: any[], dateKey: 'date' | 'completedAt'): number => {
+          if (!logs) return 0;
           const uniqueDays = new Set<string>();
           logs.forEach(log => {
             const dateValue = log[dateKey];
             if (dateValue && typeof dateValue === 'string') {
-                const logDate = parseISO(dateValue);
-                if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
-                    uniqueDays.add(logDate.toISOString().split('T')[0]);
-                }
+              const logDate = parseISO(dateValue);
+              if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+                uniqueDays.add(logDate.toISOString().split('T')[0]);
+              }
             }
           });
           return uniqueDays.size;
-        } catch (error) {
-          console.error("Error processing logs for analytics:", error);
-          return 0;
-        }
+        };
+
+        // Check-ins
+        const checkinsCollection = collection(db, 'users', user.uid, 'checkins');
+        const checkinsSnapshot = await getDocs(checkinsCollection);
+        const checkinLogs: CheckinLogEntry[] = checkinsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CheckinLogEntry));
+        const checkinsCount = getUniqueDaysInWeek(checkinLogs, 'date');
+        setCheckinDays(checkinsCount);
+
+        // Workouts
+        const workoutsCount = getUniqueDaysInWeek(workoutLogs, 'completedAt');
+        setWorkoutDays(workoutsCount);
+        
+        // Nutrition
+        const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
+        const mealLogsSnapshot = await getDocs(mealLogsCollection);
+        const mealLogs: FoodLogEntry[] = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
+        const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
+        setNutritionDays(nutritionCount);
+
+        // Adherence
+        const totalActivities = checkinsCount + workoutsCount + nutritionCount;
+        const adherencePercentage = totalActivities > 0 ? Math.round((totalActivities / (3 * 7)) * 100) : 0;
+        setWeeklyAdherence(adherencePercentage);
       };
-
-      // Check-ins
-      const storedCheckins = localStorage.getItem('protracker-checkins');
-      const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
-      const checkinsCount = getUniqueDaysInWeek(checkinLogs, 'date');
-      setCheckinDays(checkinsCount);
-
-      // Workouts (using already loaded workoutLogs)
-      const workoutsCount = getUniqueDaysInWeek(workoutLogs, 'completedAt');
-      setWorkoutDays(workoutsCount);
-      
-      // Nutrition
-      const storedMealLogs = localStorage.getItem('protracker-meal-logs');
-      const mealLogs: FoodLogEntry[] = storedMealLogs ? JSON.parse(storedMealLogs) : [];
-      const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
-      setNutritionDays(nutritionCount);
-
-      // Adherence
-      const totalActivities = checkinsCount + workoutsCount + nutritionCount;
-      const adherencePercentage = totalActivities > 0 ? Math.round((totalActivities / (3 * 7)) * 100) : 0;
-      setWeeklyAdherence(adherencePercentage);
+      fetchData();
     }
   }, [user]);
 
@@ -249,17 +245,23 @@ export default function AnalyticsPage() {
     setWeeklySleep(sleepDataForWeek);
   };
 
-  const handleAddBodyWeight = () => {
+  const handleAddBodyWeight = async () => {
+    if (!user) return;
     const weight = parseFloat(currentWeight);
     if (!isNaN(weight) && weight > 0) {
-        const newEntry: BodyWeightLogEntry = {
-            id: `bw-${Date.now()}`,
+        const newEntryData = {
             weight: weight,
             date: new Date().toISOString(),
         };
-        const updatedLogs = [newEntry, ...bodyWeightLogs];
-        setBodyWeightLogs(updatedLogs);
-        localStorage.setItem('protracker-bodyweight', JSON.stringify(updatedLogs));
+        const bodyWeightCollection = collection(db, 'users', user.uid, 'bodyweight-logs');
+        const newDocRef = await addDoc(bodyWeightCollection, newEntryData);
+        
+        const newEntry: BodyWeightLogEntry = {
+            ...newEntryData,
+            id: newDocRef.id,
+        };
+        
+        setBodyWeightLogs(prev => [newEntry, ...prev]);
         setCurrentWeight('');
     }
   };

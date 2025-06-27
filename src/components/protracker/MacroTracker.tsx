@@ -18,6 +18,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 interface MacroTrackerProps {
     currentIntake: {
@@ -44,19 +47,27 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
   const [goals, setGoals] = useState<MacroGoals>(defaultGoals);
   const [tempGoals, setTempGoals] = useState<TempMacroGoals>(defaultGoals);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
-    const storedGoals = localStorage.getItem('protracker-macro-goals');
-    if (storedGoals) {
-      try {
-        const parsedGoals = JSON.parse(storedGoals);
-        setGoals(parsedGoals);
-        setTempGoals(parsedGoals);
-      } catch (e) {
-        console.error("Failed to parse macro goals from localStorage", e);
-      }
+    if (user) {
+      const fetchGoals = async () => {
+        const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
+        const docSnap = await getDoc(goalsDocRef);
+        if (docSnap.exists()) {
+          const fetchedGoals = docSnap.data() as MacroGoals;
+          setGoals(fetchedGoals);
+          setTempGoals(fetchedGoals);
+        } else {
+          // If no goals are set, use defaults and save them for the new user
+          await setDoc(goalsDocRef, defaultGoals);
+          setGoals(defaultGoals);
+          setTempGoals(defaultGoals);
+        }
+      };
+      fetchGoals();
     }
-  }, []);
+  }, [user]);
 
   // When opening the dialog, reset tempGoals to the currently saved goals
   useEffect(() => {
@@ -87,7 +98,8 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
     }
   };
   
-  const handleSaveGoals = () => {
+  const handleSaveGoals = async () => {
+    if (!user) return;
     // If a field is empty, default it to 0 before saving.
     const finalizedGoals: MacroGoals = {
         calories: Number(tempGoals.calories) || 0,
@@ -95,8 +107,11 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
         carbs: Number(tempGoals.carbs) || 0,
         fats: Number(tempGoals.fats) || 0,
     };
+    
+    const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
+    await setDoc(goalsDocRef, finalizedGoals);
+
     setGoals(finalizedGoals);
-    localStorage.setItem('protracker-macro-goals', JSON.stringify(finalizedGoals));
     setIsDialogOpen(false);
   };
   

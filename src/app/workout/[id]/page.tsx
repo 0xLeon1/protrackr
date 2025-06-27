@@ -10,6 +10,8 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, addDoc, query, where, orderBy, limit } from 'firebase/firestore';
 
 export default function ActiveWorkoutPage() {
   const params = useParams();
@@ -30,58 +32,61 @@ export default function ActiveWorkoutPage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (user && typeof window !== 'undefined' && workoutId) {
-      // Load Programs
-      const storedPrograms = localStorage.getItem('protracker-programs');
-      if (storedPrograms) {
-        try {
-          const programs: Program[] = JSON.parse(storedPrograms);
-          let foundWorkout: Workout | null = null;
-          let foundProgramName: string = '';
+    if (user && workoutId) {
+      const fetchWorkoutData = async () => {
+        setIsLoading(true);
+        // Load Programs to find the workout
+        const programsCollection = collection(db, 'users', user.uid, 'programs');
+        const programsSnapshot = await getDocs(programsCollection);
+        const programs: Program[] = programsSnapshot.docs.map(doc => doc.data() as Program);
+        
+        let foundWorkout: Workout | null = null;
+        let foundProgramName: string = '';
 
-          for (const program of programs) {
-            const matchingWorkout = program.workouts.find(w => w.id === workoutId);
-            if (matchingWorkout) {
-              foundWorkout = matchingWorkout;
-              foundProgramName = program.name;
-              break;
-            }
+        for (const program of programs) {
+          const matchingWorkout = program.workouts.find(w => w.id === workoutId);
+          if (matchingWorkout) {
+            foundWorkout = matchingWorkout;
+            foundProgramName = program.name;
+            break;
           }
-          
-          if (foundWorkout) {
-            const workoutWithPerformance = {
-              ...foundWorkout,
-              exercises: foundWorkout.exercises.map(ex => ({
-                ...ex,
-                performance: Array.from({ length: ex.sets as number }, (_, i) => ({
-                  id: `set-${ex.id}-${i}`,
-                  reps: ex.reps,
-                  weight: ex.weight,
-                  completed: false,
-                })),
-              })),
-            };
-            setWorkout(workoutWithPerformance);
-            setProgramName(foundProgramName);
-
-            // Load History to find the last completed session for this workout
-            const storedLogs = localStorage.getItem('protracker-logs');
-            if (storedLogs) {
-                const logs: WorkoutLogEntry[] = JSON.parse(storedLogs);
-                const relevantLogs = logs
-                    .filter(log => log.workoutId === workoutId)
-                    .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
-                
-                if (relevantLogs.length > 0) {
-                    setLastWorkout(relevantLogs[0].workoutSnapshot);
-                }
-            }
-          }
-        } catch (error) {
-          console.error("Failed to parse data from localStorage", error);
         }
-      }
-      setIsLoading(false);
+        
+        if (foundWorkout) {
+          const workoutWithPerformance = {
+            ...foundWorkout,
+            exercises: foundWorkout.exercises.map(ex => ({
+              ...ex,
+              performance: Array.from({ length: ex.sets as number }, (_, i) => ({
+                id: `set-${ex.id}-${i}`,
+                reps: ex.reps,
+                weight: ex.weight,
+                completed: false,
+              })),
+            })),
+          };
+          setWorkout(workoutWithPerformance);
+          setProgramName(foundProgramName);
+
+          // Load History to find the last completed session for this workout
+          const logsCollection = collection(db, 'users', user.uid, 'logs');
+          const q = query(
+            logsCollection, 
+            where("workoutId", "==", workoutId), 
+            orderBy("completedAt", "desc"),
+            limit(1)
+          );
+          const logSnapshot = await getDocs(q);
+
+          if (!logSnapshot.empty) {
+            const lastLog = logSnapshot.docs[0].data() as WorkoutLogEntry;
+            setLastWorkout(lastLog.workoutSnapshot);
+          }
+        }
+        setIsLoading(false);
+      };
+      
+      fetchWorkoutData();
     }
   }, [workoutId, user]);
   
@@ -89,23 +94,18 @@ export default function ActiveWorkoutPage() {
     setWorkout(updatedWorkout);
   };
   
-  const handleFinishWorkout = () => {
-    if (!workout) return;
+  const handleFinishWorkout = async () => {
+    if (!workout || !user) return;
     
     // Create a new log entry
-    const newLog: WorkoutLogEntry = {
-      logId: `log-${Date.now()}`,
+    const newLog: Omit<WorkoutLogEntry, 'logId'> = {
       workoutId,
       programName,
       completedAt: new Date().toISOString(),
       workoutSnapshot: workout,
     };
 
-    // Retrieve existing logs, add the new one, and save back to localStorage
-    const storedLogs = localStorage.getItem('protracker-logs');
-    const logs: WorkoutLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
-    logs.push(newLog);
-    localStorage.setItem('protracker-logs', JSON.stringify(logs));
+    await addDoc(collection(db, 'users', user.uid, 'logs'), newLog);
 
     toast({
         title: "Workout Complete!",

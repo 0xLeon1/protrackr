@@ -36,6 +36,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 const initialPrograms: Program[] = [
   {
@@ -95,7 +97,6 @@ export default function ProgramsPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
 
-  // State for the rename dialog
   const [itemToRename, setItemToRename] = useState<{ type: 'program' | 'workout'; id: string; programId?: string; name: string; } | null>(null);
   const [newName, setNewName] = useState('');
 
@@ -107,98 +108,111 @@ export default function ProgramsPage() {
 
   useEffect(() => {
     if (user) {
-      const storedPrograms = localStorage.getItem('protracker-programs');
-      if (storedPrograms) {
-          try {
-              setPrograms(JSON.parse(storedPrograms));
-          } catch (error) {
-              console.error("Failed to parse programs from localStorage", error);
-              setPrograms(initialPrograms);
-          }
-      } else {
+      const fetchPrograms = async () => {
+        const programsCollection = collection(db, 'users', user.uid, 'programs');
+        const querySnapshot = await getDocs(programsCollection);
+        if (querySnapshot.empty) {
+          const batch = writeBatch(db);
+          initialPrograms.forEach(program => {
+            const programRef = doc(db, 'users', user.uid, 'programs', program.id);
+            batch.set(programRef, program);
+          });
+          await batch.commit();
           setPrograms(initialPrograms);
-      }
+        } else {
+          const userPrograms = querySnapshot.docs.map(doc => ({ ...doc.data() } as Program));
+          setPrograms(userPrograms);
+        }
+      };
+      fetchPrograms();
     }
   }, [user]);
 
-  const updatePrograms = (updatedPrograms: Program[]) => {
-    setPrograms(updatedPrograms);
-    localStorage.setItem('protracker-programs', JSON.stringify(updatedPrograms));
-  };
-
-  const handleAddProgram = () => {
-    if (newProgramName.trim() === '' || !programs) return;
+  const handleAddProgram = async () => {
+    if (newProgramName.trim() === '' || !programs || !user) return;
     const newProgram: Program = {
       id: `prog-${Date.now()}`,
       name: newProgramName,
       workouts: []
     };
-    updatePrograms([...programs, newProgram]);
+    
+    const programRef = doc(db, 'users', user.uid, 'programs', newProgram.id);
+    await setDoc(programRef, newProgram);
+    
+    setPrograms([...programs, newProgram]);
     setNewProgramName('');
   };
 
-  const handleDeleteProgram = (programId: string) => {
-    if (!programs) return;
-    updatePrograms(programs.filter(p => p.id !== programId));
+  const handleDeleteProgram = async (programId: string) => {
+    if (!programs || !user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'programs', programId));
+    setPrograms(programs.filter(p => p.id !== programId));
   };
 
-  const handleProgramNameChange = (programId: string, name: string) => {
-    if (!programs) return;
+  const handleProgramNameChange = async (programId: string, name: string) => {
+    if (!programs || !user) return;
+    const programRef = doc(db, 'users', user.uid, 'programs', programId);
+    await updateDoc(programRef, { name });
     const newPrograms = programs.map(p => p.id === programId ? {...p, name} : p);
-    updatePrograms(newPrograms);
+    setPrograms(newPrograms);
   };
   
-  const handleAddWorkout = (programId: string) => {
-    if (!programs) return;
+  const handleAddWorkout = async (programId: string) => {
+    if (!programs || !user) return;
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+    
     const newWorkout: Workout = {
       id: `work-${Date.now()}`,
       name: 'New Workout',
       exercises: []
     };
-    const newPrograms = programs.map(p => {
-      if (p.id === programId) {
-        return { ...p, workouts: [...p.workouts, newWorkout] };
-      }
-      return p;
-    });
-    updatePrograms(newPrograms);
+    
+    const updatedWorkouts = [...program.workouts, newWorkout];
+    const programRef = doc(db, 'users', user.uid, 'programs', programId);
+    await updateDoc(programRef, { workouts: updatedWorkouts });
+
+    const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
+    setPrograms(newPrograms);
   };
   
-  const handleDeleteWorkout = (programId: string, workoutId: string) => {
-    if (!programs) return;
-     const newPrograms = programs.map(p => {
-      if (p.id === programId) {
-        return { ...p, workouts: p.workouts.filter(w => w.id !== workoutId) };
-      }
-      return p;
-    });
-    updatePrograms(newPrograms);
+  const handleDeleteWorkout = async (programId: string, workoutId: string) => {
+    if (!programs || !user) return;
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+    
+    const updatedWorkouts = program.workouts.filter(w => w.id !== workoutId);
+    const programRef = doc(db, 'users', user.uid, 'programs', programId);
+    await updateDoc(programRef, { workouts: updatedWorkouts });
+
+    const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
+    setPrograms(newPrograms);
   };
 
-  const handleWorkoutNameChange = (programId: string, workoutId: string, name:string) => {
-    if (!programs) return;
-    const newPrograms = programs.map(p => {
-        if(p.id === programId) {
-            const newWorkouts = p.workouts.map(w => w.id === workoutId ? {...w, name} : w);
-            return {...p, workouts: newWorkouts};
-        }
-        return p;
-    })
-    updatePrograms(newPrograms);
+  const handleWorkoutNameChange = async (programId: string, workoutId: string, name:string) => {
+    if (!programs || !user) return;
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+    
+    const updatedWorkouts = program.workouts.map(w => w.id === workoutId ? { ...w, name } : w);
+    const programRef = doc(db, 'users', user.uid, 'programs', programId);
+    await updateDoc(programRef, { workouts: updatedWorkouts });
+
+    const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
+    setPrograms(newPrograms);
   };
 
-  const handleWorkoutChange = (programId: string, updatedWorkout: Workout) => {
-    if (!programs) return;
-    const newPrograms = programs.map(p => {
-      if (p.id === programId) {
-        return { 
-          ...p, 
-          workouts: p.workouts.map(w => w.id === updatedWorkout.id ? updatedWorkout : w)
-        };
-      }
-      return p;
-    });
-    updatePrograms(newPrograms);
+  const handleWorkoutChange = async (programId: string, updatedWorkout: Workout) => {
+    if (!programs || !user) return;
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+    
+    const updatedWorkouts = program.workouts.map(w => w.id === updatedWorkout.id ? updatedWorkout : w);
+    const programRef = doc(db, 'users', user.uid, 'programs', programId);
+    await updateDoc(programRef, { workouts: updatedWorkouts });
+
+    const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
+    setPrograms(newPrograms);
   };
 
   const handleStartWorkout = (workoutId: string) => {
@@ -210,13 +224,13 @@ export default function ProgramsPage() {
     setNewName(item.name);
   };
 
-  const handleSaveRename = () => {
+  const handleSaveRename = async () => {
     if (!itemToRename || !newName.trim()) return;
 
     if (itemToRename.type === 'program') {
-      handleProgramNameChange(itemToRename.id, newName);
+      await handleProgramNameChange(itemToRename.id, newName);
     } else if (itemToRename.type === 'workout' && itemToRename.programId) {
-      handleWorkoutNameChange(itemToRename.programId, itemToRename.id, newName);
+      await handleWorkoutNameChange(itemToRename.programId, itemToRename.id, newName);
     }
     setItemToRename(null);
     setNewName('');
