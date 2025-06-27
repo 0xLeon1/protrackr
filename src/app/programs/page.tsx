@@ -93,24 +93,26 @@ const initialPrograms: Program[] = [
 ];
 
 export default function ProgramsPage() {
-  const [programs, setPrograms] = useState<Program[] | null>(null);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [pageIsLoading, setPageIsLoading] = useState(true);
   const [newProgramName, setNewProgramName] = useState('');
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [itemToRename, setItemToRename] = useState<{ type: 'program' | 'workout'; id: string; programId?: string; name: string; } | null>(null);
   const [newName, setNewName] = useState('');
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     if (user) {
       const fetchPrograms = async () => {
+        setPageIsLoading(true);
         try {
           const programsCollection = collection(db, 'users', user.uid, 'programs');
           const querySnapshot = await getDocs(programsCollection);
@@ -134,14 +136,18 @@ export default function ProgramsPage() {
               variant: "destructive",
             });
             setPrograms([]);
+        } finally {
+            setPageIsLoading(false);
         }
       };
       fetchPrograms();
+    } else if (!authLoading) {
+      setPageIsLoading(false);
     }
-  }, [user, toast]);
+  }, [user, authLoading, toast]);
 
   const handleAddProgram = async () => {
-    if (newProgramName.trim() === '' || !programs || !user) return;
+    if (newProgramName.trim() === '' || !user) return;
     const newProgram: Program = {
       id: `prog-${Date.now()}`,
       name: newProgramName,
@@ -156,13 +162,13 @@ export default function ProgramsPage() {
   };
 
   const handleDeleteProgram = async (programId: string) => {
-    if (!programs || !user) return;
+    if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'programs', programId));
     setPrograms(programs.filter(p => p.id !== programId));
   };
 
   const handleProgramNameChange = async (programId: string, name: string) => {
-    if (!programs || !user) return;
+    if (!user) return;
     const programRef = doc(db, 'users', user.uid, 'programs', programId);
     await updateDoc(programRef, { name });
     const newPrograms = programs.map(p => p.id === programId ? {...p, name} : p);
@@ -170,7 +176,7 @@ export default function ProgramsPage() {
   };
   
   const handleAddWorkout = async (programId: string) => {
-    if (!programs || !user) return;
+    if (!user) return;
     const program = programs.find(p => p.id === programId);
     if (!program) return;
     
@@ -189,7 +195,7 @@ export default function ProgramsPage() {
   };
   
   const handleDeleteWorkout = async (programId: string, workoutId: string) => {
-    if (!programs || !user) return;
+    if (!user) return;
     const program = programs.find(p => p.id === programId);
     if (!program) return;
     
@@ -202,7 +208,7 @@ export default function ProgramsPage() {
   };
 
   const handleWorkoutNameChange = async (programId: string, workoutId: string, name:string) => {
-    if (!programs || !user) return;
+    if (!user) return;
     const program = programs.find(p => p.id === programId);
     if (!program) return;
     
@@ -215,7 +221,7 @@ export default function ProgramsPage() {
   };
 
   const handleWorkoutChange = async (programId: string, updatedWorkout: Workout) => {
-    if (!programs || !user) return;
+    if (!user) return;
     const program = programs.find(p => p.id === programId);
     if (!program) return;
     
@@ -249,7 +255,7 @@ export default function ProgramsPage() {
   };
 
 
-  if (!programs || loading) {
+  if (authLoading || pageIsLoading) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
