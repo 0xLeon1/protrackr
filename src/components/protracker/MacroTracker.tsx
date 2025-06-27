@@ -52,7 +52,28 @@ export default function MacroTracker() {
     }
   }, []);
 
-  const handleGoalChange = (field: keyof MacroGoals, value: string) => {
+  // When opening the dialog, reset tempGoals to the currently saved goals
+  useEffect(() => {
+    if (isDialogOpen) {
+      setTempGoals(goals);
+    }
+  }, [isDialogOpen, goals]);
+
+  // Automatically calculate calories when macros change
+  useEffect(() => {
+    const p = Number(tempGoals.protein) || 0;
+    const c = Number(tempGoals.carbs) || 0;
+    const f = Number(tempGoals.fats) || 0;
+    const calculatedCalories = (p * 4) + (c * 4) + (f * 9);
+    
+    // Prevents updating state for the initial render if everything is default
+    if (tempGoals.calories !== calculatedCalories) {
+        setTempGoals(prev => ({ ...prev, calories: calculatedCalories }));
+    }
+  }, [tempGoals.protein, tempGoals.carbs, tempGoals.fats]);
+
+
+  const handleGoalChange = (field: keyof Omit<MacroGoals, 'calories'>, value: string) => {
     if (value === "") {
       setTempGoals(prev => ({ ...prev, [field]: "" }));
       return;
@@ -75,13 +96,6 @@ export default function MacroTracker() {
     setIsDialogOpen(false);
   };
   
-  // When opening the dialog, reset tempGoals to the currently saved goals
-  useEffect(() => {
-    if (isDialogOpen) {
-      setTempGoals(goals);
-    }
-  }, [isDialogOpen, goals]);
-
   const getProgressValue = (current: number, goal: number) => {
     if (goal === 0) return 0;
     return (current / goal) * 100;
@@ -106,14 +120,10 @@ export default function MacroTracker() {
                     <DialogHeader>
                         <DialogTitle>Set Your Macro Goals</DialogTitle>
                         <DialogDescription>
-                            Define your daily targets for calories and macronutrients.
+                            Define your daily targets. Calories are calculated automatically.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="calories-goal" className="text-right">Calories</Label>
-                            <Input id="calories-goal" type="number" value={tempGoals.calories} onChange={(e) => handleGoalChange('calories', e.target.value)} className="col-span-3" />
-                        </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="protein-goal" className="text-right">Protein</Label>
                             <Input id="protein-goal" type="number" value={tempGoals.protein} onChange={(e) => handleGoalChange('protein', e.target.value)} className="col-span-3" />
@@ -125,6 +135,10 @@ export default function MacroTracker() {
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="fats-goal" className="text-right">Fats</Label>
                             <Input id="fats-goal" type="number" value={tempGoals.fats} onChange={(e) => handleGoalChange('fats', e.target.value)} className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="calories-goal" className="text-right">Calories</Label>
+                            <Input id="calories-goal" type="number" value={tempGoals.calories} className="col-span-3 bg-muted" readOnly />
                         </div>
                     </div>
                     <DialogFooter>
