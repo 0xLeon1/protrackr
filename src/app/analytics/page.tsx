@@ -2,14 +2,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { WorkoutLogEntry } from "@/types";
+import type { WorkoutLogEntry, BodyWeightLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { History, TrendingUp } from "lucide-react";
+import { History, TrendingUp, Scale } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 interface DailyVolume {
   day: string;
@@ -36,8 +39,11 @@ const renderCustomizedLabel = (props: any) => {
 export default function AnalyticsPage() {
   const [logs, setLogs] = useState<WorkoutLogEntry[]>([]);
   const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
+  const [bodyWeightLogs, setBodyWeightLogs] = useState<BodyWeightLogEntry[]>([]);
+  const [currentWeight, setCurrentWeight] = useState('');
 
   useEffect(() => {
+    // Load Workout Logs
     const storedLogs = localStorage.getItem('protracker-logs');
     if (storedLogs) {
       try {
@@ -48,6 +54,18 @@ export default function AnalyticsPage() {
       } catch (error) {
         console.error("Failed to parse logs from localStorage", error);
       }
+    }
+    
+    // Load Body Weight Logs
+    const storedBodyWeight = localStorage.getItem('protracker-bodyweight');
+    if (storedBodyWeight) {
+        try {
+            const parsedBodyWeight: BodyWeightLogEntry[] = JSON.parse(storedBodyWeight);
+            const sortedBodyWeight = parsedBodyWeight.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+            setBodyWeightLogs(sortedBodyWeight);
+        } catch (e) {
+            console.error("Failed to parse body weight logs", e);
+        }
     }
   }, []);
 
@@ -87,6 +105,21 @@ export default function AnalyticsPage() {
     
     setDailyVolume(volumeDataForWeek);
   };
+
+  const handleAddBodyWeight = () => {
+    const weight = parseFloat(currentWeight);
+    if (!isNaN(weight) && weight > 0) {
+        const newEntry: BodyWeightLogEntry = {
+            id: `bw-${Date.now()}`,
+            weight: weight,
+            date: new Date().toISOString(),
+        };
+        const updatedLogs = [newEntry, ...bodyWeightLogs];
+        setBodyWeightLogs(updatedLogs);
+        localStorage.setItem('protracker-bodyweight', JSON.stringify(updatedLogs));
+        setCurrentWeight('');
+    }
+  };
   
   const chartConfig = {
     volume: {
@@ -104,45 +137,82 @@ export default function AnalyticsPage() {
         <p className="text-muted-foreground">Your performance overview.</p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>This Week's Volume</CardTitle>
-          <CardDescription>Your total lifted volume for the current week.</CardDescription>
-        </CardHeader>
-        <CardContent className="pl-2">
-          {hasLiftedThisWeek ? (
-             <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
-              <BarChart accessibilityLayer data={dailyVolume} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
-                <XAxis
-                  dataKey="day"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                 <YAxis hide domain={[0, 'dataMax + 500']}/>
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent 
-                      formatter={(value) => `${Number(value).toLocaleString()} lbs`}
-                      indicator="dot"
-                      nameKey="volume"
-                      />}
-                  />
-                <Bar dataKey="volume" fill="var(--color-volume)" radius={[8, 8, 0, 0]}>
-                    <LabelList dataKey="volume" content={renderCustomizedLabel} />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-12 text-center">
-              <TrendingUp className="w-16 h-16 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Complete a workout to see your volume chart.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+            <CardHeader>
+            <CardTitle>This Week's Volume</CardTitle>
+            <CardDescription>Your total lifted volume for the current week.</CardDescription>
+            </CardHeader>
+            <CardContent className="pl-2">
+            {hasLiftedThisWeek ? (
+                <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
+                <BarChart accessibilityLayer data={dailyVolume} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
+                    <XAxis
+                    dataKey="day"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    />
+                    <YAxis hide domain={[0, 'dataMax + 500']}/>
+                    <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent 
+                        formatter={(value) => `${Number(value).toLocaleString()} lbs`}
+                        indicator="dot"
+                        nameKey="volume"
+                        />}
+                    />
+                    <Bar dataKey="volume" fill="var(--color-volume)" radius={[8, 8, 0, 0]}>
+                        <LabelList dataKey="volume" content={renderCustomizedLabel} />
+                    </Bar>
+                </BarChart>
+                </ChartContainer>
+            ) : (
+                <div className="flex flex-col items-center justify-center p-12 text-center h-[250px]">
+                <TrendingUp className="w-16 h-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                    Complete a workout to see your volume chart.
+                </p>
+                </div>
+            )}
+            </CardContent>
+        </Card>
+        
+        <Card>
+            <CardHeader>
+                <CardTitle>Body Weight</CardTitle>
+                <CardDescription>Log your weight to track changes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex gap-2">
+                    <Input 
+                        type="number"
+                        placeholder="Enter weight in lbs"
+                        value={currentWeight}
+                        onChange={(e) => setCurrentWeight(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddBodyWeight()}
+                    />
+                    <Button onClick={handleAddBodyWeight}>Save</Button>
+                </div>
+                <Separator className="my-4" />
+                <div className="space-y-3 max-h-[190px] overflow-y-auto pr-2">
+                    {bodyWeightLogs.length > 0 ? (
+                        bodyWeightLogs.map(log => (
+                            <div key={log.id} className="flex justify-between items-center text-sm bg-muted/50 p-2 rounded-md">
+                                <p><span className="font-semibold">{log.weight}</span> lbs</p>
+                                <p className="text-muted-foreground">{format(parseISO(log.date), 'MMM d, yyyy')}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="flex flex-col items-center justify-center pt-8 text-center">
+                            <Scale className="w-12 h-12 text-muted-foreground mb-4" />
+                            <p className="text-sm text-muted-foreground">No weight entries yet.</p>
+                        </div>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+      </div>
       
       <Card>
         <CardHeader>

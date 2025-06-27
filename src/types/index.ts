@@ -34,3 +34,9 @@ export type WorkoutLogEntry = {
     completedAt: string;
     workoutSnapshot: Workout;
 };
+
+export type BodyWeightLogEntry = {
+  id: string;
+  weight: number;
+  date: string; // ISO String
+};
