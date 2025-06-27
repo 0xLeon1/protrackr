@@ -45,9 +45,9 @@ export type BodyWeightLogEntry = {
 export type CheckinLogEntry = {
   id: string;
   date: string; // ISO String
-  energy?: number;
-  trained?: boolean;
-  hitMacros?: boolean;
+  energy: number;
+  trained: boolean;
+  hitMacros: boolean;
 };
 
 export type SleepLogEntry = {

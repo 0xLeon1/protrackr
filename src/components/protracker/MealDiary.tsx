@@ -59,10 +59,12 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     
     // Debounced search for user input
     const handler = setTimeout(async () => {
-      setIsSearching(true);
-      const results = await searchFoods(searchQuery);
-      setSearchResults(results);
-      setIsSearching(false);
+      if (view === 'search') {
+        setIsSearching(true);
+        const results = await searchFoods(searchQuery);
+        setSearchResults(results);
+        setIsSearching(false);
+      }
     }, 300);
 
     return () => clearTimeout(handler);
@@ -112,7 +114,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     setIsDialogOpen(false);
   };
 
-  const handleCustomFoodChange = (field: keyof typeof customFood, value: string) => {
+  const handleCustomFoodChange = (field: keyof Omit<typeof customFood, 'name'>, value: string) => {
     setCustomFood(prev => ({ ...prev, [field]: value.replace(/[^0-9.]/g, '') }));
   };
   
@@ -153,7 +155,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       fats: acc.fats + meal.fats,
     }), { calories: 0, protein: 0, carbs: 0, fats: 0 });
 
-    return `${Math.round(totals.calories)} kcal, ${Math.round(totals.protein)}g protein, ${Math.round(totals.carbs)}g carbs, ${Math.round(totals.fats)}g fat`;
+    return `${Math.round(totals.calories)} kcal, ${Math.round(totals.protein)}g P, ${Math.round(totals.carbs)}g C, ${Math.round(totals.fats)}g F`;
   };
 
   const renderDialogContent = () => {
@@ -302,7 +304,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
               <AccordionTrigger className="px-4 hover:no-underline">
                 <div className="flex items-center gap-4">
                   <DialogTrigger asChild onClick={(e) => { e.stopPropagation(); handleOpenDialog(mealType); }}>
-                    <Button variant="ghost" size="icon" className="text-green-500 hover:text-green-600 rounded-full">
+                    <Button variant="ghost" size="icon" className="text-accent hover:text-accent/90 rounded-full">
                       <PlusCircle className="w-6 h-6" />
                     </Button>
                   </DialogTrigger>
