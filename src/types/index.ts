@@ -95,4 +95,5 @@ export interface FoodDataItem {
     servingQty?: number;
     servingUnit?: string;
     servingWeightGrams?: number;
+    caloriesPerServing?: number;
 }

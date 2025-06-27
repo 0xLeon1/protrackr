@@ -78,6 +78,7 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
                 servingQty: food.serving_qty,
                 servingUnit: food.serving_unit,
                 servingWeightGrams: food.serving_weight_grams,
+                caloriesPerServing: food.nf_calories ? Math.round(food.nf_calories) : undefined,
             };
             // Normalize nutrients to per 100g if possible
             if (food.serving_weight_grams && food.serving_weight_grams > 0) {
@@ -88,7 +89,7 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
                 item.fats = parseFloat(((food.nf_total_fat || 0) * ratio).toFixed(1));
             }
             return item;
-        }).filter(item => item.calories); // Only include items where we could calculate calories
+        }).filter(item => typeof item.calories !== 'undefined'); // Only include items where we could calculate calories
 
         const commonResults: FoodDataItem[] = (data.common || []).map(food => ({
             id: food.food_name, // Use name as ID for the details fetch
@@ -155,6 +156,8 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         const foodDetails = data.foods[0];
         
         const ratio = foodDetails.serving_weight_grams ? 100 / foodDetails.serving_weight_grams : 0;
+        
+        const caloriesPerServing = foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : undefined;
 
         return {
             id: foodDetails.food_name,
@@ -164,6 +167,7 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
             servingQty: foodDetails.serving_qty,
             servingUnit: foodDetails.serving_unit,
             servingWeightGrams: foodDetails.serving_weight_grams,
+            caloriesPerServing: caloriesPerServing,
             // Normalize and store nutrients per 100g
             calories: ratio ? Math.round(foodDetails.nf_calories * ratio) : foodDetails.nf_calories,
             protein: ratio ? parseFloat((foodDetails.nf_protein * ratio).toFixed(1)) : foodDetails.nf_protein,

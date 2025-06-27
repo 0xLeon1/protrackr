@@ -76,7 +76,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
   };
 
   const addRecentFood = (userId: string, food: FoodDataItem) => {
-      if (!food.name || !food.calories) return; // Don't save incomplete items
+      if (!food.name || typeof food.calories === 'undefined') return; // Don't save incomplete items
       const key = `${RECENT_FOODS_KEY_PREFIX}${userId}`;
       let recents = getRecentFoods(userId);
       
@@ -430,14 +430,33 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         <ScrollArea className="h-60">
           {searchResults.length > 0 ? (
             <div className="space-y-2">
-              {searchResults.map(food => (
-                <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
-                  <p>{capitalizeWords(food.name)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {food.dataType === 'branded' && food.brandName ? capitalizeWords(food.brandName) : 'Common Food'}
-                  </p>
-                </button>
-              ))}
+              {searchResults.map(food => {
+                const subtitleParts = [];
+                if (food.dataType === 'branded') {
+                    if (food.brandName) {
+                        subtitleParts.push(capitalizeWords(food.brandName));
+                    }
+                    if (food.servingQty && food.servingUnit) {
+                        let servingString = `${food.servingQty} ${capitalizeWords(food.servingUnit)}`;
+                        if (food.servingWeightGrams) {
+                            servingString += ` (${food.servingWeightGrams}g)`;
+                        }
+                        subtitleParts.push(servingString);
+                    }
+                    if (typeof food.caloriesPerServing !== 'undefined') {
+                        subtitleParts.push(`${food.caloriesPerServing} kcal`);
+                    }
+                }
+
+                return (
+                  <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
+                    <p>{capitalizeWords(food.name)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {food.dataType === 'branded' && subtitleParts.length > 0 ? subtitleParts.join(' - ') : 'Common Food'}
+                    </p>
+                  </button>
+                )
+              })}
             </div>
           ) : (
             <p className="text-center text-sm text-muted-foreground py-4">
