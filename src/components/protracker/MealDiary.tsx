@@ -155,24 +155,12 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         <Accordion type="multiple" className="w-full" defaultValue={['Breakfast', 'Lunch']}>
           {MEAL_TYPES.map(mealType => (
             <AccordionItem value={mealType} key={mealType} className="border-b last:border-b-0">
-               <div className="flex w-full items-center p-4">
-                  <AccordionTrigger className="flex-1 p-0 hover:no-underline text-left">
-                      <div className="flex flex-col">
-                        <span className="text-lg font-semibold">{mealType}</span>
-                        <span className="text-xs text-muted-foreground">{macroSummary(mealType)}</span>
-                      </div>
-                  </AccordionTrigger>
-                  <DialogTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-accent hover:text-accent/90 rounded-full shrink-0 ml-4" 
-                      onClick={() => handleOpenDialog(mealType)}
-                    >
-                      <PlusCircle className="w-6 h-6" />
-                    </Button>
-                  </DialogTrigger>
-                </div>
+               <AccordionTrigger className="flex w-full items-center p-4 hover:no-underline text-left">
+                  <div className="flex-1">
+                    <span className="text-lg font-semibold">{mealType}</span>
+                    <p className="text-xs text-muted-foreground">{macroSummary(mealType)}</p>
+                  </div>
+              </AccordionTrigger>
               <AccordionContent className="p-0">
                 <Separator />
                 <div className="p-4 space-y-2">
@@ -198,6 +186,16 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                   ) : (
                     <p className="text-sm text-center text-muted-foreground py-2">No food logged for {mealType}.</p>
                   )}
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-4"
+                      onClick={() => handleOpenDialog(mealType)}
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Add Food
+                    </Button>
+                  </DialogTrigger>
                 </div>
               </AccordionContent>
             </AccordionItem>
