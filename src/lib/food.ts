@@ -1,10 +1,11 @@
 'use server';
 
 import type { FoodDataItem, Serving } from "@/types";
+import { GRAMS_PER_OUNCE } from "./constants";
 
 // --- FatSecret API Implementation ---
 
-const FATSECRET_CREDENTIALS_ERROR = "FatSecret API is not configured. Please add FATSECRET_CLIENT_ID and FATSECRET_CLIENT_SECRET to your .env file.";
+const FATSECRET_CREDENTIALS_ERROR = "FatSecret API is not configured. Please add NEXT_PUBLIC_FATSECRET_CLIENT_ID and NEXT_PUBLIC_FATSECRET_CLIENT_SECRET to your .env file.";
 
 interface FatSecretToken {
   access_token: string;
@@ -15,8 +16,8 @@ interface FatSecretToken {
 let token: FatSecretToken | null = null;
 
 function areCredentialsMissing(): boolean {
-    const clientId = process.env.FATSECRET_CLIENT_ID;
-    const clientSecret = process.env.FATSECRET_CLIENT_SECRET;
+    const clientId = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_ID;
+    const clientSecret = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_SECRET;
     return !clientId || !clientSecret || clientId === "YOUR_CLIENT_ID_HERE" || clientSecret === "YOUR_SECRET_KEY_HERE";
 }
 
@@ -25,8 +26,8 @@ async function getFatSecretAccessToken(): Promise<string> {
     if (areCredentialsMissing()) {
         throw new Error(FATSECRET_CREDENTIALS_ERROR);
     }
-    const clientId = process.env.FATSECRET_CLIENT_ID;
-    const clientSecret = process.env.FATSECRET_CLIENT_SECRET;
+    const clientId = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_ID;
+    const clientSecret = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_SECRET;
 
     // Check if we have a valid, non-expired token
     if (token && (token.retrieved_at + token.expires_in) > (Date.now() / 1000 + 60)) {
