@@ -85,6 +85,7 @@ export interface FoodDataItem {
     id: string;
     name: string;
     brandName?: string;
+    description?: string;
     // Macros per 100g
     calories?: number;
     protein?: number;

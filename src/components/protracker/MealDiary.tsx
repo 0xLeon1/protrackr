@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { PlusCircle, Trash2, Loader2, ArrowLeft, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getCommonFoodDetails, searchFoods } from "@/lib/food";
+import { getFoodDetails, searchFoods } from "@/lib/food";
 import { GRAMS_PER_OUNCE } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -209,24 +209,25 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
   };
 
   const handleSelectFood = async (food: FoodDataItem) => {
-    if (food.dataType === 'branded' || food.calories) {
-        setSelectedFood(food);
-    } else {
-        setIsFetchingDetails(true);
-        try {
-            const detailedFood = await getCommonFoodDetails(food.name);
-            setSelectedFood(detailedFood);
-        } catch (error: any) {
-            toast({
-                title: "Could Not Fetch Details",
-                description: error.message,
-                variant: "destructive"
-            });
-            setCustomFood(prev => ({...prev, name: food.name}));
-            setView('manual');
-        } finally {
-            setIsFetchingDetails(false);
+    setIsFetchingDetails(true);
+    try {
+        const detailedFood = await getFoodDetails(food.id);
+        if (detailedFood) {
+          setSelectedFood(detailedFood);
+        } else {
+           throw new Error("Could not retrieve details for this food.");
         }
+    } catch (error: any) {
+        toast({
+            title: "Could Not Fetch Details",
+            description: error.message,
+            variant: "destructive"
+        });
+        // Fallback to manual entry
+        setCustomFood(prev => ({...prev, name: food.name}));
+        setView('manual');
+    } finally {
+        setIsFetchingDetails(false);
     }
   };
 
@@ -433,32 +434,14 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
           {searchResults.length > 0 ? (
             <div className="space-y-2">
               {searchResults.map(food => {
-                let subtitle = '';
-                if (food.dataType === 'branded') {
-                    const subtitleParts = [];
-                    if (food.brandName) {
-                        subtitleParts.push(food.brandName);
-                    }
-                    if (food.servingQty && food.servingUnit) {
-                        let servingString = `${food.servingQty} ${capitalizeWords(food.servingUnit)}`;
-                        if (food.servingWeightGrams) {
-                            servingString += ` (${Math.round(food.servingWeightGrams)}g)`;
-                        }
-                        subtitleParts.push(servingString);
-                    }
-                    if (typeof food.caloriesPerServing !== 'undefined') {
-                        subtitleParts.push(`${food.caloriesPerServing} kcal`);
-                    }
-                    subtitle = subtitleParts.join(' - ');
-                } else {
-                    subtitle = 'Common Food';
-                }
-                const displayName = food.brandName ? food.name : capitalizeWords(food.name);
+                const subtitle = food.description || (food.dataType === 'branded' ? (food.brandName || 'Branded') : 'Common Food');
+                const displayName = capitalizeWords(food.name);
 
                 return (
                   <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
-                    <p>{displayName}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-medium">{displayName}</p>
+                    {food.brandName && <p className="text-xs text-muted-foreground">{food.brandName}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">
                       {subtitle}
                     </p>
                   </button>

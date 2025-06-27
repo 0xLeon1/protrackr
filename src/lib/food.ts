@@ -1,190 +1,200 @@
 
 import type { FoodDataItem } from "@/types";
 
-// Type definitions for the Nutritionix API responses
-interface NutritionixBrandedFood {
-    food_name: string;
-    nix_item_id: string;
-    serving_qty: number;
-    serving_unit: string;
-    serving_weight_grams: number | null;
-    nf_calories: number | null;
-    nf_total_fat: number | null;
-    nf_total_carbohydrate: number | null;
-    nf_protein: number | null;
-    brand_name?: string;
+// --- FatSecret API Implementation ---
+
+const FATSECRET_CREDENTIALS_ERROR = "FatSecret API is not configured. Please add your credentials to the .env file.";
+
+interface FatSecretToken {
+  access_token: string;
+  expires_in: number;
+  retrieved_at: number; // timestamp in seconds
 }
 
-interface NutritionixCommonFood {
-    food_name: string;
-    tag_id: string;
+let token: FatSecretToken | null = null;
+
+function areCredentialsMissing(): boolean {
+    const clientId = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_ID;
+    const clientSecret = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_SECRET;
+    return !clientId || !clientSecret || clientId === "YOUR_CLIENT_ID_HERE" || clientSecret === "YOUR_SECRET_KEY_HERE";
 }
 
-interface NutritionixSearchResponse {
-    common: NutritionixCommonFood[];
-    branded: NutritionixBrandedFood[];
-}
 
-interface NutritionixNaturalResponse {
-    foods: {
-        food_name: string;
-        serving_qty: number;
-        serving_unit: string;
-        serving_weight_grams: number;
-        nf_calories: number;
-        nf_total_fat: number;
-        nf_total_carbohydrate: number;
-        nf_protein: number;
-    }[];
-}
-
-const NUTRITIONIX_CREDENTIALS_ERROR = "Nutritionix API is not configured. Please add your credentials to the .env file.";
-
-function areCredentialsMissing(appId?: string, apiKey?: string): boolean {
-    return !appId || !apiKey || appId === "YOUR_APP_ID_HERE" || apiKey === "YOUR_API_KEY_HERE";
-}
-
-// Function to search for foods using the Nutritionix Instant Search endpoint
-export async function searchFoods(query: string): Promise<FoodDataItem[]> {
-    const appId = process.env.NEXT_PUBLIC_NUTRITIONIX_APP_ID;
-    const apiKey = process.env.NEXT_PUBLIC_NUTRITIONIX_API_KEY;
-
-    if (areCredentialsMissing(appId, apiKey)) {
-        throw new Error(NUTRITIONIX_CREDENTIALS_ERROR);
+async function getFatSecretAccessToken(): Promise<string> {
+    if (areCredentialsMissing()) {
+        throw new Error(FATSECRET_CREDENTIALS_ERROR);
     }
-    
-    if (!query.trim()) {
-        return [];
+    const clientId = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_ID;
+    const clientSecret = process.env.NEXT_PUBLIC_FATSECRET_CLIENT_SECRET;
+
+    // Check if we have a valid, non-expired token
+    if (token && (token.retrieved_at + token.expires_in) > (Date.now() / 1000 + 60)) {
+        return token.access_token;
     }
 
-    const API_URL = `https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(query)}`;
-
-    try {
-        const response = await fetch(API_URL, {
-            headers: {
-                'x-app-id': appId,
-                'x-app-key': apiKey,
-            }
-        });
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                throw new Error("Nutritionix API authentication failed. Please check your credentials.");
-            }
-            // For other non-critical errors during search, just log it and return empty.
-            console.error("Failed to fetch from Nutritionix API:", response.status, response.statusText);
-            return [];
-        }
-
-        const data: NutritionixSearchResponse = await response.json();
-        
-        const brandedResults: FoodDataItem[] = (data.branded || []).map(food => {
-            const item: FoodDataItem = {
-                id: food.nix_item_id,
-                name: food.food_name,
-                brandName: food.brand_name,
-                dataType: 'branded',
-                servingQty: food.serving_qty,
-                servingUnit: food.serving_unit,
-                servingWeightGrams: food.serving_weight_grams,
-                caloriesPerServing: food.nf_calories ? Math.round(food.nf_calories) : undefined,
-            };
-            if (food.serving_weight_grams && food.serving_weight_grams > 0) {
-                const ratio = 100 / food.serving_weight_grams;
-                item.calories = Math.round((food.nf_calories || 0) * ratio);
-                item.protein = parseFloat(((food.nf_protein || 0) * ratio).toFixed(1));
-                item.carbs = parseFloat(((food.nf_total_carbohydrate || 0) * ratio).toFixed(1));
-                item.fats = parseFloat(((food.nf_total_fat || 0) * ratio).toFixed(1));
-            }
-            return item;
-        }).filter(item => typeof item.calories !== 'undefined');
-
-        const commonResults: FoodDataItem[] = (data.common || []).map(food => ({
-            id: food.food_name,
-            name: food.food_name,
-            dataType: 'common',
-        }));
-
-        const allResults = [...commonResults, ...brandedResults];
-
-        const uniqueResults = new Map<string, FoodDataItem>();
-        allResults.forEach(item => {
-            const capitalizedName = item.name.toUpperCase();
-            if (!uniqueResults.has(capitalizedName)) {
-                uniqueResults.set(capitalizedName, item);
-            }
-        });
-
-        return Array.from(uniqueResults.values());
-
-    } catch (error) {
-        if (error instanceof Error && error.message.includes("Nutritionix")) {
-            throw error;
-        }
-        console.error("Error searching for foods:", error);
-        return [];
-    }
-}
-
-
-// Function to get detailed nutritional info for a common food
-export async function getCommonFoodDetails(foodName: string): Promise<FoodDataItem> {
-    const appId = process.env.NEXT_PUBLIC_NUTRITIONIX_APP_ID;
-    const apiKey = process.env.NEXT_PUBLIC_NUTRITIONIX_API_KEY;
-
-    if (areCredentialsMissing(appId, apiKey)) {
-        throw new Error(NUTRITIONIX_CREDENTIALS_ERROR);
-    }
-    
-    const API_URL = `https://trackapi.nutritionix.com/v2/natural/nutrients`;
-
-    const query = /^\d/.test(foodName) ? foodName : `1 ${foodName}`;
-
-    const response = await fetch(API_URL, {
+    // If not, fetch a new one
+    const response = await fetch('https://oauth.platform.fatsecret.com/connect/token', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'x-app-id': appId,
-            'x-app-key': apiKey,
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({ query }),
+        body: new URLSearchParams({
+            'grant_type': 'client_credentials',
+            'scope': 'basic',
+            'client_id': clientId!,
+            'client_secret': clientSecret!,
+        }),
     });
 
     if (!response.ok) {
-        if (response.status === 401) {
-            throw new Error("Nutritionix API authentication failed. Please check your credentials.");
+        console.error("FatSecret auth error:", await response.text());
+        throw new Error('Could not authenticate with FatSecret API. Check your credentials.');
+    }
+
+    const tokenData = await response.json();
+    token = { ...tokenData, retrieved_at: Date.now() / 1000 };
+    return token!.access_token;
+}
+
+// Search for foods
+export async function searchFoods(query: string): Promise<FoodDataItem[]> {
+    if (!query.trim()) return [];
+    if (areCredentialsMissing()) {
+      throw new Error(FATSECRET_CREDENTIALS_ERROR);
+    }
+
+    try {
+        const accessToken = await getFatSecretAccessToken();
+        const searchUrl = `https://platform.fatsecret.com/rest/server.api?method=foods.search&search_expression=${encodeURIComponent(query)}&format=json`;
+
+        const response = await fetch(searchUrl, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (!response.ok) {
+            // Don't throw for search errors, just return empty
+            console.error("FatSecret search error:", await response.text());
+            return [];
         }
-        throw new Error(`Could not find nutrition data for "${foodName}".`);
-    }
 
-    const data: NutritionixNaturalResponse = await response.json();
-    
-    if (!data.foods || data.foods.length === 0) {
-        throw new Error(`Could not find nutrition data for "${foodName}".`);
-    }
+        const data = await response.json();
 
-    const foodDetails = data.foods[0];
-    
-    const servingWeight = foodDetails.serving_weight_grams;
-    if (!servingWeight || servingWeight === 0) {
-        throw new Error(`Could not calculate nutrition data for "${foodName}".`);
-    }
-    
-    const ratio = 100 / servingWeight;
+        if (data.error) {
+            console.error("FatSecret API error:", data.error.message);
+            return [];
+        }
 
-    return {
-        id: foodDetails.food_name, 
-        name: foodDetails.food_name,
-        dataType: 'common',
+        const foods = data.foods?.food;
+        if (!foods) {
+            return [];
+        }
         
-        calories: Math.round((foodDetails.nf_calories || 0) * ratio),
-        protein: parseFloat(((foodDetails.nf_protein || 0) * ratio).toFixed(1)),
-        carbs: parseFloat(((foodDetails.nf_total_carbohydrate || 0) * ratio).toFixed(1)),
-        fats: parseFloat(((foodDetails.nf_total_fat || 0) * ratio).toFixed(1)),
+        const foodsArray = Array.isArray(foods) ? foods : [foods];
 
-        servingQty: foodDetails.serving_qty,
-        servingUnit: foodDetails.serving_unit,
-        servingWeightGrams: foodDetails.serving_weight_grams,
-        caloriesPerServing: Math.round(foodDetails.nf_calories || 0),
-    };
+        const results: FoodDataItem[] = foodsArray.map((food: any): FoodDataItem | null => {
+            return {
+                id: food.food_id,
+                name: food.food_name,
+                brandName: food.brand_name,
+                dataType: food.food_type === 'Branded' ? 'branded' : 'common',
+                description: food.food_description,
+            };
+        }).filter((item): item is FoodDataItem => item !== null);
+
+        return results;
+
+    } catch (error) {
+        if (error instanceof Error && error.message.includes("FatSecret")) {
+            throw error; // Re-throw errors related to credentials etc.
+        }
+        console.error("Error searching FatSecret:", error);
+        return [];
+    }
+}
+
+interface FatSecretServing {
+    calories: string;
+    carbohydrate: string;
+    fat: string;
+    protein: string;
+    serving_description: string;
+    serving_id: string;
+    serving_url: string;
+    measurement_description: string;
+    metric_serving_amount?: string;
+    metric_serving_unit?: string;
+    number_of_units: string;
+}
+
+// Get detailed info for a single food
+export async function getFoodDetails(foodId: string): Promise<FoodDataItem | null> {
+    if (areCredentialsMissing()) {
+      throw new Error(FATSECRET_CREDENTIALS_ERROR);
+    }
+    
+    try {
+        const accessToken = await getFatSecretAccessToken();
+        const detailsUrl = `https://platform.fatsecret.com/rest/server.api?method=food.get.v2&food_id=${foodId}&format=json`;
+
+        const response = await fetch(detailsUrl, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch details for food ID ${foodId}.`);
+        }
+
+        const data = await response.json();
+        const food = data.food;
+        
+        if (!food || !food.servings || !food.servings.serving) {
+             throw new Error(`Incomplete data received for food ID ${foodId}.`);
+        }
+        
+        const servings: FatSecretServing[] = Array.isArray(food.servings.serving) ? food.servings.serving : [food.servings.serving];
+
+        // Find a 100g serving, or the first serving with a gram weight to calculate from
+        let baseServing = servings.find(s => s.metric_serving_amount === "100" && s.metric_serving_unit === "g");
+        let servingWithGrams = servings.find(s => s.metric_serving_amount && s.metric_serving_unit === 'g');
+        
+        if (!baseServing && !servingWithGrams) {
+            throw new Error(`Food ${foodId} has no serving with gram weight to use for calculations.`);
+        }
+
+        const referenceServing = baseServing || servingWithGrams!;
+        const servingWeight = parseFloat(referenceServing.metric_serving_amount!);
+        const ratio = servingWeight > 0 ? 100 / servingWeight : 0;
+        
+        const calories = parseFloat(referenceServing.calories);
+        const protein = parseFloat(referenceServing.protein);
+        const carbs = parseFloat(referenceServing.carbohydrate);
+        const fats = parseFloat(referenceServing.fat);
+        
+        const standardServing = servings.find(s => s.measurement_description.toLowerCase() !== 'g') || referenceServing;
+        const standardServingWeight = parseFloat(standardServing.metric_serving_amount || "0");
+
+        return {
+            id: food.food_id,
+            name: food.food_name,
+            brandName: food.brand_name,
+            dataType: food.food_type === 'Branded' ? 'branded' : 'common',
+
+            calories: Math.round(calories * ratio),
+            protein: parseFloat((protein * ratio).toFixed(1)),
+            carbs: parseFloat((carbs * ratio).toFixed(1)),
+            fats: parseFloat((fats * ratio).toFixed(1)),
+            
+            servingQty: parseFloat(standardServing.number_of_units),
+            servingUnit: standardServing.measurement_description,
+            servingWeightGrams: standardServingWeight,
+            caloriesPerServing: Math.round(parseFloat(standardServing.calories)),
+        };
+
+    } catch (error) {
+         if (error instanceof Error) {
+            throw error; // Re-throw known errors
+        }
+        console.error(`Error getting FatSecret details for foodId ${foodId}:`, error);
+        throw new Error(`An unexpected error occurred while fetching food details.`);
+    }
 }
