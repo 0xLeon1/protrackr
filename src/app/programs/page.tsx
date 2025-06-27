@@ -25,7 +25,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -260,6 +259,14 @@ export default function ProgramsPage() {
                                   onClick={(e) => e.stopPropagation()}
                                 />
                                 <div className="flex items-center gap-2 mr-2">
+                                   <Button 
+                                      size="sm"
+                                      onClick={(e) => { e.stopPropagation(); handleStartWorkout(workout.id) }}
+                                      className="bg-green-500 hover:bg-green-600 text-white"
+                                  >
+                                      <Play className="mr-2 h-4 w-4" />
+                                      Start
+                                  </Button>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -267,11 +274,6 @@ export default function ProgramsPage() {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
-                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStartWorkout(workout.id) }}>
-                                        <Play className="mr-2 h-4 w-4" />
-                                        <span>Start Workout</span>
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                           <DropdownMenuItem
