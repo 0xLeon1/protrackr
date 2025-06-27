@@ -6,13 +6,13 @@ import type { WorkoutLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, Tooltip, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { format, startOfWeek, parseISO } from 'date-fns';
+import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
 import { History, TrendingUp } from "lucide-react";
 
-interface WeeklyVolume {
-  week: string;
+interface DailyVolume {
+  day: string;
   volume: number;
 }
 
@@ -35,7 +35,7 @@ const renderCustomizedLabel = (props: any) => {
 
 export default function AnalyticsPage() {
   const [logs, setLogs] = useState<WorkoutLogEntry[]>([]);
-  const [weeklyVolume, setWeeklyVolume] = useState<WeeklyVolume[]>([]);
+  const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
 
   useEffect(() => {
     const storedLogs = localStorage.getItem('protracker-logs');
@@ -44,48 +44,48 @@ export default function AnalyticsPage() {
         const parsedLogs: WorkoutLogEntry[] = JSON.parse(storedLogs);
         const sortedLogs = parsedLogs.sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
         setLogs(sortedLogs);
-        calculateWeeklyVolume(sortedLogs);
+        calculateDailyVolume(sortedLogs);
       } catch (error) {
         console.error("Failed to parse logs from localStorage", error);
       }
     }
   }, []);
 
-  const calculateWeeklyVolume = (allLogs: WorkoutLogEntry[]) => {
-    if (allLogs.length === 0) return;
+  const calculateDailyVolume = (allLogs: WorkoutLogEntry[]) => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    let volumeDataForWeek: DailyVolume[] = daysInWeek.map(day => ({
+      day: format(day, 'E'), // Mon, Tue, etc.
+      volume: 0,
+    }));
     
-    const volumeByWeek: { [key: string]: { volume: number, date: Date } } = {};
-
     allLogs.forEach(log => {
-      const date = parseISO(log.completedAt);
-      const weekStartDate = startOfWeek(date, { weekStartsOn: 1 });
-      const weekKey = format(weekStartDate, 'yyyy-MM-dd');
+      const logDate = parseISO(log.completedAt);
+      if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+        const dayOfWeek = format(logDate, 'E');
+        const dayIndex = volumeDataForWeek.findIndex(d => d.day === dayOfWeek);
 
-      if (!volumeByWeek[weekKey]) {
-        volumeByWeek[weekKey] = { volume: 0, date: weekStartDate };
+        if (dayIndex !== -1) {
+          const workoutVolume = log.workoutSnapshot.exercises.reduce((totalVolume, exercise) => {
+            const exerciseVolume = exercise.performance?.reduce((total, set) => {
+              if (set.completed) {
+                const reps = typeof set.reps === 'number' ? set.reps : 0;
+                const weight = typeof set.weight === 'number' ? set.weight : 0;
+                return total + (reps * weight);
+              }
+              return total;
+            }, 0) || 0;
+            return totalVolume + exerciseVolume;
+          }, 0);
+          volumeDataForWeek[dayIndex].volume += workoutVolume;
+        }
       }
-
-      let workoutVolume = 0;
-      log.workoutSnapshot.exercises.forEach(exercise => {
-        exercise.performance?.forEach(set => {
-          if (set.completed) {
-            const reps = typeof set.reps === 'number' ? set.reps : 0;
-            const weight = typeof set.weight === 'number' ? set.weight : 0;
-            workoutVolume += reps * weight;
-          }
-        });
-      });
-      volumeByWeek[weekKey].volume += workoutVolume;
     });
-
-    const sortedWeeks = Object.keys(volumeByWeek).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
-    const formattedVolumeData = sortedWeeks.map(weekKey => ({
-        week: format(volumeByWeek[weekKey].date, 'MMM d'),
-        volume: volumeByWeek[weekKey].volume
-    })).slice(-8);
-
-    setWeeklyVolume(formattedVolumeData);
+    
+    setDailyVolume(volumeDataForWeek);
   };
   
   const chartConfig = {
@@ -94,6 +94,8 @@ export default function AnalyticsPage() {
       color: "hsl(var(--accent))",
     },
   };
+
+  const hasLiftedThisWeek = dailyVolume.some(d => d.volume > 0);
 
   return (
     <div className="space-y-6">
@@ -104,23 +106,25 @@ export default function AnalyticsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Weekly Volume</CardTitle>
-          <CardDescription>Total weight lifted per week (last 8 weeks).</CardDescription>
+          <CardTitle>This Week's Volume</CardTitle>
+          <CardDescription>Your total lifted volume for the current week.</CardDescription>
         </CardHeader>
         <CardContent className="pl-2">
-          {weeklyVolume.length > 0 ? (
+          {hasLiftedThisWeek ? (
              <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
-              <BarChart accessibilityLayer data={weeklyVolume} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
+              <BarChart accessibilityLayer data={dailyVolume} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
                 <XAxis
-                  dataKey="week"
+                  dataKey="day"
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
                 />
+                 <YAxis hide domain={[0, 'dataMax + 500']}/>
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent 
                       formatter={(value) => `${Number(value).toLocaleString()} lbs`}
+                      indicator="dot"
                       nameKey="volume"
                       />}
                   />
