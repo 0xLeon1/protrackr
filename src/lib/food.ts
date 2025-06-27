@@ -27,6 +27,8 @@ interface NutritionixSearchResponse {
 interface NutritionixNaturalResponse {
     foods: {
         food_name: string;
+        serving_qty: number;
+        serving_unit: string;
         serving_weight_grams: number;
         nf_calories: number;
         nf_total_fat: number;
@@ -71,6 +73,9 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
                 id: food.nix_item_id,
                 name: food.food_name,
                 dataType: 'branded',
+                servingQty: food.serving_qty,
+                servingUnit: food.serving_unit,
+                servingWeightGrams: food.serving_weight_grams,
             };
             // Normalize nutrients to per 100g if possible
             if (food.serving_weight_grams && food.serving_weight_grams > 0) {
@@ -89,8 +94,19 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
             dataType: 'common',
         }));
 
-        // Prioritize branded results as they have more complete data initially
-        return [...brandedResults, ...commonResults];
+        // Deduplicate results based on capitalized name
+        const uniqueResults = new Map<string, FoodDataItem>();
+        const allResults = [...brandedResults, ...commonResults];
+
+        allResults.forEach(item => {
+            const capitalizedName = item.name.toUpperCase();
+            if (!uniqueResults.has(capitalizedName)) {
+                uniqueResults.set(capitalizedName, item);
+            }
+        });
+
+        return Array.from(uniqueResults.values());
+
 
     } catch (error) {
         console.error("Error searching for foods with Nutritionix:", error);
@@ -119,7 +135,8 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            body: JSON.stringify({ query: `100g ${foodName}` }),
+            // Query for the food name itself, API will return a default serving
+            body: JSON.stringify({ query: foodName }),
         });
 
         if (!response.ok) {
@@ -134,16 +151,22 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         }
 
         const foodDetails = data.foods[0];
+        
+        const ratio = foodDetails.serving_weight_grams ? 100 / foodDetails.serving_weight_grams : 0;
 
         return {
             id: foodDetails.food_name,
             name: foodDetails.food_name,
             dataType: 'common',
-            // The API returns values for the amount queried (100g)
-            calories: foodDetails.nf_calories,
-            protein: foodDetails.nf_protein,
-            carbs: foodDetails.nf_total_carbohydrate,
-            fats: foodDetails.nf_total_fat,
+            // Store serving info from the API response
+            servingQty: foodDetails.serving_qty,
+            servingUnit: foodDetails.serving_unit,
+            servingWeightGrams: foodDetails.serving_weight_grams,
+            // Normalize and store nutrients per 100g
+            calories: ratio ? Math.round(foodDetails.nf_calories * ratio) : foodDetails.nf_calories,
+            protein: ratio ? parseFloat((foodDetails.nf_protein * ratio).toFixed(1)) : foodDetails.nf_protein,
+            carbs: ratio ? parseFloat((foodDetails.nf_total_carbohydrate * ratio).toFixed(1)) : foodDetails.nf_total_carbohydrate,
+            fats: ratio ? parseFloat((foodDetails.nf_total_fat * ratio).toFixed(1)) : foodDetails.nf_total_fat,
         };
 
     } catch (error) {

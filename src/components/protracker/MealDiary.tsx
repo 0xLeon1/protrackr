@@ -48,8 +48,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
 
   // Serving size state
-  const [amount, setAmount] = useState("100");
-  const [unit, setUnit] = useState<"g" | "oz">("g");
+  const [amount, setAmount] = useState("1");
+  const [unit, setUnit] = useState<string>("serving");
 
   // Custom food form state
   const [customFood, setCustomFood] = useState({ name: '', calories: '', protein: '', carbs: '', fats: '' });
@@ -76,6 +76,19 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
     return () => clearTimeout(handler);
   }, [searchQuery, view, isDialogOpen, selectedFood]);
+  
+  // When a food is selected, intelligently set the default amount and unit.
+  useEffect(() => {
+    if (selectedFood) {
+      if (selectedFood.servingUnit && selectedFood.servingWeightGrams) {
+        setUnit("serving");
+        setAmount(String(selectedFood.servingQty || 1));
+      } else {
+        setUnit("g");
+        setAmount("100");
+      }
+    }
+  }, [selectedFood]);
 
 
   const resetDialogState = () => {
@@ -84,8 +97,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     setIsSearching(false);
     setIsFetchingDetails(false);
     setSelectedFood(null);
-    setAmount("100");
-    setUnit("g");
+    setAmount("1");
+    setUnit("serving");
     setView('search');
     setCustomFood({ name: '', calories: '', protein: '', carbs: '', fats: '' });
   };
@@ -96,8 +109,17 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     }
     
     const numAmount = parseFloat(amount) || 0;
-    const totalGrams = unit === 'g' ? numAmount : numAmount * GRAMS_PER_OUNCE;
-    const ratio = totalGrams / 100;
+    let totalGrams = 0;
+
+    if (unit === 'g') {
+        totalGrams = numAmount;
+    } else if (unit === 'oz') {
+        totalGrams = numAmount * GRAMS_PER_OUNCE;
+    } else if (unit === 'serving' && selectedFood.servingWeightGrams) {
+        totalGrams = numAmount * selectedFood.servingWeightGrams;
+    }
+
+    const ratio = totalGrams > 0 ? totalGrams / 100 : 0;
 
     return {
       calories: Math.round((selectedFood.calories || 0) * ratio),
@@ -113,10 +135,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   };
   
   const handleSelectFood = async (food: FoodDataItem) => {
-    if (food.dataType === 'branded') {
+    if (food.calories) { // Branded food already has details
       setSelectedFood(food);
-    } else {
-      // It's a common food, we need to fetch its details
+    } else { // Common food, needs details fetched
       setIsFetchingDetails(true);
       const detailedFood = await getCommonFoodDetails(food.name);
       setIsFetchingDetails(false);
@@ -218,11 +239,16 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit">Unit</Label>
-                <Select value={unit} onValueChange={(value: "g" | "oz") => setUnit(value)}>
+                <Select value={unit} onValueChange={(value: string) => setUnit(value)}>
                   <SelectTrigger id="unit">
                     <SelectValue placeholder="Select unit" />
                   </SelectTrigger>
                   <SelectContent>
+                    {selectedFood.servingUnit && selectedFood.servingWeightGrams && (
+                        <SelectItem value="serving">
+                            {capitalizeWords(selectedFood.servingUnit)}
+                        </SelectItem>
+                    )}
                     <SelectItem value="g">Grams (g)</SelectItem>
                     <SelectItem value="oz">Ounces (oz)</SelectItem>
                   </SelectContent>
@@ -315,7 +341,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                 <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
                   <p>{capitalizeWords(food.name)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {food.dataType === 'branded' ? `${Math.round(food.calories || 0)} kcal per 100g` : 'Common Food'}
+                    {food.dataType === 'branded' ? (food.servingUnit ? `${capitalizeWords(food.servingUnit)}` : `${Math.round(food.calories || 0)} kcal per 100g`) : 'Common Food'}
                   </p>
                 </button>
               ))}
