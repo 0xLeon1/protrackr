@@ -157,28 +157,6 @@ export default function ProgramsPage() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create a New Program</CardTitle>
-          <CardDescription>
-            Build a new workout program from scratch.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Input 
-              placeholder="e.g., My Awesome Program" 
-              value={newProgramName}
-              onChange={(e) => setNewProgramName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
-            />
-            <Button onClick={handleAddProgram}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Program
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Your Programs</h2>
         {programs.length === 0 && (
@@ -310,6 +288,28 @@ export default function ProgramsPage() {
           ))}
         </Accordion>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Create a New Program</CardTitle>
+          <CardDescription>
+            Build a new workout program from scratch.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input 
+              placeholder="e.g., My Awesome Program" 
+              value={newProgramName}
+              onChange={(e) => setNewProgramName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
+            />
+            <Button onClick={handleAddProgram}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Program
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
