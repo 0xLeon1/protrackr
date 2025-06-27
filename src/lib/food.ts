@@ -1,3 +1,4 @@
+'use server';
 
 import type { FoodDataItem, Serving } from "@/types";
 
@@ -44,6 +45,7 @@ async function getFatSecretAccessToken(): Promise<string> {
             'client_id': clientId!,
             'client_secret': clientSecret!,
         }),
+        cache: 'no-cache',
     });
 
     if (!response.ok) {
