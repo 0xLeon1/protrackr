@@ -37,19 +37,19 @@ const initialPrograms: Program[] = [
         id: 'work1',
         name: 'Day 1: Push (Chest, Shoulders, Triceps)',
         exercises: [
-          { id: 'ex1', name: 'Barbell Bench Press', sets: 4, reps: 8, rest: 90, weight: 185, notes: 'Felt strong today.' },
-          { id: 'ex2', name: 'Incline Dumbbell Press', sets: 3, reps: 10, rest: 60, weight: 65, notes: '' },
-          { id: 'ex3', name: 'Overhead Press', sets: 4, reps: 8, rest: 90, weight: 105, notes: '' },
-          { id: 'ex4', name: 'Tricep Pushdowns', sets: 4, reps: 12, rest: 60, weight: 50, notes: '' },
+          { id: 'ex1', name: 'Barbell Bench Press', sets: 4, reps: 8, weight: 185, notes: 'Felt strong today.' },
+          { id: 'ex2', name: 'Incline Dumbbell Press', sets: 3, reps: 10, weight: 65, notes: '' },
+          { id: 'ex3', name: 'Overhead Press', sets: 4, reps: 8, weight: 105, notes: '' },
+          { id: 'ex4', name: 'Tricep Pushdowns', sets: 4, reps: 12, weight: 50, notes: '' },
         ]
       },
       {
         id: 'work2',
         name: 'Day 2: Pull (Back, Biceps)',
         exercises: [
-          { id: 'ex5', name: 'Pull-ups', sets: 4, reps: 8, rest: 90, weight: 0, notes: 'Bodyweight' },
-          { id: 'ex6', name: 'Bent Over Rows', sets: 4, reps: 8, rest: 90, weight: 135, notes: '' },
-          { id: 'ex7', name: 'Bicep Curls', sets: 3, reps: 12, rest: 60, weight: 30, notes: '' },
+          { id: 'ex5', name: 'Pull-ups', sets: 4, reps: 8, weight: 0, notes: 'Bodyweight' },
+          { id: 'ex6', name: 'Bent Over Rows', sets: 4, reps: 8, weight: 135, notes: '' },
+          { id: 'ex7', name: 'Bicep Curls', sets: 3, reps: 12, weight: 30, notes: '' },
         ]
       }
     ]
@@ -62,18 +62,18 @@ const initialPrograms: Program[] = [
         id: 'work3',
         name: 'Workout A',
         exercises: [
-            { id: 'ex8', name: 'Squat', sets: 3, reps: 5, rest: 180, weight: 225, notes: '' },
-            { id: 'ex9', name: 'Bench Press', sets: 3, reps: 5, rest: 180, weight: 185, notes: '' },
-            { id: 'ex10', name: 'Deadlift', sets: 1, reps: 5, rest: 300, weight: 315, notes: '' },
+            { id: 'ex8', name: 'Squat', sets: 3, reps: 5, weight: 225, notes: '' },
+            { id: 'ex9', name: 'Bench Press', sets: 3, reps: 5, weight: 185, notes: '' },
+            { id: 'ex10', name: 'Deadlift', sets: 1, reps: 5, weight: 315, notes: '' },
         ]
       },
        {
         id: 'work4',
         name: 'Workout B',
         exercises: [
-            { id: 'ex11', name: 'Squat', sets: 3, reps: 5, rest: 180, weight: 225, notes: '' },
-            { id: 'ex12', name: 'Overhead Press', sets: 3, reps: 5, rest: 180, weight: 105, notes: '' },
-            { id: 'ex13', name: 'Power Clean', sets: 5, reps: 3, rest: 120, weight: 135, notes: '' },
+            { id: 'ex11', name: 'Squat', sets: 3, reps: 5, weight: 225, notes: '' },
+            { id: 'ex12', name: 'Overhead Press', sets: 3, reps: 5, weight: 105, notes: '' },
+            { id: 'ex13', name: 'Power Clean', sets: 5, reps: 3, weight: 135, notes: '' },
         ]
       }
     ]

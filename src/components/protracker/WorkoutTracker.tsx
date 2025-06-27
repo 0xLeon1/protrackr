@@ -4,8 +4,8 @@ import type { Exercise, Workout } from '@/types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, PlusCircle, Flame } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Trash2, PlusCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 interface WorkoutEditorProps {
   workout: Workout;
@@ -17,9 +17,11 @@ export default function WorkoutTracker({ workout, onWorkoutChange }: WorkoutEdit
   const handleExerciseChange = (id: string, field: keyof Exercise, value: string | number) => {
     const updatedExercises = workout.exercises.map(ex => {
       if (ex.id === id) {
-        // Ensure numeric fields are stored as numbers
-        const isNumericField = field === 'sets' || field === 'reps' || field === 'weight' || field === 'rest';
-        return { ...ex, [field]: isNumericField ? Number(value) : value };
+        const isNumericField = field === 'sets' || field === 'reps' || field === 'weight';
+        if (isNumericField) {
+            return { ...ex, [field]: Math.max(0, Number(value)) };
+        }
+        return { ...ex, [field]: value };
       }
       return ex;
     });
@@ -28,7 +30,7 @@ export default function WorkoutTracker({ workout, onWorkoutChange }: WorkoutEdit
 
   const addExercise = () => {
     const newId = `ex-${Date.now()}`;
-    const newExercise: Exercise = { id: newId, name: 'New Exercise', sets: 3, reps: 10, rest: 60, weight: 0, notes: '' };
+    const newExercise: Exercise = { id: newId, name: 'New Exercise', sets: 3, reps: 10, weight: 0, notes: '' };
     onWorkoutChange({ ...workout, exercises: [...workout.exercises, newExercise] });
   };
 
@@ -56,7 +58,6 @@ export default function WorkoutTracker({ workout, onWorkoutChange }: WorkoutEdit
                   <TableHead>Sets</TableHead>
                   <TableHead>Reps</TableHead>
                   <TableHead>Weight</TableHead>
-                  <TableHead>Rest</TableHead>
                   <TableHead className="min-w-[150px]">Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -65,10 +66,9 @@ export default function WorkoutTracker({ workout, onWorkoutChange }: WorkoutEdit
                 {workout.exercises.map((exercise) => (
                   <TableRow key={exercise.id} className="transition-colors hover:bg-muted/50">
                     <TableCell><Input type="text" value={exercise.name} onChange={(e) => handleExerciseChange(exercise.id, 'name', e.target.value)} className="font-medium" /></TableCell>
-                    <TableCell><Input type="number" value={exercise.sets} onChange={(e) => handleExerciseChange(exercise.id, 'sets', e.target.value)} className="w-16" /></TableCell>
-                    <TableCell><Input type="number" value={exercise.reps} onChange={(e) => handleExerciseChange(exercise.id, 'reps', e.target.value)} className="w-16" /></TableCell>
-                    <TableCell><Input type="number" value={exercise.weight} onChange={(e) => handleExerciseChange(exercise.id, 'weight', e.target.value)} className="w-20" /></TableCell>
-                    <TableCell><Input type="number" value={exercise.rest} onChange={(e) => handleExerciseChange(exercise.id, 'rest', e.target.value)} className="w-16" /></TableCell>
+                    <TableCell><Input type="number" min="0" value={exercise.sets} onChange={(e) => handleExerciseChange(exercise.id, 'sets', e.target.value)} className="w-16" /></TableCell>
+                    <TableCell><Input type="number" min="0" value={exercise.reps} onChange={(e) => handleExerciseChange(exercise.id, 'reps', e.target.value)} className="w-16" /></TableCell>
+                    <TableCell><Input type="number" min="0" value={exercise.weight} onChange={(e) => handleExerciseChange(exercise.id, 'weight', e.target.value)} className="w-20" /></TableCell>
                     <TableCell><Input type="text" value={exercise.notes} onChange={(e) => handleExerciseChange(exercise.id, 'notes', e.target.value)} placeholder="Add a note..." /></TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => removeExercise(exercise.id)}>

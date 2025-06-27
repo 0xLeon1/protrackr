@@ -10,7 +10,6 @@ export type Exercise = {
   name: string;
   sets: number;
   reps: number;
-  rest: number;
   weight: number;
   notes: string;
   performance?: SetPerformance[];
