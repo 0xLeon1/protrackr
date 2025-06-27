@@ -1,6 +1,5 @@
 "use client";
 
-import AiWorkoutGenerator from "@/components/protracker/AiWorkoutGenerator";
 import ConsistencyMeter from "@/components/protracker/ConsistencyMeter";
 import DailyCheckin from "@/components/protracker/DailyCheckin";
 import MacroTracker from "@/components/protracker/MacroTracker";
@@ -20,7 +19,6 @@ export default function Dashboard() {
       </div>
       <div className="flex flex-col gap-6 lg:col-span-3 xl:col-span-1">
         <MealLogger />
-        <AiWorkoutGenerator />
       </div>
     </div>
   );
