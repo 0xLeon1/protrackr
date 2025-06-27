@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Loader2, ArrowLeft, Pencil } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, ArrowLeft, Pencil, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getCommonFoodDetails, searchFoods } from "@/lib/food";
@@ -498,18 +498,21 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         <Accordion type="multiple" className="w-full" defaultValue={['Breakfast', 'Lunch']}>
           {MEAL_TYPES.map(mealType => (
             <AccordionItem value={mealType} key={mealType} className="border-b last:border-b-0">
-              <AccordionTrigger className="px-4 hover:no-underline">
-                <div className="flex items-center gap-4">
-                  <DialogTrigger asChild onClick={(e) => { e.stopPropagation(); handleOpenDialog(mealType); }}>
-                    <Button variant="ghost" size="icon" className="text-accent hover:text-accent/90 rounded-full">
-                      <PlusCircle className="w-6 h-6" />
-                    </Button>
-                  </DialogTrigger>
-                  <div className="flex flex-col items-start text-left">
-                    <span className="text-lg font-semibold">{mealType}</span>
-                    <span className="text-xs text-muted-foreground">{macroSummary(mealType)}</span>
+              <AccordionTrigger asChild className="px-4 hover:no-underline">
+                 <div className="flex w-full items-center justify-between cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <DialogTrigger asChild onClick={(e) => { e.stopPropagation(); handleOpenDialog(mealType); }}>
+                        <Button variant="ghost" size="icon" className="text-accent hover:text-accent/90 rounded-full">
+                          <PlusCircle className="w-6 h-6" />
+                        </Button>
+                      </DialogTrigger>
+                      <div className="flex flex-col items-start text-left">
+                        <span className="text-lg font-semibold">{mealType}</span>
+                        <span className="text-xs text-muted-foreground">{macroSummary(mealType)}</span>
+                      </div>
+                    </div>
+                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                   </div>
-                </div>
               </AccordionTrigger>
               <AccordionContent className="p-0">
                 <Separator />
