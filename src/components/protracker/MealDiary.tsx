@@ -244,16 +244,13 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                     <SelectValue placeholder="Select unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    {selectedFood.servingUnit && selectedFood.servingWeightGrams ? (
-                        <SelectItem value="serving">
-                            {capitalizeWords(selectedFood.servingUnit)}
-                        </SelectItem>
-                    ) : (
-                        <>
-                            <SelectItem value="g">Grams (g)</SelectItem>
-                            <SelectItem value="oz">Ounces (oz)</SelectItem>
-                        </>
+                    {selectedFood.servingUnit && selectedFood.servingWeightGrams && (
+                      <SelectItem value="serving">
+                        {capitalizeWords(selectedFood.servingUnit)} ({selectedFood.servingWeightGrams}g)
+                      </SelectItem>
                     )}
+                    <SelectItem value="g">Grams (g)</SelectItem>
+                    <SelectItem value="oz">Ounces (oz)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
