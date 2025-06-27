@@ -17,10 +17,11 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 
-if (typeof window !== "undefined" && firebaseConfig.apiKey) {
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  auth = getAuth(app);
-  db = getFirestore(app);
+// This check is to prevent Firebase from being initialized on the server.
+if (typeof window !== "undefined") {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
 }
 
 export { app, auth, db };
