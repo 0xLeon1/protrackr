@@ -21,7 +21,7 @@ export default function ActiveWorkout({ workout, onWorkoutChange }: ActiveWorkou
           return {
             ...ex,
             performance: ex.performance?.map(set => 
-              set.id === setId ? { ...set, [field]: Math.max(0, Number(value)) } : set
+              set.id === setId ? { ...set, [field]: Math.max(field === 'reps' ? 1 : 0, Number(value)) } : set
             )
           };
         }
@@ -86,7 +86,7 @@ export default function ActiveWorkout({ workout, onWorkoutChange }: ActiveWorkou
                     <TableCell>
                       <Input 
                         type="number" 
-                        min="0"
+                        min="1"
                         value={set.reps} 
                         onChange={(e) => handleSetChange(exercise.id, set.id, 'reps', e.target.value)}
                         className="w-24"
