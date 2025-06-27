@@ -136,11 +136,11 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-key': apiKey,
             },
             // Query for a 100g serving to get standardized nutrient values
-            body: JSON.stringify({ query: `100g ${foodName}` }),
+            body: JSON.stringify({ query: foodName }),
         });
 
         if (!response.ok) {
-            console.error(`Failed to fetch details for '100g ${foodName}' from Nutritionix API:`, response.statusText);
+            console.error(`Failed to fetch details for '${foodName}' from Nutritionix API:`, response.statusText);
             return null;
         }
 
@@ -152,26 +152,26 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
 
         const foodDetails = data.foods[0];
         
-        // The data returned is for the full query (e.g., '100g ground beef'), so the nutrients are for 100g
-        // For common foods fetched this way, we are ONLY interested in the per-100g data.
-        // We will intentionally leave serving info undefined to avoid calculation errors.
+        if (!foodDetails.serving_weight_grams || foodDetails.serving_weight_grams <= 0) {
+            return null;
+        }
+        
         return {
             id: foodName, 
             name: foodName, 
             dataType: 'common',
             
-            // Serving info is intentionally omitted for common foods to avoid the calculation error.
-            // The UI will default to grams/ounces, which is what we want.
-            servingQty: undefined,
-            servingUnit: undefined,
-            servingWeightGrams: undefined,
-            caloriesPerServing: undefined,
+            // Serving info from API
+            servingQty: foodDetails.serving_qty,
+            servingUnit: foodDetails.serving_unit,
+            servingWeightGrams: foodDetails.serving_weight_grams,
+            caloriesPerServing: foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : 0,
 
-            // These values are correctly for 100g
-            calories: foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : 0,
-            protein: foodDetails.nf_protein ? parseFloat(foodDetails.nf_protein.toFixed(1)) : 0,
-            carbs: foodDetails.nf_total_carbohydrate ? parseFloat(foodDetails.nf_total_carbohydrate.toFixed(1)) : 0,
-            fats: foodDetails.nf_total_fat ? parseFloat(foodDetails.nf_total_fat.toFixed(1)) : 0,
+            // Calculate and store per 100g values for consistency
+            calories: Math.round((foodDetails.nf_calories / foodDetails.serving_weight_grams) * 100),
+            protein: parseFloat(((foodDetails.nf_protein / foodDetails.serving_weight_grams) * 100).toFixed(1)),
+            carbs: parseFloat(((foodDetails.nf_total_carbohydrate / foodDetails.serving_weight_grams) * 100).toFixed(1)),
+            fats: parseFloat(((foodDetails.nf_total_fat / foodDetails.serving_weight_grams) * 100).toFixed(1)),
         };
 
     } catch (error) {
