@@ -7,7 +7,7 @@ export type SetPerformance = {
 };
 
 export type Exercise = {
-  id: string;
+  id:string;
   name: string;
   sets: number | '';
   reps: number | '';
@@ -45,6 +45,9 @@ export type BodyWeightLogEntry = {
 export type CheckinLogEntry = {
   id: string;
   date: string; // ISO String
+  energy?: number;
+  trained?: boolean;
+  hitMacros?: boolean;
 };
 
 export type SleepLogEntry = {

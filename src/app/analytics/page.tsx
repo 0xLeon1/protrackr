@@ -141,8 +141,9 @@ export default function AnalyticsPage() {
   const bodyWeightChartData = useMemo(() => {
     if (bodyWeightLogs.length < 2) return [];
     return [...bodyWeightLogs]
-        .reverse()
+        .reverse() // Sort logs from oldest to newest for the chart
         .map(log => ({
+            fullDate: log.date.split('T')[0], // YYYY-MM-DD
             date: format(parseISO(log.date), 'MMM d'),
             weight: log.weight,
         }));
@@ -230,6 +231,15 @@ export default function AnalyticsPage() {
         
         setBodyWeightLogs(prev => [newEntry, ...prev].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
         setCurrentWeight('');
+    }
+  };
+
+  const handleChartClick = (e: any) => {
+    if (e && e.activePayload && e.activePayload.length > 0) {
+        const date = e.activePayload[0].payload.fullDate;
+        if (date) {
+            router.push(`/analytics/${date}`);
+        }
     }
   };
   
@@ -338,15 +348,16 @@ export default function AnalyticsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Body Weight Trend</CardTitle>
-                    <CardDescription>Log your weight to track changes.</CardDescription>
+                    <CardDescription>Log your weight to track changes. Click a point to see details.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[180px] -ml-2 pr-2">
                         {bodyWeightLogs.length > 1 ? (
-                            <ChartContainer config={chartConfig} className="w-full h-full">
+                            <ChartContainer config={chartConfig} className="w-full h-full cursor-pointer">
                                 <LineChart
                                     data={bodyWeightChartData}
                                     margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
+                                    onClick={handleChartClick}
                                 >
                                     <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                     <XAxis

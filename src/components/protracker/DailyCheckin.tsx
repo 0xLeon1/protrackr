@@ -17,6 +17,9 @@ import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 export default function DailyCheckin() {
   const [morningWeight, setMorningWeight] = useState('');
   const [sleepHours, setSleepHours] = useState('');
+  const [energyLevel, setEnergyLevel] = useState(3);
+  const [trained, setTrained] = useState('yes');
+  const [hitMacros, setHitMacros] = useState('yes');
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -69,6 +72,9 @@ export default function DailyCheckin() {
 
     const newCheckinEntry: Omit<CheckinLogEntry, 'id'> = {
       date: today.toISOString(),
+      energy: energyLevel,
+      trained: trained === 'yes',
+      hitMacros: hitMacros === 'yes',
     };
     await addDoc(checkinsCollection, newCheckinEntry);
     
@@ -117,7 +123,7 @@ export default function DailyCheckin() {
         
         <div className="space-y-4">
           <Label>Did you train today?</Label>
-          <RadioGroup defaultValue="yes" className="flex gap-4">
+          <RadioGroup value={trained} onValueChange={setTrained} className="flex gap-4">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="yes" id="train-yes" />
               <Label htmlFor="train-yes">Yes</Label>
@@ -130,7 +136,7 @@ export default function DailyCheckin() {
         </div>
         <div className="space-y-4">
           <Label>Did you hit your macros?</Label>
-          <RadioGroup defaultValue="yes" className="flex gap-4">
+           <RadioGroup value={hitMacros} onValueChange={setHitMacros} className="flex gap-4">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="yes" id="macros-yes" />
               <Label htmlFor="macros-yes">Yes</Label>
@@ -143,7 +149,7 @@ export default function DailyCheckin() {
         </div>
         <div className="space-y-4">
             <Label htmlFor="energy">Energy</Label>
-            <Slider id="energy" defaultValue={[3]} min={1} max={5} step={1} />
+            <Slider id="energy" value={[energyLevel]} onValueChange={(value) => setEnergyLevel(value[0])} min={1} max={5} step={1} />
             <div className="flex justify-between text-xs text-muted-foreground px-1">
               <span>1</span>
               <span>2</span>
