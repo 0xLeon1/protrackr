@@ -203,8 +203,27 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
   };
 
   const handleSelectFood = async (food: FoodDataItem) => {
-    // Since common foods are now pre-fetched with details, this logic simplifies
-    setSelectedFood(food);
+    if (food.dataType === 'branded' || food.calories) {
+        // If it's branded or already has details, select it.
+        setSelectedFood(food);
+    } else {
+        // It's a common food that needs details fetched.
+        setIsFetchingDetails(true);
+        const detailedFood = await getCommonFoodDetails(food.name);
+        setIsFetchingDetails(false);
+        if (detailedFood) {
+            setSelectedFood(detailedFood);
+        } else {
+            toast({
+                title: "Could not fetch details",
+                description: `We couldn't find nutritional information for "${food.name}". You can add it manually.`,
+                variant: "destructive"
+            });
+            // Optional: switch to manual view with name pre-filled
+            setCustomFood(prev => ({...prev, name: food.name}));
+            setView('manual');
+        }
+    }
   };
 
   const handleSaveMeal = () => {
@@ -413,28 +432,26 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
           {searchResults.length > 0 ? (
             <div className="space-y-2">
               {searchResults.map(food => {
-                const subtitleParts = [];
-
-                if (food.dataType === 'branded' && food.brandName) {
-                    subtitleParts.push(food.brandName);
-                }
-
-                if (food.servingQty && food.servingUnit) {
-                    let servingString = `${food.servingQty} ${capitalizeWords(food.servingUnit)}`;
-                    if (food.servingWeightGrams) {
-                        servingString += ` (${Math.round(food.servingWeightGrams)}g)`;
+                let subtitle = '';
+                if (food.dataType === 'branded') {
+                    const subtitleParts = [];
+                    if (food.brandName) {
+                        subtitleParts.push(food.brandName);
                     }
-                    subtitleParts.push(servingString);
+                    if (food.servingQty && food.servingUnit) {
+                        let servingString = `${food.servingQty} ${capitalizeWords(food.servingUnit)}`;
+                        if (food.servingWeightGrams) {
+                            servingString += ` (${Math.round(food.servingWeightGrams)}g)`;
+                        }
+                        subtitleParts.push(servingString);
+                    }
+                    if (typeof food.caloriesPerServing !== 'undefined') {
+                        subtitleParts.push(`${food.caloriesPerServing} kcal`);
+                    }
+                    subtitle = subtitleParts.join(' - ');
+                } else {
+                    subtitle = 'Common Food';
                 }
-                
-                if (typeof food.caloriesPerServing !== 'undefined') {
-                    subtitleParts.push(`${food.caloriesPerServing} kcal`);
-                } else if (food.dataType === 'common' && typeof food.calories !== 'undefined') {
-                    subtitleParts.push('Common Food');
-                    subtitleParts.push(`${food.calories} kcal per 100g`);
-                }
-                
-                const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' - ') : (food.dataType === 'common' ? 'Common Food' : 'Branded Food');
                 const displayName = food.brandName ? food.name : capitalizeWords(food.name);
 
                 return (
@@ -499,8 +516,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         <Accordion type="multiple" className="w-full" defaultValue={['Breakfast', 'Lunch']}>
           {MEAL_TYPES.map(mealType => (
             <AccordionItem value={mealType} key={mealType} className="border-b last:border-b-0">
-               <div className="flex w-full items-center">
-                  <AccordionTrigger className="flex-1 text-left p-4 hover:no-underline">
+               <div className="flex w-full items-center p-4">
+                  <AccordionTrigger className="flex-1 p-0 hover:no-underline">
                       <div className="flex flex-col items-start">
                         <span className="text-lg font-semibold">{mealType}</span>
                         <span className="text-xs text-muted-foreground">{macroSummary(mealType)}</span>
@@ -510,7 +527,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="text-accent hover:text-accent/90 rounded-full shrink-0 mr-4" 
+                      className="text-accent hover:text-accent/90 rounded-full shrink-0 ml-4" 
                       onClick={() => handleOpenDialog(mealType)}
                     >
                       <PlusCircle className="w-6 h-6" />

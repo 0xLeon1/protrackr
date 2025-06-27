@@ -91,13 +91,16 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
             return item;
         }).filter(item => typeof item.calories !== 'undefined'); // Only include items where we could calculate calories
 
-        const commonFoodPromises = (data.common || []).map(food => getCommonFoodDetails(food.food_name));
-        const detailedCommonResults = (await Promise.all(commonFoodPromises)).filter((food): food is FoodDataItem => food !== null);
+        const commonResults: FoodDataItem[] = (data.common || []).map(food => ({
+            id: food.food_name,
+            name: food.food_name,
+            dataType: 'common',
+        }));
+
+        const allResults = [...commonResults, ...brandedResults];
 
         // Deduplicate results based on capitalized name
         const uniqueResults = new Map<string, FoodDataItem>();
-        const allResults = [...brandedResults, ...detailedCommonResults];
-
         allResults.forEach(item => {
             const capitalizedName = item.name.toUpperCase();
             if (!uniqueResults.has(capitalizedName)) {
