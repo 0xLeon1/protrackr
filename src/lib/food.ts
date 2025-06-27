@@ -137,10 +137,11 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            body: JSON.stringify({ query: `1 ${foodName}` }),
+            body: JSON.stringify({ query: foodName }),
         });
 
         if (!response.ok) {
+            console.error(`Nutritionix API error for "${foodName}":`, response.status, response.statusText);
             return null;
         }
 
@@ -178,6 +179,7 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         };
 
     } catch (error) {
+        console.error("Error fetching common food details:", error);
         return null;
     }
 }
