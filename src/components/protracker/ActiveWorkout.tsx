@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Workout } from '@/types';
@@ -92,7 +93,7 @@ export default function ActiveWorkout({ workout, onWorkoutChange, lastWorkout }:
             <CardHeader>
               <CardTitle>{exercise.name}</CardTitle>
               <CardDescription>
-                Target: {exercise.sets} sets of {exercise.reps} reps @ {exercise.weight}kg.
+                Target: {exercise.sets} sets of {exercise.reps} reps @ {exercise.weight} lbs.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -100,7 +101,7 @@ export default function ActiveWorkout({ workout, onWorkoutChange, lastWorkout }:
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[80px]">Set</TableHead>
-                    <TableHead>Weight (kg)</TableHead>
+                    <TableHead>Weight (lbs)</TableHead>
                     <TableHead>Reps</TableHead>
                     <TableHead className="text-right">Done</TableHead>
                   </TableRow>
@@ -120,12 +121,12 @@ export default function ActiveWorkout({ workout, onWorkoutChange, lastWorkout }:
                             onChange={(e) => handleSetChange(exercise.id, set.id, 'weight', e.target.value)}
                             onBlur={() => handleSetBlur(exercise.id, set.id, 'weight')}
                             className="w-24"
-                            placeholder="kg"
+                            placeholder="lbs"
                           />
                           {lastSet?.completed && (
                             <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
                               <History className="w-3 h-3"/>
-                              Last: {lastSet.weight}kg
+                              Last: {lastSet.weight} lbs
                             </p>
                           )}
                         </TableCell>
