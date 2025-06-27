@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import type { WorkoutLogEntry, BodyWeightLogEntry } from "@/types";
+import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,19 +41,25 @@ export default function AnalyticsPage() {
   const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
   const [bodyWeightLogs, setBodyWeightLogs] = useState<BodyWeightLogEntry[]>([]);
   const [currentWeight, setCurrentWeight] = useState('');
+  const [checkinDays, setCheckinDays] = useState(0);
+  const [workoutDays, setWorkoutDays] = useState(0);
+  const [nutritionDays, setNutritionDays] = useState(0);
+  const [weeklyAdherence, setWeeklyAdherence] = useState(0);
 
   useEffect(() => {
     // Load Workout Logs
     const storedLogs = localStorage.getItem('protracker-logs');
-    if (storedLogs) {
+    const workoutLogs: WorkoutLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
+    if (workoutLogs.length > 0) {
       try {
-        const parsedLogs: WorkoutLogEntry[] = JSON.parse(storedLogs);
-        const sortedLogs = parsedLogs.sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
+        const sortedLogs = [...workoutLogs].sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
         setLogs(sortedLogs);
         calculateDailyVolume(sortedLogs);
       } catch (error) {
         console.error("Failed to parse logs from localStorage", error);
       }
+    } else {
+        calculateDailyVolume([]);
     }
     
     // Load Body Weight Logs
@@ -77,6 +83,53 @@ export default function AnalyticsPage() {
         setBodyWeightLogs(exampleBodyWeightData);
         localStorage.setItem('protracker-bodyweight', JSON.stringify(exampleBodyWeightData));
     }
+
+    // --- Weekly Adherence Data ---
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+
+    const getUniqueDaysInWeek = (logs: any[], dateKey: 'date' | 'completedAt'): number => {
+      if (!logs) return 0;
+      try {
+        const uniqueDays = new Set<string>();
+        logs.forEach(log => {
+          const dateValue = log[dateKey];
+          if (dateValue && typeof dateValue === 'string') {
+              const logDate = parseISO(dateValue);
+              if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+                  uniqueDays.add(logDate.toISOString().split('T')[0]);
+              }
+          }
+        });
+        return uniqueDays.size;
+      } catch (error) {
+        console.error("Error processing logs for analytics:", error);
+        return 0;
+      }
+    };
+
+    // Check-ins
+    const storedCheckins = localStorage.getItem('protracker-checkins');
+    const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
+    const checkinsCount = getUniqueDaysInWeek(checkinLogs, 'date');
+    setCheckinDays(checkinsCount);
+
+    // Workouts (using already loaded workoutLogs)
+    const workoutsCount = getUniqueDaysInWeek(workoutLogs, 'completedAt');
+    setWorkoutDays(workoutsCount);
+    
+    // Nutrition
+    const storedMealLogs = localStorage.getItem('protracker-meal-logs');
+    const mealLogs: FoodLogEntry[] = storedMealLogs ? JSON.parse(storedMealLogs) : [];
+    const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
+    setNutritionDays(nutritionCount);
+
+    // Adherence
+    const totalActivities = checkinsCount + workoutsCount + nutritionCount;
+    const adherencePercentage = totalActivities > 0 ? Math.round((totalActivities / (3 * 7)) * 100) : 0;
+    setWeeklyAdherence(adherencePercentage);
+
   }, []);
 
   const bodyWeightChartData = useMemo(() => {
@@ -160,6 +213,33 @@ export default function AnalyticsPage() {
         <h1 className="text-3xl font-bold">Analytics</h1>
         <p className="text-muted-foreground">Your performance overview.</p>
       </header>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+            <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+                <p className="text-4xl font-bold text-accent">{checkinDays}</p>
+                <p className="text-sm text-muted-foreground">Check-in Days</p>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+                <p className="text-4xl font-bold text-accent">{workoutDays}</p>
+                <p className="text-sm text-muted-foreground">Workout Days</p>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+                <p className="text-4xl font-bold text-accent">{nutritionDays}</p>
+                <p className="text-sm text-muted-foreground">Nutrition Days</p>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+                <p className="text-4xl font-bold text-accent">{weeklyAdherence}%</p>
+                <p className="text-sm text-muted-foreground">Weekly Adherence</p>
+            </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
@@ -336,3 +416,5 @@ export default function AnalyticsPage() {
     </div>
   );
 }
+
+    
