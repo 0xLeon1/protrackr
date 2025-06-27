@@ -40,58 +40,6 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
-const initialPrograms: Program[] = [
-  {
-    id: 'prog1',
-    name: 'My 5-Day Split',
-    workouts: [
-      {
-        id: 'work1',
-        name: 'Day 1: Push (Chest, Shoulders, Triceps)',
-        exercises: [
-          { id: 'ex1', name: 'Barbell Bench Press', sets: 4, reps: 8, weight: 185, notes: 'Felt strong today.' },
-          { id: 'ex2', name: 'Incline Dumbbell Press', sets: 3, reps: 10, weight: 65, notes: '' },
-          { id: 'ex3', name: 'Overhead Press', sets: 4, reps: 8, weight: 105, notes: '' },
-          { id: 'ex4', name: 'Tricep Pushdowns', sets: 4, reps: 12, weight: 50, notes: '' },
-        ]
-      },
-      {
-        id: 'work2',
-        name: 'Day 2: Pull (Back, Biceps)',
-        exercises: [
-          { id: 'ex5', name: 'Pull-ups', sets: 4, reps: 8, weight: 0, notes: 'Bodyweight' },
-          { id: 'ex6', name: 'Bent Over Rows', sets: 4, reps: 8, weight: 135, notes: '' },
-          { id: 'ex7', name: 'Bicep Curls', sets: 3, reps: 12, weight: 30, notes: '' },
-        ]
-      }
-    ]
-  },
-  {
-    id: 'prog2',
-    name: 'Starting Strength',
-    workouts: [
-      {
-        id: 'work3',
-        name: 'Workout A',
-        exercises: [
-            { id: 'ex8', name: 'Squat', sets: 3, reps: 5, weight: 225, notes: '' },
-            { id: 'ex9', name: 'Bench Press', sets: 3, reps: 5, weight: 185, notes: '' },
-            { id: 'ex10', name: 'Deadlift', sets: 1, reps: 5, weight: 315, notes: '' },
-        ]
-      },
-       {
-        id: 'work4',
-        name: 'Workout B',
-        exercises: [
-            { id: 'ex11', name: 'Squat', sets: 3, reps: 5, weight: 225, notes: '' },
-            { id: 'ex12', name: 'Overhead Press', sets: 3, reps: 5, weight: 105, notes: '' },
-            { id: 'ex13', name: 'Power Clean', sets: 5, reps: 3, weight: 135, notes: '' },
-        ]
-      }
-    ]
-  }
-];
-
 export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [pageIsLoading, setPageIsLoading] = useState(true);
@@ -116,20 +64,8 @@ export default function ProgramsPage() {
         try {
           const programsCollection = collection(db, 'users', user.uid, 'programs');
           const querySnapshot = await getDocs(programsCollection);
-
-          if (querySnapshot.empty) {
-            // Seed initial data for a new user
-            const seedingPromises = initialPrograms.map(program => {
-                const programRef = doc(db, 'users', user.uid, 'programs', program.id);
-                return setDoc(programRef, program);
-            });
-            await Promise.all(seedingPromises);
-            setPrograms(initialPrograms);
-
-          } else {
-            const userPrograms = querySnapshot.docs.map(doc => ({ ...doc.data() } as Program));
-            setPrograms(userPrograms);
-          }
+          const userPrograms = querySnapshot.docs.map(doc => ({ ...doc.data() } as Program));
+          setPrograms(userPrograms);
         } catch (error) {
             console.error("Error fetching programs:", error);
             toast({
@@ -457,5 +393,3 @@ export default function ProgramsPage() {
     </div>
   );
 }
-
-    

@@ -80,47 +80,14 @@ export default function AnalyticsPage() {
         // --- Body Weight Logs ---
         const bodyWeightCollection = collection(db, 'users', user.uid, 'bodyweight-logs');
         const bodyWeightSnapshot = await getDocs(bodyWeightCollection);
-        let userBodyWeightLogs: BodyWeightLogEntry[];
-        if (bodyWeightSnapshot.empty) {
-            const exampleBodyWeightData: Omit<BodyWeightLogEntry, 'id'>[] = [
-                { weight: 185, date: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString() },
-                { weight: 184.5, date: new Date(new Date().setDate(new Date().getDate() - 21)).toISOString() },
-                { weight: 183, date: new Date(new Date().setDate(new Date().getDate() - 14)).toISOString() },
-                { weight: 182.5, date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString() },
-                { weight: 181, date: new Date().toISOString() },
-            ];
-            const newEntries: BodyWeightLogEntry[] = [];
-            for (const entry of exampleBodyWeightData) {
-              const newDocRef = await addDoc(bodyWeightCollection, entry);
-              newEntries.push({ ...entry, id: newDocRef.id });
-            }
-            userBodyWeightLogs = newEntries;
-        } else {
-            userBodyWeightLogs = bodyWeightSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as BodyWeightLogEntry));
-        }
-        const sortedBodyWeight = userBodyWeightLogs.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+        const userBodyWeightLogs: BodyWeightLogEntry[] = bodyWeightSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as BodyWeightLogEntry));
+        const sortedBodyWeight = [...userBodyWeightLogs].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
         setBodyWeightLogs(sortedBodyWeight);
 
         // --- Sleep Logs ---
         const sleepLogsCollection = collection(db, 'users', user.uid, 'sleep-logs');
         const sleepLogsSnapshot = await getDocs(sleepLogsCollection);
-        let userSleepLogs: SleepLogEntry[];
-        if (sleepLogsSnapshot.empty) {
-          const exampleSleepData: Omit<SleepLogEntry, 'id'>[] = [
-              { hours: 7.5, date: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString() },
-              { hours: 8, date: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString() },
-              { hours: 6, date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString() },
-              { hours: 7, date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString() },
-          ];
-          const newEntries: SleepLogEntry[] = [];
-          for (const entry of exampleSleepData) {
-            const newDocRef = await addDoc(sleepLogsCollection, entry);
-            newEntries.push({ ...entry, id: newDocRef.id });
-          }
-          userSleepLogs = newEntries;
-        } else {
-          userSleepLogs = sleepLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SleepLogEntry));
-        }
+        const userSleepLogs: SleepLogEntry[] = sleepLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SleepLogEntry));
         setSleepLogs(userSleepLogs);
         calculateWeeklySleep(userSleepLogs);
 
@@ -261,7 +228,7 @@ export default function AnalyticsPage() {
             id: newDocRef.id,
         };
         
-        setBodyWeightLogs(prev => [newEntry, ...prev]);
+        setBodyWeightLogs(prev => [newEntry, ...prev].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
         setCurrentWeight('');
     }
   };

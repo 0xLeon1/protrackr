@@ -11,12 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-
-const exampleMealData: Omit<FoodLogEntry, 'id' | 'date'>[] = [
-    { mealType: 'Breakfast', name: 'Scrambled Eggs & Toast', calories: 329, protein: 19, carbs: 33, fats: 12 },
-    { mealType: 'Lunch', name: 'Chicken Wrap', calories: 341, protein: 16, carbs: 26, fats: 18 }
-];
+import { collection, getDocs, doc, addDoc, deleteDoc } from 'firebase/firestore';
 
 const defaultGoals: MacroGoals = {
   calories: 2500,
@@ -42,24 +37,8 @@ export default function NutritionPage() {
         const fetchMealLogs = async () => {
             const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
             const mealLogsSnapshot = await getDocs(mealLogsCollection);
-            
-            if (mealLogsSnapshot.empty) {
-                // Seed data for new user
-                const today = startOfToday().toISOString();
-                const batch = writeBatch(db);
-                const seededLogs: FoodLogEntry[] = [];
-                exampleMealData.forEach(meal => {
-                    const docRef = doc(mealLogsCollection);
-                    const newLog = { ...meal, date: today, id: docRef.id };
-                    batch.set(docRef, newLog);
-                    seededLogs.push(newLog);
-                });
-                await batch.commit();
-                setAllMealLogs(seededLogs);
-            } else {
-                const logs = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
-                setAllMealLogs(logs);
-            }
+            const logs = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
+            setAllMealLogs(logs);
         };
         fetchMealLogs();
     }
