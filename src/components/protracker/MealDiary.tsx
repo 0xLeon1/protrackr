@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import type { FoodLogEntry, MealType, FoodDataItem } from "@/types";
+import type { FoodLogEntry, MealType, FoodDataItem, Serving } from "@/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -16,7 +16,6 @@ import { GRAMS_PER_OUNCE } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/auth-context";
 
 function capitalizeWords(str: string): string {
     if (!str) return '';
@@ -27,8 +26,6 @@ function capitalizeWords(str: string): string {
 }
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
-const RECENT_FOODS_KEY_PREFIX = 'protracker-recents-';
-const MAX_RECENT_FOODS = 5;
 
 interface MealDiaryProps {
   logs: FoodLogEntry[];
@@ -54,50 +51,29 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
 
   // Serving size state
   const [amount, setAmount] = useState("1");
-  const [unit, setUnit] = useState<string>("serving");
-  
-  // Recent foods state
-  const [recentFoods, setRecentFoods] = useState<FoodDataItem[]>([]);
+  const [unit, setUnit] = useState<string>(""); // Will be serving_id, 'g', or 'oz'
+  const [gramReferenceServing, setGramReferenceServing] = useState<Serving | null>(null);
 
   // Custom food form state
   const [customFood, setCustomFood] = useState({ name: '', calories: '', protein: '', carbs: '', fats: '' });
   
   const { toast } = useToast();
-  const { user } = useAuth();
-  
-  const getRecentFoods = (userId: string): FoodDataItem[] => {
-      const key = `${RECENT_FOODS_KEY_PREFIX}${userId}`;
-      const stored = localStorage.getItem(key);
-      try {
-        return stored ? JSON.parse(stored) : [];
-      } catch (e) {
-        return [];
-      }
-  };
-
-  const addRecentFood = (userId: string, food: FoodDataItem) => {
-      if (!food.name || typeof food.calories === 'undefined') return; // Don't save incomplete items
-      const key = `${RECENT_FOODS_KEY_PREFIX}${userId}`;
-      let recents = getRecentFoods(userId);
-      
-      recents = recents.filter(f => f.name.toLowerCase() !== food.name.toLowerCase());
-      
-      recents.unshift(food);
-      
-      if (recents.length > MAX_RECENT_FOODS) {
-          recents = recents.slice(0, MAX_RECENT_FOODS);
-      }
-      
-      localStorage.setItem(key, JSON.stringify(recents));
-  };
   
   // Effect to load recent foods when dialog opens
   useEffect(() => {
-    if (isDialogOpen && user) {
-        const recents = getRecentFoods(user.uid);
-        setRecentFoods(recents);
+    if (selectedFood?.servings) {
+        const refServing = selectedFood.servings.find(s => s.weightGrams && s.weightGrams > 0) || null;
+        setGramReferenceServing(refServing);
+        
+        if (selectedFood.servings.length > 0) {
+            setUnit(selectedFood.servings[0].id);
+            setAmount("1");
+        } else if (refServing) {
+            setUnit('g');
+            setAmount('100');
+        }
     }
-  }, [isDialogOpen, user]);
+  }, [selectedFood]);
 
   // Effect to handle searching
   useEffect(() => {
@@ -128,19 +104,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
 
     return () => clearTimeout(handler);
   }, [searchQuery, view, isDialogOpen, selectedFood, toast]);
-  
-  // When a food is selected, intelligently set the default amount and unit.
-  useEffect(() => {
-    if (selectedFood) {
-      if (selectedFood.servingUnit && selectedFood.servingWeightGrams) {
-        setUnit("serving");
-        setAmount(String(selectedFood.servingQty || 1));
-      } else {
-        setUnit("g");
-        setAmount("100");
-      }
-    }
-  }, [selectedFood]);
 
 
   const resetDialogState = () => {
@@ -151,36 +114,46 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     setSelectedFood(null);
     setEditingLog(null);
     setAmount("1");
-    setUnit("serving");
+    setUnit("");
     setView('search');
     setCustomFood({ name: '', calories: '', protein: '', carbs: '', fats: '' });
+    setGramReferenceServing(null);
   };
 
   const calculatedMacros = useMemo(() => {
-    if (!selectedFood || typeof selectedFood.calories === 'undefined') {
+    if (!selectedFood || !unit) {
        return { calories: 0, protein: 0, carbs: 0, fats: 0 };
     }
     
     const numAmount = parseFloat(amount) || 0;
-    let totalGrams = 0;
 
-    if (unit === 'g') {
-        totalGrams = numAmount;
-    } else if (unit === 'oz') {
-        totalGrams = numAmount * GRAMS_PER_OUNCE;
-    } else if (unit === 'serving' && selectedFood.servingWeightGrams) {
-        totalGrams = numAmount * selectedFood.servingWeightGrams;
+    // Case 1: Unit is 'g' or 'oz', and we have a serving with gram weight to calculate from
+    if ((unit === 'g' || unit === 'oz') && gramReferenceServing) {
+        const gramsPerRef = gramReferenceServing.weightGrams!;
+        
+        const totalGrams = unit === 'oz' ? numAmount * GRAMS_PER_OUNCE : numAmount;
+
+        return {
+            calories: Math.round(gramReferenceServing.calories / gramsPerRef * totalGrams),
+            protein: parseFloat((gramReferenceServing.protein / gramsPerRef * totalGrams).toFixed(1)),
+            carbs: parseFloat((gramReferenceServing.carbs / gramsPerRef * totalGrams).toFixed(1)),
+            fats: parseFloat((gramReferenceServing.fats / gramsPerRef * totalGrams).toFixed(1)),
+        }
     }
 
-    const ratio = totalGrams > 0 ? totalGrams / 100 : 0;
+    // Case 2: Unit is a serving ID from the API
+    const selectedServing = selectedFood.servings?.find(s => s.id === unit);
+    if (selectedServing) {
+        return {
+          calories: Math.round(selectedServing.calories * numAmount),
+          protein: parseFloat((selectedServing.protein * numAmount).toFixed(1)),
+          carbs: parseFloat((selectedServing.carbs * numAmount).toFixed(1)),
+          fats: parseFloat((selectedServing.fats * numAmount).toFixed(1)),
+        };
+    }
 
-    return {
-      calories: Math.round((selectedFood.calories || 0) * ratio),
-      protein: parseFloat(((selectedFood.protein || 0) * ratio).toFixed(1)),
-      carbs: parseFloat(((selectedFood.carbs || 0) * ratio).toFixed(1)),
-      fats: parseFloat(((selectedFood.fats || 0) * ratio).toFixed(1)),
-    };
-  }, [selectedFood, amount, unit]);
+    return { calories: 0, protein: 0, carbs: 0, fats: 0 };
+  }, [selectedFood, amount, unit, gramReferenceServing]);
 
   const handleOpenDialog = (mealType: MealType) => {
     setActiveMealType(mealType);
@@ -232,7 +205,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
   };
 
   const handleSaveMeal = () => {
-    if (!activeMealType || !selectedFood || !user) return;
+    if (!activeMealType || !selectedFood || !unit) return;
+    
     const numAmount = parseFloat(amount) || 0;
     
     const mealData = {
@@ -247,7 +221,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     if (editingLog) {
         onUpdateMeal({ ...editingLog, ...mealData });
     } else {
-        addRecentFood(user.uid, selectedFood);
         onAddMeal(mealData);
     }
     setIsDialogOpen(false);
@@ -258,7 +231,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
   };
   
   const handleSaveCustomMeal = () => {
-      if (!activeMealType || !customFood.name || !customFood.calories || !user) return;
+      if (!activeMealType || !customFood.name || !customFood.calories) return;
       
       const mealData = {
           mealType: activeMealType,
@@ -336,13 +309,13 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                     <SelectValue placeholder="Select unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    {selectedFood.servingUnit && selectedFood.servingWeightGrams && (
-                       <SelectItem value="serving">
-                          {capitalizeWords(selectedFood.servingUnit)} ({Math.round(selectedFood.servingWeightGrams)}g)
+                    {selectedFood.servings?.map(serving => (
+                       <SelectItem key={serving.id} value={serving.id}>
+                          {capitalizeWords(serving.name)}
                        </SelectItem>
-                    )}
-                    <SelectItem value="g">Grams (g)</SelectItem>
-                    <SelectItem value="oz">Ounces (oz)</SelectItem>
+                    ))}
+                    {gramReferenceServing && <SelectItem value="g">Grams (g)</SelectItem>}
+                    {gramReferenceServing && <SelectItem value="oz">Ounces (oz)</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -457,30 +430,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         
         <Separator />
         
-        <div className="space-y-2">
-            <h4 className="font-medium text-sm text-muted-foreground">Recently Logged</h4>
-            {recentFoods.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                    {recentFoods.map(food => (
-                        <Button
-                            key={`${food.id}-${food.name}`}
-                            variant="outline"
-                            size="sm"
-                            className="h-auto py-1 px-2.5"
-                            onClick={() => handleSelectFood(food)}
-                        >
-                            {food.brandName ? food.name : capitalizeWords(food.name)}
-                        </Button>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-center text-xs text-muted-foreground py-2">
-                    Your recently logged foods will appear here.
-                </p>
-            )}
-        </div>
-
-        <Separator />
         <Button variant="link" className="p-0 h-auto" onClick={() => setView('manual')}>
           Can't find it? Add a custom food
         </Button>
@@ -525,7 +474,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                     (mealsByType[mealType] || []).map(meal => (
                       <div key={meal.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
                         <div>
-                          <p className="font-medium">{meal.brandName ? meal.name : capitalizeWords(meal.name)}</p>
+                          <p className="font-medium">{meal.foodDetails?.brandName ? meal.name : capitalizeWords(meal.name)}</p>
                           <p className="text-muted-foreground text-xs">
                             {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
                           </p>

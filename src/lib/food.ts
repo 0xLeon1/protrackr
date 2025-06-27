@@ -1,5 +1,5 @@
 
-import type { FoodDataItem } from "@/types";
+import type { FoodDataItem, Serving } from "@/types";
 
 // --- FatSecret API Implementation ---
 
@@ -147,47 +147,28 @@ export async function getFoodDetails(foodId: string): Promise<FoodDataItem | nul
         const data = await response.json();
         const food = data.food;
         
-        if (!food || !food.servings || !food.servings.serving) {
-             throw new Error(`Incomplete data received for food ID ${foodId}.`);
+        if (!food) {
+            throw new Error(`No food data returned for ID ${foodId}.`);
         }
         
-        const servings: FatSecretServing[] = Array.isArray(food.servings.serving) ? food.servings.serving : [food.servings.serving];
+        const servingsList: FatSecretServing[] = Array.isArray(food.servings?.serving) ? food.servings.serving : food.servings?.serving ? [food.servings.serving] : [];
 
-        // Find a 100g serving, or the first serving with a gram weight to calculate from
-        let baseServing = servings.find(s => s.metric_serving_amount === "100" && s.metric_serving_unit === "g");
-        let servingWithGrams = servings.find(s => s.metric_serving_amount && s.metric_serving_unit === 'g');
+        const mappedServings: Serving[] = servingsList.map(s => ({
+            id: s.serving_id,
+            name: s.serving_description,
+            calories: parseFloat(s.calories),
+            protein: parseFloat(s.protein),
+            carbs: parseFloat(s.carbohydrate),
+            fats: parseFloat(s.fat),
+            weightGrams: s.metric_serving_amount ? parseFloat(s.metric_serving_amount) : undefined,
+        }));
         
-        if (!baseServing && !servingWithGrams) {
-            throw new Error(`Food ${foodId} has no serving with gram weight to use for calculations.`);
-        }
-
-        const referenceServing = baseServing || servingWithGrams!;
-        const servingWeight = parseFloat(referenceServing.metric_serving_amount!);
-        const ratio = servingWeight > 0 ? 100 / servingWeight : 0;
-        
-        const calories = parseFloat(referenceServing.calories);
-        const protein = parseFloat(referenceServing.protein);
-        const carbs = parseFloat(referenceServing.carbohydrate);
-        const fats = parseFloat(referenceServing.fat);
-        
-        const standardServing = servings.find(s => s.measurement_description.toLowerCase() !== 'g') || referenceServing;
-        const standardServingWeight = parseFloat(standardServing.metric_serving_amount || "0");
-
         return {
             id: food.food_id,
             name: food.food_name,
             brandName: food.brand_name,
             dataType: food.food_type === 'Branded' ? 'branded' : 'common',
-
-            calories: Math.round(calories * ratio),
-            protein: parseFloat((protein * ratio).toFixed(1)),
-            carbs: parseFloat((carbs * ratio).toFixed(1)),
-            fats: parseFloat((fats * ratio).toFixed(1)),
-            
-            servingQty: parseFloat(standardServing.number_of_units),
-            servingUnit: standardServing.measurement_description,
-            servingWeightGrams: standardServingWeight,
-            caloriesPerServing: Math.round(parseFloat(standardServing.calories)),
+            servings: mappedServings,
         };
 
     } catch (error) {

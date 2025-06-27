@@ -77,24 +77,25 @@ export type FoodLogEntry = {
 
   // Fields for editing and recalculation
   servingAmount: number;
-  servingUnit: string;
+  servingUnit: string; // This can be a serving_id from FatSecret, or 'g' or 'oz'
   foodDetails: FoodDataItem | null; // Details of the base food, null if custom entry
 };
+
+export interface Serving {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  weightGrams?: number;
+}
 
 export interface FoodDataItem {
     id: string;
     name: string;
     brandName?: string;
     description?: string;
-    // Macros per 100g
-    calories?: number;
-    protein?: number;
-    carbs?: number;
-    fats?: number;
     dataType: 'branded' | 'common';
-    // Optional serving info
-    servingQty?: number;
-    servingUnit?: string;
-    servingWeightGrams?: number;
-    caloriesPerServing?: number;
+    servings?: Serving[]; // This will hold all possible servings from the API. Populated by getFoodDetails.
 }
