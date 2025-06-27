@@ -1,44 +1,146 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import type { MacroGoals } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Settings } from "lucide-react";
+
+const defaultGoals: MacroGoals = {
+  calories: 2500,
+  protein: 180,
+  carbs: 250,
+  fats: 70,
+};
 
 export default function MacroTracker() {
-  const calories = { current: 1890, goal: 2500 };
-  const protein = { current: 150, goal: 180 };
-  const carbs = { current: 200, goal: 250 };
-  const fats = { current: 50, goal: 70 };
+  // Hardcoded current values for now. This would typically come from a meal log.
+  const currentIntake = { calories: 1890, protein: 150, carbs: 200, fats: 50 };
+
+  const [goals, setGoals] = useState<MacroGoals>(defaultGoals);
+  const [tempGoals, setTempGoals] = useState<MacroGoals>(defaultGoals);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const storedGoals = localStorage.getItem('protracker-macro-goals');
+    if (storedGoals) {
+      try {
+        const parsedGoals = JSON.parse(storedGoals);
+        setGoals(parsedGoals);
+        setTempGoals(parsedGoals);
+      } catch (e) {
+        console.error("Failed to parse macro goals from localStorage", e);
+      }
+    }
+  }, []);
+
+  const handleGoalChange = (field: keyof MacroGoals, value: string) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue >= 0) {
+      setTempGoals(prev => ({ ...prev, [field]: numValue }));
+    } else if (value === "") {
+       setTempGoals(prev => ({ ...prev, [field]: 0 }));
+    }
+  };
+  
+  const handleSaveGoals = () => {
+    setGoals(tempGoals);
+    localStorage.setItem('protracker-macro-goals', JSON.stringify(tempGoals));
+    setIsDialogOpen(false);
+  };
+  
+  // When opening the dialog, reset tempGoals to the currently saved goals
+  useEffect(() => {
+    if (isDialogOpen) {
+      setTempGoals(goals);
+    }
+  }, [isDialogOpen, goals]);
 
   return (
     <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader>
-        <CardTitle className="font-headline">Macro Tracker</CardTitle>
-        <CardDescription>Your daily nutrition summary.</CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle className="font-headline">Macro Tracker</CardTitle>
+                <CardDescription>Your daily nutrition summary.</CardDescription>
+            </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                        <Settings className="h-5 w-5" />
+                        <span className="sr-only">Set Goals</span>
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Set Your Macro Goals</DialogTitle>
+                        <DialogDescription>
+                            Define your daily targets for calories and macronutrients.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="calories-goal" className="text-right">Calories</Label>
+                            <Input id="calories-goal" type="number" value={tempGoals.calories} onChange={(e) => handleGoalChange('calories', e.target.value)} className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="protein-goal" className="text-right">Protein</Label>
+                            <Input id="protein-goal" type="number" value={tempGoals.protein} onChange={(e) => handleGoalChange('protein', e.target.value)} className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="carbs-goal" className="text-right">Carbs</Label>
+                            <Input id="carbs-goal" type="number" value={tempGoals.carbs} onChange={(e) => handleGoalChange('carbs', e.target.value)} className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="fats-goal" className="text-right">Fats</Label>
+                            <Input id="fats-goal" type="number" value={tempGoals.fats} onChange={(e) => handleGoalChange('fats', e.target.value)} className="col-span-3" />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit" onClick={handleSaveGoals}>Save Goals</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex justify-between items-baseline">
-            <h3 className="text-3xl font-bold text-primary">{calories.current.toLocaleString()}</h3>
-            <span className="font-medium text-muted-foreground">/ {calories.goal.toLocaleString()} kCal</span>
+            <h3 className="text-3xl font-bold text-primary">{currentIntake.calories.toLocaleString()}</h3>
+            <span className="font-medium text-muted-foreground">/ {goals.calories.toLocaleString()} kCal</span>
         </div>
         <div className="space-y-3 pt-2">
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Protein</span>
-              <span className="text-muted-foreground">{protein.current}g / {protein.goal}g</span>
+              <span className="text-muted-foreground">{currentIntake.protein}g / {goals.protein}g</span>
             </div>
-            <Progress value={(protein.current / protein.goal) * 100} className="h-2 [&>div]:bg-sky-400" />
+            <Progress value={(currentIntake.protein / goals.protein) * 100} className="h-2 [&>div]:bg-sky-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Carbs</span>
-              <span className="text-muted-foreground">{carbs.current}g / {carbs.goal}g</span>
+              <span className="text-muted-foreground">{currentIntake.carbs}g / {goals.carbs}g</span>
             </div>
-            <Progress value={(carbs.current / carbs.goal) * 100} className="h-2 [&>div]:bg-orange-400" />
+            <Progress value={(currentIntake.carbs / goals.carbs) * 100} className="h-2 [&>div]:bg-orange-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Fats</span>
-              <span className="text-muted-foreground">{fats.current}g / {fats.goal}g</span>
+              <span className="text-muted-foreground">{currentIntake.fats}g / {goals.fats}g</span>
             </div>
-            <Progress value={(fats.current / fats.goal) * 100} className="h-2 [&>div]:bg-amber-400" />
+            <Progress value={(currentIntake.fats / goals.fats) * 100} className="h-2 [&>div]:bg-amber-400" />
           </div>
         </div>
       </CardContent>

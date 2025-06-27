@@ -40,3 +40,10 @@ export type BodyWeightLogEntry = {
   weight: number;
   date: string; // ISO String
 };
+
+export type MacroGoals = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+};
