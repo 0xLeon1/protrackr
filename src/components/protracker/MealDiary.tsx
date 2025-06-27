@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -28,20 +27,37 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
 
-  // State for the new food search dialog
+  // Dialog view state
+  const [view, setView] = useState<'search' | 'manual'>('search');
+  const [selectedFood, setSelectedFood] = useState<FoodDataItem | null>(null);
+
+  // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<FoodDataItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedFood, setSelectedFood] = useState<FoodDataItem | null>(null);
+
+  // Serving size state
   const [amount, setAmount] = useState("100");
   const [unit, setUnit] = useState<"g" | "oz">("g");
 
-  // Debounced search effect
+  // Custom food form state
+  const [customFood, setCustomFood] = useState({ name: '', calories: '', protein: '', carbs: '', fats: '' });
+
+  // Effect to handle searching
   useEffect(() => {
-    if (searchQuery.trim().length < 2) {
-      setSearchResults([]);
+    // Show full list initially when dialog opens
+    if (isDialogOpen && searchQuery === '' && view === 'search' && !selectedFood) {
+      const fetchInitialList = async () => {
+        setIsSearching(true);
+        const results = await searchFoods('');
+        setSearchResults(results);
+        setIsSearching(false);
+      };
+      fetchInitialList();
       return;
     }
+    
+    // Debounced search for user input
     const handler = setTimeout(async () => {
       setIsSearching(true);
       const results = await searchFoods(searchQuery);
@@ -50,7 +66,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     }, 300);
 
     return () => clearTimeout(handler);
-  }, [searchQuery]);
+  }, [searchQuery, isDialogOpen, view, selectedFood]);
 
   const resetDialogState = () => {
     setSearchQuery("");
@@ -59,6 +75,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     setSelectedFood(null);
     setAmount("100");
     setUnit("g");
+    setView('search');
+    setCustomFood({ name: '', calories: '', protein: '', carbs: '', fats: '' });
   };
 
   const calculatedMacros = useMemo(() => {
@@ -81,7 +99,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     setIsDialogOpen(true);
   };
 
-  const handleSaveMeal = () => {
+  const handleSaveSearchedMeal = () => {
     if (!activeMealType || !selectedFood) return;
 
     const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
@@ -91,7 +109,27 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     };
 
     onAddMeal(newMeal);
-    setIsDialogOpen(false); // This will trigger the reset via onOpenChange
+    setIsDialogOpen(false);
+  };
+
+  const handleCustomFoodChange = (field: keyof typeof customFood, value: string) => {
+    setCustomFood(prev => ({ ...prev, [field]: value.replace(/[^0-9.]/g, '') }));
+  };
+  
+  const handleSaveCustomMeal = () => {
+      if (!activeMealType || !customFood.name || !customFood.calories) return;
+      
+      const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
+          mealType: activeMealType,
+          name: customFood.name,
+          calories: parseFloat(customFood.calories) || 0,
+          protein: parseFloat(customFood.protein) || 0,
+          carbs: parseFloat(customFood.carbs) || 0,
+          fats: parseFloat(customFood.fats) || 0,
+      };
+
+      onAddMeal(newMeal);
+      setIsDialogOpen(false);
   };
 
   const mealsByType = useMemo(() => {
@@ -117,6 +155,138 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
     return `${Math.round(totals.calories)} kcal, ${Math.round(totals.protein)}g protein, ${Math.round(totals.carbs)}g carbs, ${Math.round(totals.fats)}g fat`;
   };
+
+  const renderDialogContent = () => {
+    if (selectedFood) {
+      // DETAILS VIEW
+      return (
+        <div className="space-y-4">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedFood(null)} className="-ml-4">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
+            </Button>
+            <h3 className="font-semibold text-lg">{selectedFood.name}</h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount</Label>
+                <Input id="amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <Select value={unit} onValueChange={(value: "g" | "oz") => setUnit(value)}>
+                  <SelectTrigger id="unit">
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="g">Grams (g)</SelectItem>
+                    <SelectItem value="oz">Ounces (oz)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Card className="p-4 bg-muted/50">
+              <h4 className="font-medium mb-2 text-center">Calculated Macros</h4>
+              <div className="flex justify-around text-center text-sm">
+                  <div>
+                      <p className="font-bold text-lg">{calculatedMacros.calories}</p>
+                      <p className="text-xs text-muted-foreground">kCal</p>
+                  </div>
+                  <div>
+                      <p className="font-bold text-lg">{calculatedMacros.protein}g</p>
+                      <p className="text-xs text-muted-foreground">Protein</p>
+                  </div>
+                  <div>
+                      <p className="font-bold text-lg">{calculatedMacros.carbs}g</p>
+                      <p className="text-xs text-muted-foreground">Carbs</p>
+                  </div>
+                  <div>
+                      <p className="font-bold text-lg">{calculatedMacros.fats}g</p>
+                      <p className="text-xs text-muted-foreground">Fats</p>
+                  </div>
+              </div>
+            </Card>
+
+            <DialogFooter>
+              <Button onClick={handleSaveSearchedMeal} className="w-full">Add to {activeMealType}</Button>
+            </DialogFooter>
+        </div>
+      );
+    }
+
+    if (view === 'manual') {
+      // MANUAL INPUT VIEW
+      return (
+         <div className="space-y-4">
+            <Button variant="ghost" size="sm" onClick={() => setView('search')} className="-ml-4">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
+            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="custom-name">Food Name</Label>
+              <Input id="custom-name" value={customFood.name} onChange={e => setCustomFood(prev => ({...prev, name: e.target.value}))} placeholder="e.g., Homemade Lasagna" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="custom-calories">Calories</Label>
+                    <Input id="custom-calories" type="number" value={customFood.calories} onChange={e => handleCustomFoodChange('calories', e.target.value)} placeholder="kcal"/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="custom-protein">Protein</Label>
+                    <Input id="custom-protein" type="number" value={customFood.protein} onChange={e => handleCustomFoodChange('protein', e.target.value)} placeholder="grams"/>
+                </div>
+            </div>
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="custom-carbs">Carbs</Label>
+                    <Input id="custom-carbs" type="number" value={customFood.carbs} onChange={e => handleCustomFoodChange('carbs', e.target.value)} placeholder="grams"/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="custom-fats">Fats</Label>
+                    <Input id="custom-fats" type="number" value={customFood.fats} onChange={e => handleCustomFoodChange('fats', e.target.value)} placeholder="grams"/>
+                </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleSaveCustomMeal} className="w-full">Log Custom Food</Button>
+            </DialogFooter>
+         </div>
+      );
+    }
+    
+    // SEARCH VIEW (default)
+    return (
+      <div className="space-y-4">
+        <div className="relative">
+          <Input
+            placeholder="e.g., Grilled Chicken"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
+        </div>
+        <ScrollArea className="h-60">
+          {searchResults.length > 0 ? (
+            <div className="space-y-2">
+              {searchResults.map(food => (
+                <button key={food.id} onClick={() => setSelectedFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
+                  <p>{food.name}</p>
+                  <p className="text-xs text-muted-foreground">{food.calories} kcal per 100g</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            !isSearching && (
+              <p className="text-center text-sm text-muted-foreground py-4">No results found.</p>
+            )
+          )}
+        </ScrollArea>
+        <Separator />
+        <Button variant="link" className="p-0 h-auto" onClick={() => setView('manual')}>
+          Can't find it? Add a custom food
+        </Button>
+      </div>
+    );
+  };
+
 
   return (
     <Card>
@@ -170,88 +340,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add Food to {activeMealType}</DialogTitle>
-            <DialogDescription>Search for a food to log it.</DialogDescription>
+            <DialogDescription>
+              {selectedFood ? 'Adjust serving size and save.' : (view === 'search' ? 'Search for a food to log.' : 'Log a custom food.')}
+            </DialogDescription>
           </DialogHeader>
-          {!selectedFood ? (
-            <div className="space-y-4">
-              <div className="relative">
-                <Input
-                  placeholder="e.g., Grilled Chicken"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
-              </div>
-              <ScrollArea className="h-60">
-                {searchResults.length > 0 ? (
-                  <div className="space-y-2">
-                    {searchResults.map(food => (
-                      <button key={food.id} onClick={() => setSelectedFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
-                        <p>{food.name}</p>
-                        <p className="text-xs text-muted-foreground">{food.calories} kcal per 100g</p>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  !isSearching && searchQuery.length > 1 && (
-                    <p className="text-center text-sm text-muted-foreground py-4">No results found.</p>
-                  )
-                )}
-              </ScrollArea>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <Button variant="ghost" size="sm" onClick={() => setSelectedFood(null)} className="-ml-4">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
-              </Button>
-              <h3 className="font-semibold text-lg">{selectedFood.name}</h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input id="amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unit</Label>
-                  <Select value={unit} onValueChange={(value: "g" | "oz") => setUnit(value)}>
-                    <SelectTrigger id="unit">
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="g">Grams (g)</SelectItem>
-                      <SelectItem value="oz">Ounces (oz)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <Card className="p-4 bg-muted/50">
-                <h4 className="font-medium mb-2 text-center">Calculated Macros</h4>
-                <div className="flex justify-around text-center text-sm">
-                    <div>
-                        <p className="font-bold text-lg">{calculatedMacros.calories}</p>
-                        <p className="text-xs text-muted-foreground">kCal</p>
-                    </div>
-                    <div>
-                        <p className="font-bold text-lg">{calculatedMacros.protein}g</p>
-                        <p className="text-xs text-muted-foreground">Protein</p>
-                    </div>
-                    <div>
-                        <p className="font-bold text-lg">{calculatedMacros.carbs}g</p>
-                        <p className="text-xs text-muted-foreground">Carbs</p>
-                    </div>
-                    <div>
-                        <p className="font-bold text-lg">{calculatedMacros.fats}g</p>
-                        <p className="text-xs text-muted-foreground">Fats</p>
-                    </div>
-                </div>
-              </Card>
-
-              <DialogFooter>
-                <Button onClick={handleSaveMeal} className="w-full">Add to {activeMealType}</Button>
-              </DialogFooter>
-            </div>
-          )}
+          {renderDialogContent()}
         </DialogContent>
       </Dialog>
     </Card>

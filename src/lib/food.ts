@@ -1,4 +1,3 @@
-
 import type { FoodDataItem } from "@/types";
 
 // A mock food database and search service.
@@ -23,13 +22,16 @@ const mockFoodDatabase: FoodDataItem[] = [
 ];
 
 export async function searchFoods(query: string): Promise<FoodDataItem[]> {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
     if (!query) {
-        return [];
+        return mockFoodDatabase;
     }
+
     const lowercasedQuery = query.toLowerCase();
     const results = mockFoodDatabase.filter(food => 
         food.name.toLowerCase().includes(lowercasedQuery)
     );
-    // Simulate network delay
-    return new Promise(resolve => setTimeout(() => resolve(results), 200));
+    return results;
 }
