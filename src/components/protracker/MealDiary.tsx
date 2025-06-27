@@ -157,8 +157,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
           {MEAL_TYPES.map(mealType => (
             <AccordionItem value={mealType} key={mealType} className="border-b last:border-b-0">
                <div className="flex w-full items-center p-4">
-                  <AccordionTrigger className="flex-1 p-0 hover:no-underline">
-                      <div className="flex flex-col items-start">
+                  <AccordionTrigger className="flex-1 p-0 hover:no-underline text-left">
+                      <div className="flex flex-col">
                         <span className="text-lg font-semibold">{mealType}</span>
                         <span className="text-xs text-muted-foreground">{macroSummary(mealType)}</span>
                       </div>
