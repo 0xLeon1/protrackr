@@ -17,6 +17,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 
+function capitalizeWords(str: string): string {
+    if (!str) return '';
+    return str.toLowerCase()
+        .split(' ')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
 
 interface MealDiaryProps {
@@ -123,7 +131,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
         });
         // Switch to manual entry view with the food name pre-filled
         setView('manual');
-        setCustomFood(prev => ({...prev, name: food.name}));
+        setCustomFood(prev => ({...prev, name: capitalizeWords(food.name)}));
       }
     }
   };
@@ -133,7 +141,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
     const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
       mealType: activeMealType,
-      name: `${selectedFood.name}`,
+      name: `${capitalizeWords(selectedFood.name)}`,
       ...calculatedMacros,
     };
 
@@ -150,7 +158,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       
       const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
           mealType: activeMealType,
-          name: customFood.name,
+          name: capitalizeWords(customFood.name),
           calories: parseFloat(customFood.calories) || 0,
           protein: parseFloat(customFood.protein) || 0,
           carbs: parseFloat(customFood.carbs) || 0,
@@ -201,7 +209,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
             <Button variant="ghost" size="sm" onClick={() => setSelectedFood(null)} className="-ml-4">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
             </Button>
-            <h3 className="font-semibold text-lg">{selectedFood.name}</h3>
+            <h3 className="font-semibold text-lg">{capitalizeWords(selectedFood.name)}</h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -305,7 +313,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
             <div className="space-y-2">
               {searchResults.map(food => (
                 <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
-                  <p>{food.name}</p>
+                  <p>{capitalizeWords(food.name)}</p>
                   <p className="text-xs text-muted-foreground">
                     {food.dataType === 'branded' ? `${Math.round(food.calories || 0)} kcal per 100g` : 'Common Food'}
                   </p>
