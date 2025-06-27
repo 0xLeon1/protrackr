@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Loader2, ArrowLeft, Pencil, ChevronDown } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, ArrowLeft, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getCommonFoodDetails, searchFoods } from "@/lib/food";
@@ -296,9 +296,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
             <Button variant="ghost" size="sm" onClick={() => setSelectedFood(null)} className="-ml-4">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
             </Button>
-            <h3 className="font-semibold text-lg">{capitalizeWords(selectedFood.name)}</h3>
+            <h3 className="font-semibold text-lg">{selectedFood.brandName ? selectedFood.name : capitalizeWords(selectedFood.name)}</h3>
             {selectedFood.brandName && (
-                <p className="text-sm text-muted-foreground -mt-3">{capitalizeWords(selectedFood.brandName)}</p>
+                <p className="text-sm text-muted-foreground -mt-3">{selectedFood.brandName}</p>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -416,7 +416,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                 const subtitleParts = [];
 
                 if (food.dataType === 'branded' && food.brandName) {
-                    subtitleParts.push(capitalizeWords(food.brandName));
+                    subtitleParts.push(food.brandName);
                 }
 
                 if (food.servingQty && food.servingUnit) {
@@ -435,10 +435,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                 }
                 
                 const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' - ') : (food.dataType === 'common' ? 'Common Food' : 'Branded Food');
+                const displayName = food.brandName ? food.name : capitalizeWords(food.name);
 
                 return (
                   <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
-                    <p>{capitalizeWords(food.name)}</p>
+                    <p>{displayName}</p>
                     <p className="text-xs text-muted-foreground">
                       {subtitle}
                     </p>
@@ -467,7 +468,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                             className="h-auto py-1 px-2.5"
                             onClick={() => handleSelectFood(food)}
                         >
-                            {capitalizeWords(food.name)}
+                            {food.brandName ? food.name : capitalizeWords(food.name)}
                         </Button>
                     ))}
                 </div>
@@ -498,22 +499,24 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         <Accordion type="multiple" className="w-full" defaultValue={['Breakfast', 'Lunch']}>
           {MEAL_TYPES.map(mealType => (
             <AccordionItem value={mealType} key={mealType} className="border-b last:border-b-0">
-              <AccordionTrigger asChild className="px-4 hover:no-underline">
-                 <div className="flex w-full items-center justify-between cursor-pointer">
-                    <div className="flex items-center gap-4">
-                      <DialogTrigger asChild onClick={(e) => { e.stopPropagation(); handleOpenDialog(mealType); }}>
-                        <Button variant="ghost" size="icon" className="text-accent hover:text-accent/90 rounded-full">
-                          <PlusCircle className="w-6 h-6" />
-                        </Button>
-                      </DialogTrigger>
-                      <div className="flex flex-col items-start text-left">
+               <div className="flex w-full items-center">
+                  <AccordionTrigger className="flex-1 text-left p-4 hover:no-underline">
+                      <div className="flex flex-col items-start">
                         <span className="text-lg font-semibold">{mealType}</span>
                         <span className="text-xs text-muted-foreground">{macroSummary(mealType)}</span>
                       </div>
-                    </div>
-                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                  </div>
-              </AccordionTrigger>
+                  </AccordionTrigger>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-accent hover:text-accent/90 rounded-full shrink-0 mr-4" 
+                      onClick={() => handleOpenDialog(mealType)}
+                    >
+                      <PlusCircle className="w-6 h-6" />
+                    </Button>
+                  </DialogTrigger>
+                </div>
               <AccordionContent className="p-0">
                 <Separator />
                 <div className="p-4 space-y-2">
@@ -521,7 +524,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                     (mealsByType[mealType] || []).map(meal => (
                       <div key={meal.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
                         <div>
-                          <p className="font-medium">{capitalizeWords(meal.name)}</p>
+                          <p className="font-medium">{meal.brandName ? meal.name : capitalizeWords(meal.name)}</p>
                           <p className="text-muted-foreground text-xs">
                             {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
                           </p>
