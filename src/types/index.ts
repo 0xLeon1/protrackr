@@ -1,3 +1,10 @@
+export type SetPerformance = {
+  id: string;
+  reps: number;
+  weight: number;
+  completed: boolean;
+};
+
 export type Exercise = {
   id: string;
   name: string;
@@ -6,6 +13,7 @@ export type Exercise = {
   rest: number;
   weight: number;
   notes: string;
+  performance?: SetPerformance[];
 };
 
 export type Workout = {

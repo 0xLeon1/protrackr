@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Program, Workout } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Play } from 'lucide-react';
 
 const initialPrograms: Program[] = [
   {
@@ -64,6 +65,7 @@ const initialPrograms: Program[] = [
 export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>(initialPrograms);
   const [newProgramName, setNewProgramName] = useState('');
+  const router = useRouter();
 
   const handleAddProgram = () => {
     if (newProgramName.trim() === '') return;
@@ -107,7 +109,7 @@ export default function ProgramsPage() {
     }));
   };
 
-  const handleWorkoutNameChange = (programId: string, workoutId: string, name: string) => {
+  const handleWorkoutNameChange = (programId: string, workoutId: string, name:string) => {
     setPrograms(programs.map(p => {
         if(p.id === programId) {
             const newWorkouts = p.workouts.map(w => w.id === workoutId ? {...w, name} : w);
@@ -127,6 +129,11 @@ export default function ProgramsPage() {
       }
       return p;
     }));
+  };
+
+  const handleStartWorkout = (workoutId: string) => {
+    localStorage.setItem('protracker-programs', JSON.stringify(programs));
+    router.push(`/workout/${workoutId}`);
   };
 
   return (
@@ -197,9 +204,21 @@ export default function ProgramsPage() {
                                   className="border-none focus-visible:ring-1 bg-transparent"
                                   onClick={(e) => e.stopPropagation()}
                                 />
-                               <Button onClick={(e) => {e.stopPropagation(); handleDeleteWorkout(program.id, workout.id)}} variant="ghost" size="icon" className="mr-2 shrink-0">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                                <div className="flex items-center gap-2 mr-2">
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartWorkout(workout.id);
+                                    }}
+                                    size="sm"
+                                  >
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Start
+                                  </Button>
+                                  <Button onClick={(e) => {e.stopPropagation(); handleDeleteWorkout(program.id, workout.id)}} variant="ghost" size="icon" className="shrink-0">
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
                              </AccordionTrigger>
                              <AccordionContent className="bg-background rounded-b-lg">
                                <WorkoutTracker 
