@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Program, Workout } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
-import { PlusCircle, Trash2, Play, MoreVertical } from 'lucide-react';
+import { PlusCircle, Trash2, Play, MoreVertical, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,64 +82,93 @@ const initialPrograms: Program[] = [
 ];
 
 export default function ProgramsPage() {
-  const [programs, setPrograms] = useState<Program[]>(initialPrograms);
+  const [programs, setPrograms] = useState<Program[] | null>(null);
   const [newProgramName, setNewProgramName] = useState('');
   const router = useRouter();
 
+  useEffect(() => {
+    const storedPrograms = localStorage.getItem('protracker-programs');
+    if (storedPrograms) {
+        try {
+            setPrograms(JSON.parse(storedPrograms));
+        } catch (error) {
+            console.error("Failed to parse programs from localStorage", error);
+            setPrograms(initialPrograms);
+        }
+    } else {
+        setPrograms(initialPrograms);
+    }
+  }, []);
+
+  const updatePrograms = (updatedPrograms: Program[]) => {
+    setPrograms(updatedPrograms);
+    localStorage.setItem('protracker-programs', JSON.stringify(updatedPrograms));
+  };
+
   const handleAddProgram = () => {
-    if (newProgramName.trim() === '') return;
+    if (newProgramName.trim() === '' || !programs) return;
     const newProgram: Program = {
       id: `prog-${Date.now()}`,
       name: newProgramName,
       workouts: []
     };
-    setPrograms([...programs, newProgram]);
+    updatePrograms([...programs, newProgram]);
     setNewProgramName('');
   };
 
   const handleDeleteProgram = (programId: string) => {
-    setPrograms(programs.filter(p => p.id !== programId));
+    if (!programs) return;
+    updatePrograms(programs.filter(p => p.id !== programId));
   };
 
   const handleProgramNameChange = (programId: string, name: string) => {
-    setPrograms(programs.map(p => p.id === programId ? {...p, name} : p));
+    if (!programs) return;
+    const newPrograms = programs.map(p => p.id === programId ? {...p, name} : p);
+    updatePrograms(newPrograms);
   };
   
   const handleAddWorkout = (programId: string) => {
+    if (!programs) return;
     const newWorkout: Workout = {
       id: `work-${Date.now()}`,
       name: 'New Workout',
       exercises: []
     };
-    setPrograms(programs.map(p => {
+    const newPrograms = programs.map(p => {
       if (p.id === programId) {
         return { ...p, workouts: [...p.workouts, newWorkout] };
       }
       return p;
-    }));
+    });
+    updatePrograms(newPrograms);
   };
   
   const handleDeleteWorkout = (programId: string, workoutId: string) => {
-     setPrograms(programs.map(p => {
+    if (!programs) return;
+     const newPrograms = programs.map(p => {
       if (p.id === programId) {
         return { ...p, workouts: p.workouts.filter(w => w.id !== workoutId) };
       }
       return p;
-    }));
+    });
+    updatePrograms(newPrograms);
   };
 
   const handleWorkoutNameChange = (programId: string, workoutId: string, name:string) => {
-    setPrograms(programs.map(p => {
+    if (!programs) return;
+    const newPrograms = programs.map(p => {
         if(p.id === programId) {
             const newWorkouts = p.workouts.map(w => w.id === workoutId ? {...w, name} : w);
             return {...p, workouts: newWorkouts};
         }
         return p;
-    }))
+    })
+    updatePrograms(newPrograms);
   };
 
   const handleWorkoutChange = (programId: string, updatedWorkout: Workout) => {
-    setPrograms(programs.map(p => {
+    if (!programs) return;
+    const newPrograms = programs.map(p => {
       if (p.id === programId) {
         return { 
           ...p, 
@@ -147,13 +176,22 @@ export default function ProgramsPage() {
         };
       }
       return p;
-    }));
+    });
+    updatePrograms(newPrograms);
   };
 
   const handleStartWorkout = (workoutId: string) => {
-    localStorage.setItem('protracker-programs', JSON.stringify(programs));
     router.push(`/workout/${workoutId}`);
   };
+
+  if (!programs) {
+    return (
+      <div className="flex justify-center items-center h-full min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="sr-only">Loading programs...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
