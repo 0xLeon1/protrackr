@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 export default function DailyCheckin() {
   return (
-    <Card className="transition-all duration-300 hover:shadow-lg animate-fade-in">
+    <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline">Daily Check-in</CardTitle>
         <CardDescription>How are you feeling today?</CardDescription>

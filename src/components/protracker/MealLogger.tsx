@@ -6,7 +6,7 @@ import { UtensilsCrossed } from "lucide-react";
 
 export default function MealLogger() {
   return (
-    <Card className="transition-all duration-300 hover:shadow-lg animate-fade-in">
+    <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader>
         <div className="flex items-center gap-2">
             <UtensilsCrossed className="w-5 h-5 text-primary" />

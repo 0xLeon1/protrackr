@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/toaster";
+import Header from '@/components/protracker/Header';
+import BottomNav from '@/components/protracker/BottomNav';
 
 export const metadata: Metadata = {
   title: 'ProTracker',
@@ -20,7 +22,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></link>
       </head>
       <body className="font-body antialiased">
-        {children}
+        <div className="relative flex flex-col min-h-screen bg-background">
+          <Header />
+          <main className="flex-1 p-4 sm:p-6 md:p-8 pb-20">
+            {children}
+          </main>
+          <BottomNav />
+        </div>
         <Toaster />
       </body>
     </html>

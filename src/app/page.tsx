@@ -1,13 +1,11 @@
-import Header from '@/components/protracker/Header';
-import Dashboard from '@/components/protracker/Dashboard';
+import DailyCheckin from '@/components/protracker/DailyCheckin';
+import ConsistencyMeter from '@/components/protracker/ConsistencyMeter';
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <Header />
-      <main className="flex-1 p-4 sm:p-6 md:p-8">
-        <Dashboard />
-      </main>
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <DailyCheckin />
+      <ConsistencyMeter />
     </div>
   );
 }

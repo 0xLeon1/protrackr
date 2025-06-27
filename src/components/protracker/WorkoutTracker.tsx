@@ -32,7 +32,7 @@ export default function WorkoutTracker() {
   };
 
   return (
-    <Card className="w-full h-full transition-all duration-300 hover:shadow-lg animate-fade-in">
+    <Card className="w-full h-full transition-all duration-300 hover:shadow-lg">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

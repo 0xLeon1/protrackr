@@ -15,7 +15,7 @@ export default function ConsistencyMeter() {
   const completedDays = week.filter(d => d.complete).length;
 
   return (
-    <Card className="transition-all duration-300 hover:shadow-lg animate-fade-in">
+    <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline">Consistency</CardTitle>
         <CardDescription>Your weekly progress at a glance.</CardDescription>

@@ -8,7 +8,7 @@ export default function MacroTracker() {
   const fats = { current: 50, goal: 70 };
 
   return (
-    <Card className="transition-all duration-300 hover:shadow-lg animate-fade-in">
+    <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline">Macro Tracker</CardTitle>
         <CardDescription>Your daily nutrition summary.</CardDescription>
