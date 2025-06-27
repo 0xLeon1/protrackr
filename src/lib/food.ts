@@ -121,7 +121,7 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
     const apiKey = process.env.NEXT_PUBLIC_NUTRITIONIX_API_KEY;
 
     if (!appId || !apiKey || appId === "YOUR_APP_ID_HERE" || apiKey === "YOUR_API_KEY_HERE") {
-        console.error("Nutritionix API credentials are missing.");
+        // No console.error here as it's handled in the searchFoods function
         return null;
     }
     
@@ -135,18 +135,18 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            // Use the food name directly, let Nutritionix parse it.
             body: JSON.stringify({ query: foodName }),
         });
 
         if (!response.ok) {
-            console.error(`Failed to fetch details for '${foodName}' from Nutritionix API:`, response.statusText);
+            // Silently fail, the item just won't appear in the search results.
             return null;
         }
 
         const data: NutritionixNaturalResponse = await response.json();
         
         if (!data.foods || data.foods.length === 0) {
+            // This is a valid scenario where Nutritionix has no data.
             return null;
         }
 
@@ -154,7 +154,8 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         
         const servingWeight = foodDetails.serving_weight_grams;
         if (!servingWeight || servingWeight === 0) {
-            return null; // Can't normalize to 100g if we don't have a weight
+            // Can't normalize to 100g if we don't have a weight, so we can't use this data.
+            return null;
         }
         
         const ratio = 100 / servingWeight;
@@ -178,7 +179,7 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         };
 
     } catch (error) {
-        console.error("Error getting food details:", error);
+        // Also fail silently on network errors, etc.
         return null;
     }
 }
