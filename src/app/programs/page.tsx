@@ -238,7 +238,7 @@ export default function ProgramsPage() {
             <Card key={program.id} className="overflow-hidden">
               <AccordionItem value={program.id} className="border-none">
                 <div className="flex items-center bg-card p-4">
-                    <AccordionTrigger className="flex-1 p-0 hover:no-underline text-lg font-semibold text-left">
+                    <AccordionTrigger className="flex-1 p-0 hover:no-underline text-lg font-semibold">
                         {program.name}
                     </AccordionTrigger>
                     <DropdownMenu>
@@ -291,7 +291,7 @@ export default function ProgramsPage() {
                          {program.workouts.map(workout => (
                            <AccordionItem value={workout.id} key={workout.id} className="border rounded-lg bg-muted/30">
                              <div className="flex items-center p-2">
-                                <AccordionTrigger className="flex-1 text-left p-2 hover:no-underline font-medium">
+                                <AccordionTrigger className="flex-1 p-2 hover:no-underline font-medium">
                                     {workout.name}
                                 </AccordionTrigger>
                                 <div className="flex items-center gap-2 ml-2">
