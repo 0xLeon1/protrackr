@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -15,12 +16,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from '@/hooks/use-toast';
 
 export default function Header() {
-  const { user } = useAuth();
+  const { user, isFirebaseConfigured } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   const handleLogout = async () => {
+    if (!isFirebaseConfigured || !auth) {
+        toast({
+            title: "Configuration Error",
+            description: "Firebase is not configured correctly.",
+            variant: "destructive"
+        });
+        return;
+    }
     await signOut(auth);
     router.push('/login');
   };

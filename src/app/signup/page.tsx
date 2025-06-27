@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -17,10 +19,22 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { isFirebaseConfigured } = useAuth();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
+    if (!isFirebaseConfigured || !auth) {
+        toast({
+            title: "Configuration Error",
+            description: "Firebase is not configured correctly. Please contact support.",
+            variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+    }
+
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       toast({ title: "Account Created", description: "Welcome! You have been successfully signed up." });
