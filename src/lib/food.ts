@@ -129,6 +129,10 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
     
     const API_URL = `https://trackapi.nutritionix.com/v2/natural/nutrients`;
 
+    // Make the query more specific by prepending "1" to it, unless it already starts with a number.
+    // This helps the Nutritionix API better understand the query for a single serving.
+    const query = /^\d/.test(foodName) ? foodName : `1 ${foodName}`;
+
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -137,11 +141,11 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            body: JSON.stringify({ query: foodName }),
+            body: JSON.stringify({ query }),
         });
 
         if (!response.ok) {
-            console.error(`Nutritionix API error for "${foodName}":`, response.status, response.statusText);
+            console.error(`Nutritionix API error for query "${query}":`, response.status, response.statusText);
             return null;
         }
 
