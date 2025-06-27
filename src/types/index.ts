@@ -26,3 +26,11 @@ export type Program = {
   name: string;
   workouts: Workout[];
 };
+
+export type WorkoutLogEntry = {
+    logId: string;
+    workoutId: string;
+    programName: string;
+    completedAt: string;
+    workoutSnapshot: Workout;
+};

@@ -3,23 +3,27 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { Program, Workout } from '@/types';
+import type { Program, Workout, WorkoutLogEntry } from '@/types';
 import ActiveWorkout from '@/components/protracker/ActiveWorkout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ActiveWorkoutPage() {
   const params = useParams();
   const router = useRouter();
   const workoutId = params.id as string;
+  const { toast } = useToast();
   
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [programName, setProgramName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [lastWorkout, setLastWorkout] = useState<Workout | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && workoutId) {
+      // Load Programs
       const storedPrograms = localStorage.getItem('protracker-programs');
       if (storedPrograms) {
         try {
@@ -41,7 +45,7 @@ export default function ActiveWorkoutPage() {
               ...foundWorkout,
               exercises: foundWorkout.exercises.map(ex => ({
                 ...ex,
-                performance: Array.from({ length: ex.sets }, (_, i) => ({
+                performance: Array.from({ length: ex.sets as number }, (_, i) => ({
                   id: `set-${ex.id}-${i}`,
                   reps: ex.reps,
                   weight: ex.weight,
@@ -51,9 +55,22 @@ export default function ActiveWorkoutPage() {
             };
             setWorkout(workoutWithPerformance);
             setProgramName(foundProgramName);
+
+            // Load History to find the last completed session for this workout
+            const storedLogs = localStorage.getItem('protracker-logs');
+            if (storedLogs) {
+                const logs: WorkoutLogEntry[] = JSON.parse(storedLogs);
+                const relevantLogs = logs
+                    .filter(log => log.workoutId === workoutId)
+                    .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+                
+                if (relevantLogs.length > 0) {
+                    setLastWorkout(relevantLogs[0].workoutSnapshot);
+                }
+            }
           }
         } catch (error) {
-          console.error("Failed to parse programs from localStorage", error);
+          console.error("Failed to parse data from localStorage", error);
         }
       }
     }
@@ -65,8 +82,27 @@ export default function ActiveWorkoutPage() {
   };
   
   const handleFinishWorkout = () => {
-    // In a real app, you would save the completed workout data
-    alert("Workout finished! (Data not saved in this prototype)");
+    if (!workout) return;
+    
+    // Create a new log entry
+    const newLog: WorkoutLogEntry = {
+      logId: `log-${Date.now()}`,
+      workoutId,
+      programName,
+      completedAt: new Date().toISOString(),
+      workoutSnapshot: workout,
+    };
+
+    // Retrieve existing logs, add the new one, and save back to localStorage
+    const storedLogs = localStorage.getItem('protracker-logs');
+    const logs: WorkoutLogEntry[] = storedLogs ? JSON.parse(storedLogs) : [];
+    logs.push(newLog);
+    localStorage.setItem('protracker-logs', JSON.stringify(logs));
+
+    toast({
+        title: "Workout Complete!",
+        description: `Your session for "${workout.name}" has been logged.`
+    });
     router.push('/programs');
   };
 
@@ -108,10 +144,10 @@ export default function ActiveWorkoutPage() {
             <h1 className="text-3xl font-bold">{workout.name}</h1>
             <p className="text-muted-foreground">{programName}</p>
         </div>
-        <Button onClick={handleFinishWorkout} className="mt-2">Finish Workout</Button>
+        <Button onClick={handleFinishWorkout} className="mt-2 bg-green-500 hover:bg-green-600 text-white">Finish Workout</Button>
       </div>
 
-      <ActiveWorkout workout={workout} onWorkoutChange={handleWorkoutChange} />
+      <ActiveWorkout workout={workout} onWorkoutChange={handleWorkoutChange} lastWorkout={lastWorkout} />
     </div>
   );
 }
