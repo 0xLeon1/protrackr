@@ -124,7 +124,6 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
     const apiKey = process.env.NEXT_PUBLIC_NUTRITIONIX_API_KEY;
 
     if (!appId || !apiKey || appId === "YOUR_APP_ID_HERE" || apiKey === "YOUR_API_KEY_HERE") {
-        // No console.error here as it's handled in the searchFoods function
         return null;
     }
     
@@ -138,19 +137,16 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            // Prepending '1' makes the query less ambiguous for the API
-            body: JSON.stringify({ query: `1 ${foodName}` }),
+            body: JSON.stringify({ query: foodName }),
         });
 
         if (!response.ok) {
-            // Silently fail, the item just won't appear in the search results.
             return null;
         }
 
         const data: NutritionixNaturalResponse = await response.json();
         
         if (!data.foods || data.foods.length === 0) {
-            // This is a valid scenario where Nutritionix has no data for the specific query.
             return null;
         }
 
@@ -158,7 +154,6 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         
         const servingWeight = foodDetails.serving_weight_grams;
         if (!servingWeight || servingWeight === 0) {
-            // Can't normalize to 100g if we don't have a weight, so we can't use this data.
             return null;
         }
         
@@ -183,7 +178,6 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         };
 
     } catch (error) {
-        // Also fail silently on network errors, etc.
         return null;
     }
 }
