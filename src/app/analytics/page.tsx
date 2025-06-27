@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { WorkoutLogEntry, BodyWeightLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
 import { History, TrendingUp, Scale } from "lucide-react";
@@ -66,8 +66,28 @@ export default function AnalyticsPage() {
         } catch (e) {
             console.error("Failed to parse body weight logs", e);
         }
+    } else {
+        const exampleBodyWeightData: BodyWeightLogEntry[] = [
+            { id: 'bw-ex1', weight: 185, date: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString() },
+            { id: 'bw-ex2', weight: 184.5, date: new Date(new Date().setDate(new Date().getDate() - 21)).toISOString() },
+            { id: 'bw-ex3', weight: 183, date: new Date(new Date().setDate(new Date().getDate() - 14)).toISOString() },
+            { id: 'bw-ex4', weight: 182.5, date: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString() },
+            { id: 'bw-ex5', weight: 181, date: new Date().toISOString() },
+        ].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+        setBodyWeightLogs(exampleBodyWeightData);
+        localStorage.setItem('protracker-bodyweight', JSON.stringify(exampleBodyWeightData));
     }
   }, []);
+
+  const bodyWeightChartData = useMemo(() => {
+    if (bodyWeightLogs.length < 2) return [];
+    return [...bodyWeightLogs]
+        .reverse()
+        .map(log => ({
+            date: format(parseISO(log.date), 'MMM d'),
+            weight: log.weight,
+        }));
+  }, [bodyWeightLogs]);
 
   const calculateDailyVolume = (allLogs: WorkoutLogEntry[]) => {
     const today = new Date();
@@ -126,6 +146,10 @@ export default function AnalyticsPage() {
       label: "Volume (lbs)",
       color: "hsl(var(--accent))",
     },
+    weight: {
+        label: "Weight (lbs)",
+        color: "hsl(var(--primary))",
+    }
   };
 
   const hasLiftedThisWeek = dailyVolume.some(d => d.volume > 0);
@@ -180,10 +204,60 @@ export default function AnalyticsPage() {
         
         <Card>
             <CardHeader>
-                <CardTitle>Body Weight</CardTitle>
+                <CardTitle>Body Weight Trend</CardTitle>
                 <CardDescription>Log your weight to track changes.</CardDescription>
             </CardHeader>
             <CardContent>
+                <div className="h-[180px] -ml-2 pr-2">
+                    {bodyWeightLogs.length > 1 ? (
+                        <ChartContainer config={chartConfig} className="w-full h-full">
+                            <LineChart
+                                data={bodyWeightChartData}
+                                margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
+                            >
+                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                <XAxis
+                                    dataKey="date"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    fontSize={12}
+                                />
+                                <YAxis 
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    fontSize={12}
+                                    domain={['dataMin - 5', 'dataMax + 5']}
+                                />
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent 
+                                        formatter={(value) => [`${value} lbs`, 'Weight']}
+                                        indicator="dot"
+                                        />}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="weight"
+                                    stroke="var(--color-weight)"
+                                    strokeWidth={2}
+                                    dot={{
+                                        fill: "var(--color-weight)",
+                                        r: 3
+                                    }}
+                                    activeDot={{ r: 5 }}
+                                />
+                            </LineChart>
+                        </ChartContainer>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-center h-full">
+                            <Scale className="w-12 h-12 text-muted-foreground mb-4" />
+                            <p className="text-sm text-muted-foreground">Log at least two entries to see your trendline.</p>
+                        </div>
+                    )}
+                </div>
+                <Separator className="my-4" />
                 <div className="flex gap-2">
                     <Input 
                         type="number"
@@ -193,22 +267,6 @@ export default function AnalyticsPage() {
                         onKeyDown={(e) => e.key === 'Enter' && handleAddBodyWeight()}
                     />
                     <Button onClick={handleAddBodyWeight}>Save</Button>
-                </div>
-                <Separator className="my-4" />
-                <div className="space-y-3 max-h-[190px] overflow-y-auto pr-2">
-                    {bodyWeightLogs.length > 0 ? (
-                        bodyWeightLogs.map(log => (
-                            <div key={log.id} className="flex justify-between items-center text-sm bg-muted/50 p-2 rounded-md">
-                                <p><span className="font-semibold">{log.weight}</span> lbs</p>
-                                <p className="text-muted-foreground">{format(parseISO(log.date), 'MMM d, yyyy')}</p>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="flex flex-col items-center justify-center pt-8 text-center">
-                            <Scale className="w-12 h-12 text-muted-foreground mb-4" />
-                            <p className="text-sm text-muted-foreground">No weight entries yet.</p>
-                        </div>
-                    )}
                 </div>
             </CardContent>
         </Card>
