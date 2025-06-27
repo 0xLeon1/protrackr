@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 const defaultGoals: MacroGoals = {
   calories: 2500,
@@ -69,6 +69,17 @@ export default function NutritionPage() {
     setAllMealLogs(prev => [...prev, newLogEntry]);
   };
 
+  const handleUpdateMeal = async (meal: FoodLogEntry) => {
+    if (!user) return;
+    const mealDocRef = doc(db, 'users', user.uid, 'meal-logs', meal.id);
+    await updateDoc(mealDocRef, meal);
+    setAllMealLogs(prev => prev.map(log => (log.id === meal.id ? meal : log)));
+    toast({
+        title: "Meal Updated",
+        description: "Your meal log has been successfully updated.",
+    });
+  };
+
   const handleDeleteMeal = async (mealId: string) => {
     if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'meal-logs', mealId));
@@ -99,7 +110,12 @@ export default function NutritionPage() {
           <MacroTracker currentIntake={currentIntake} />
         </div>
         <div className="lg:col-span-2">
-          <MealDiary logs={todaysLogs} onAddMeal={handleAddMeal} onDeleteMeal={handleDeleteMeal} />
+          <MealDiary 
+            logs={todaysLogs} 
+            onAddMeal={handleAddMeal} 
+            onDeleteMeal={handleDeleteMeal}
+            onUpdateMeal={handleUpdateMeal}
+          />
         </div>
       </div>
     </div>

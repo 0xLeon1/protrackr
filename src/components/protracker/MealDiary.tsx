@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Loader2, ArrowLeft } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, ArrowLeft, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getCommonFoodDetails, searchFoods } from "@/lib/food";
@@ -34,15 +34,17 @@ interface MealDiaryProps {
   logs: FoodLogEntry[];
   onAddMeal: (meal: Omit<FoodLogEntry, 'id' | 'date'>) => void;
   onDeleteMeal: (mealId: string) => void;
+  onUpdateMeal: (meal: FoodLogEntry) => void;
 }
 
-export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryProps) {
+export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal }: MealDiaryProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
 
   // Dialog view state
   const [view, setView] = useState<'search' | 'manual'>('search');
   const [selectedFood, setSelectedFood] = useState<FoodDataItem | null>(null);
+  const [editingLog, setEditingLog] = useState<FoodLogEntry | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -141,6 +143,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     setIsSearching(false);
     setIsFetchingDetails(false);
     setSelectedFood(null);
+    setEditingLog(null);
     setAmount("1");
     setUnit("serving");
     setView('search');
@@ -178,6 +181,27 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     setIsDialogOpen(true);
   };
   
+  const handleEditClick = (log: FoodLogEntry) => {
+    setEditingLog(log);
+    setActiveMealType(log.mealType);
+    
+    if (log.foodDetails) { // It's a food from the database
+        setSelectedFood(log.foodDetails);
+        setAmount(String(log.servingAmount));
+        setUnit(log.servingUnit);
+    } else { // It's a custom/manual entry
+        setView('manual');
+        setCustomFood({
+            name: log.name,
+            calories: String(log.calories),
+            protein: String(log.protein),
+            carbs: String(log.carbs),
+            fats: String(log.fats),
+        });
+    }
+    setIsDialogOpen(true);
+  };
+
   const handleSelectFood = async (food: FoodDataItem) => {
     if (food.dataType === 'branded' || (food.dataType === 'common' && food.calories)) {
       setSelectedFood(food);
@@ -201,17 +225,25 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     }
   };
 
-  const handleSaveSearchedMeal = () => {
+  const handleSaveMeal = () => {
     if (!activeMealType || !selectedFood || !user) return;
-
-    const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
+    const numAmount = parseFloat(amount) || 0;
+    
+    const mealData = {
       mealType: activeMealType,
       name: selectedFood.name,
       ...calculatedMacros,
+      servingAmount: numAmount,
+      servingUnit: unit,
+      foodDetails: selectedFood,
     };
-    
-    addRecentFood(user.uid, selectedFood);
-    onAddMeal(newMeal);
+
+    if (editingLog) {
+        onUpdateMeal({ ...editingLog, ...mealData });
+    } else {
+        addRecentFood(user.uid, selectedFood);
+        onAddMeal(mealData);
+    }
     setIsDialogOpen(false);
   };
 
@@ -222,27 +254,23 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const handleSaveCustomMeal = () => {
       if (!activeMealType || !customFood.name || !customFood.calories || !user) return;
       
-      const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
+      const mealData = {
           mealType: activeMealType,
           name: customFood.name,
           calories: parseFloat(customFood.calories) || 0,
           protein: parseFloat(customFood.protein) || 0,
           carbs: parseFloat(customFood.carbs) || 0,
           fats: parseFloat(customFood.fats) || 0,
+          servingAmount: 1,
+          servingUnit: 'serving',
+          foodDetails: null, // No details for custom food
       };
       
-      const customFoodItem: FoodDataItem = {
-        id: `custom-${customFood.name.toLowerCase()}`,
-        name: customFood.name,
-        calories: newMeal.calories,
-        protein: newMeal.protein,
-        carbs: newMeal.carbs,
-        fats: newMeal.fats,
-        dataType: 'branded' // Treat as branded to prevent re-fetching
-      };
-      addRecentFood(user.uid, customFoodItem);
-
-      onAddMeal(newMeal);
+      if (editingLog) {
+          onUpdateMeal({ ...editingLog, ...mealData });
+      } else {
+          onAddMeal(mealData);
+      }
       setIsDialogOpen(false);
   };
 
@@ -301,9 +329,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                   </SelectTrigger>
                   <SelectContent>
                     {selectedFood.servingUnit && selectedFood.servingWeightGrams && (
-                      <SelectItem value="serving">
-                        {capitalizeWords(selectedFood.servingUnit)} ({selectedFood.servingWeightGrams}g)
-                      </SelectItem>
+                       <SelectItem value="serving">
+                          {capitalizeWords(selectedFood.servingUnit)} ({selectedFood.servingWeightGrams}g)
+                       </SelectItem>
                     )}
                     <SelectItem value="g">Grams (g)</SelectItem>
                     <SelectItem value="oz">Ounces (oz)</SelectItem>
@@ -335,7 +363,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
             </Card>
 
             <DialogFooter>
-              <Button onClick={handleSaveSearchedMeal} className="w-full">Add to {activeMealType}</Button>
+              <Button onClick={handleSaveMeal} className="w-full">
+                {editingLog ? 'Update Food' : `Add to ${activeMealType}`}
+              </Button>
             </DialogFooter>
         </div>
       );
@@ -345,9 +375,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       // MANUAL INPUT VIEW
       return (
          <div className="space-y-4">
-            <Button variant="ghost" size="sm" onClick={() => setView('search')} className="-ml-4">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
-            </Button>
+            {!editingLog && (
+                <Button variant="ghost" size="sm" onClick={() => setView('search')} className="-ml-4">
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
+                </Button>
+            )}
             <div className="space-y-2">
               <Label htmlFor="custom-name">Food Name</Label>
               <Input id="custom-name" value={customFood.name} onChange={e => setCustomFood(prev => ({...prev, name: e.target.value}))} placeholder="e.g., Homemade Lasagna" />
@@ -373,7 +405,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                 </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleSaveCustomMeal} className="w-full">Log Custom Food</Button>
+              <Button onClick={handleSaveCustomMeal} className="w-full">
+                {editingLog ? 'Update Custom Food' : 'Log Custom Food'}
+              </Button>
             </DialogFooter>
          </div>
       );
@@ -479,9 +513,14 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                             {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
                           </p>
                         </div>
-                        <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center">
+                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary h-8 w-8" onClick={() => handleEditClick(meal)}>
+                                <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)}>
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -494,7 +533,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
         </Accordion>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Food to {activeMealType}</DialogTitle>
+            <DialogTitle>
+                {editingLog ? `Edit Food in ${editingLog.mealType}` : `Add Food to ${activeMealType}`}
+            </DialogTitle>
             <DialogDescription>
               {selectedFood ? 'Adjust serving size and save.' : (view === 'search' ? 'Search for a food to log.' : 'Log a custom food.')}
             </DialogDescription>

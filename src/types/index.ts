@@ -74,6 +74,11 @@ export type FoodLogEntry = {
   protein: number;
   carbs: number;
   fats: number;
+
+  // Fields for editing and recalculation
+  servingAmount: number;
+  servingUnit: string;
+  foodDetails: FoodDataItem | null; // Details of the base food, null if custom entry
 };
 
 export interface FoodDataItem {
