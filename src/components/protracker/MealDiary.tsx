@@ -315,6 +315,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
             </Button>
             <h3 className="font-semibold text-lg">{capitalizeWords(selectedFood.name)}</h3>
+            {selectedFood.brandName && (
+                <p className="text-sm text-muted-foreground -mt-3">{capitalizeWords(selectedFood.brandName)}</p>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -431,7 +434,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                 <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
                   <p>{capitalizeWords(food.name)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {food.dataType === 'branded' ? (food.servingUnit ? `${capitalizeWords(food.servingUnit)}` : `${Math.round(food.calories || 0)} kcal per 100g`) : 'Common Food'}
+                    {food.dataType === 'branded' && food.brandName ? capitalizeWords(food.brandName) : 'Common Food'}
                   </p>
                 </button>
               ))}

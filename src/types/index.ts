@@ -84,6 +84,7 @@ export type FoodLogEntry = {
 export interface FoodDataItem {
     id: string;
     name: string;
+    brandName?: string;
     // Macros per 100g
     calories?: number;
     protein?: number;

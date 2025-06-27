@@ -12,6 +12,7 @@ interface NutritionixBrandedFood {
     nf_total_fat: number | null;
     nf_total_carbohydrate: number | null;
     nf_protein: number | null;
+    brand_name?: string;
 }
 
 interface NutritionixCommonFood {
@@ -72,6 +73,7 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
             const item: FoodDataItem = {
                 id: food.nix_item_id,
                 name: food.food_name,
+                brandName: food.brand_name,
                 dataType: 'branded',
                 servingQty: food.serving_qty,
                 servingUnit: food.serving_unit,
