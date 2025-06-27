@@ -17,7 +17,6 @@ interface MealDiaryProps {
   logs: FoodLogEntry[];
   onAddMeal: (meal: Omit<FoodLogEntry, 'id' | 'date'>) => void;
   onDeleteMeal: (mealId: string) => void;
-  isLocked: boolean;
 }
 
 interface TempFoodLog {
@@ -27,7 +26,7 @@ interface TempFoodLog {
   fats: string | number;
 }
 
-export default function MealDiary({ logs, onAddMeal, onDeleteMeal, isLocked }: MealDiaryProps) {
+export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryProps) {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
@@ -99,7 +98,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, isLocked }: M
                 <AccordionItem value={mealType} key={mealType} className="border-b last:border-b-0">
                     <AccordionTrigger className="px-4 hover:no-underline">
                     <div className="flex items-center gap-4">
-                        <DialogTrigger asChild onClick={(e) => {e.stopPropagation(); handleOpenDialog(mealType);}} disabled={isLocked}>
+                        <DialogTrigger asChild onClick={(e) => {e.stopPropagation(); handleOpenDialog(mealType);}}>
                             <Button variant="ghost" size="icon" className="text-green-500 hover:text-green-600 rounded-full">
                                 <PlusCircle className="w-6 h-6" />
                             </Button>
@@ -122,7 +121,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, isLocked }: M
                                                 {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
                                             </p>
                                         </div>
-                                        <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)} disabled={isLocked}>
+                                        <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)}>
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
                                     </div>
