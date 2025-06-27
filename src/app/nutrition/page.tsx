@@ -135,7 +135,7 @@ export default function NutritionPage() {
         </div>
       </div>
       
-      <div className="flex justify-center pt-4">
+      <div className="flex justify-center pt-8">
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" size="lg" className="w-full max-w-sm text-lg" disabled={isLocked}>
