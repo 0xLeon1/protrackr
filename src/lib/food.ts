@@ -137,7 +137,7 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            body: JSON.stringify({ query: foodName }),
+            body: JSON.stringify({ query: `1 ${foodName}` }),
         });
 
         if (!response.ok) {
