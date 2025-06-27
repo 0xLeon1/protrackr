@@ -6,7 +6,7 @@ import type { WorkoutLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO } from 'date-fns';
 import { History, TrendingUp } from "lucide-react";
@@ -15,6 +15,23 @@ interface WeeklyVolume {
   week: string;
   volume: number;
 }
+
+const renderCustomizedLabel = (props: any) => {
+  const { x, y, width, value } = props;
+
+  if (value === 0) {
+    return null;
+  }
+
+  const formattedValue = value > 1000 ? `${(value / 1000).toFixed(1)}k` : value.toString();
+
+  return (
+    <text x={x + width / 2} y={y} dy={-4} className="fill-foreground" fontSize={12} textAnchor="middle">
+      {formattedValue}
+    </text>
+  );
+};
+
 
 export default function AnalyticsPage() {
   const [logs, setLogs] = useState<WorkoutLogEntry[]>([]);
@@ -74,7 +91,7 @@ export default function AnalyticsPage() {
   const chartConfig = {
     volume: {
       label: "Volume (lbs)",
-      color: "hsl(var(--primary))",
+      color: "hsl(var(--accent))",
     },
   };
 
@@ -93,19 +110,12 @@ export default function AnalyticsPage() {
         <CardContent className="pl-2">
           {weeklyVolume.length > 0 ? (
              <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
-              <BarChart accessibilityLayer data={weeklyVolume} margin={{ top: 20, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid vertical={false} />
+              <BarChart accessibilityLayer data={weeklyVolume} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
                 <XAxis
                   dataKey="week"
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  tickFormatter={(value) => (value > 1000 ? `${value / 1000}k` : value.toString())}
                 />
                 <ChartTooltip
                   cursor={false}
@@ -114,7 +124,9 @@ export default function AnalyticsPage() {
                       nameKey="volume"
                       />}
                   />
-                <Bar dataKey="volume" fill="var(--color-volume)" radius={4} />
+                <Bar dataKey="volume" fill="var(--color-volume)" radius={[8, 8, 0, 0]}>
+                    <LabelList dataKey="volume" content={renderCustomizedLabel} />
+                </Bar>
               </BarChart>
             </ChartContainer>
           ) : (
