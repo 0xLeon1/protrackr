@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -8,7 +9,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
-import { PlusCircle, Trash2, Play } from 'lucide-react';
+import { PlusCircle, Trash2, Play, MoreVertical } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const initialPrograms: Program[] = [
   {
@@ -180,17 +199,37 @@ export default function ProgramsPage() {
                       className="text-lg font-semibold border-none focus-visible:ring-1 bg-transparent"
                       onClick={(e) => e.stopPropagation()}
                     />
-                     <Button onClick={(e) => {e.stopPropagation(); handleDeleteProgram(program.id)}} variant="ghost" size="icon" className="mr-2 shrink-0">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
                 </AccordionTrigger>
                 <AccordionContent className="p-4 border-t">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="font-semibold">Workouts</h3>
-                        <Button onClick={() => handleAddWorkout(program.id)} variant="outline" size="sm">
-                           <PlusCircle className="mr-2 h-4 w-4" /> Add Workout
-                       </Button>
+                        <div className="flex items-center gap-2">
+                          <Button onClick={() => handleAddWorkout(program.id)} variant="outline" size="sm">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Workout
+                          </Button>
+                           <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="icon" className="text-destructive border-destructive/50 hover:bg-destructive/10 hover:text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the "{program.name}" program and all of its workouts.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteProgram(program.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
                     </div>
                    
                     {program.workouts.length > 0 ? (
@@ -205,19 +244,48 @@ export default function ProgramsPage() {
                                   onClick={(e) => e.stopPropagation()}
                                 />
                                 <div className="flex items-center gap-2 mr-2">
-                                  <Button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStartWorkout(workout.id);
-                                    }}
-                                    size="sm"
-                                  >
-                                    <Play className="mr-2 h-4 w-4" />
-                                    Start
-                                  </Button>
-                                  <Button onClick={(e) => {e.stopPropagation(); handleDeleteWorkout(program.id, workout.id)}} variant="ghost" size="icon" className="shrink-0">
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
+                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStartWorkout(workout.id) }}>
+                                        <Play className="mr-2 h-4 w-4" />
+                                        <span>Start Workout</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <DropdownMenuItem
+                                            onSelect={(e) => e.preventDefault()}
+                                            className="text-destructive focus:text-destructive"
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            <span>Delete Workout</span>
+                                          </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              This action cannot be undone. This will permanently delete the "{workout.name}" workout.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction
+                                              onClick={() => handleDeleteWorkout(program.id, workout.id)}
+                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                            >
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                              </AccordionTrigger>
                              <AccordionContent className="bg-background rounded-b-lg">
