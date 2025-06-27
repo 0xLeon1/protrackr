@@ -41,6 +41,11 @@ export type BodyWeightLogEntry = {
   date: string; // ISO String
 };
 
+export type CheckinLogEntry = {
+  id: string;
+  date: string; // ISO String
+};
+
 export type MacroGoals = {
   calories: number;
   protein: number;

@@ -1,6 +1,6 @@
 "use client"
 import { useState } from 'react';
-import type { BodyWeightLogEntry } from '@/types';
+import type { BodyWeightLogEntry, CheckinLogEntry } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -40,6 +40,37 @@ export default function DailyCheckin() {
             variant: "destructive"
         });
     }
+  };
+  
+  const handleSubmitCheckin = () => {
+    const newEntry: CheckinLogEntry = {
+      id: `checkin-${Date.now()}`,
+      date: new Date().toISOString(),
+    };
+
+    const storedCheckins = localStorage.getItem('protracker-checkins');
+    const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
+    
+    // To prevent duplicate check-ins for the same day
+    const todayStr = new Date().toISOString().split('T')[0];
+    const hasCheckedInToday = checkinLogs.some(log => log.date.startsWith(todayStr));
+
+    if (hasCheckedInToday) {
+         toast({
+            title: "Already Checked In!",
+            description: "You have already submitted your check-in for today.",
+            variant: "default"
+        });
+        return;
+    }
+
+    const updatedLogs = [newEntry, ...checkinLogs];
+    localStorage.setItem('protracker-checkins', JSON.stringify(updatedLogs));
+
+    toast({
+      title: "Check-in Submitted!",
+      description: "Your daily check-in has been recorded.",
+    });
   };
 
 
@@ -108,7 +139,7 @@ export default function DailyCheckin() {
           <Label htmlFor="sleep">Hours of Sleep</Label>
           <Input id="sleep" type="number" placeholder="e.g., 8" />
         </div>
-        <Button className="w-full bg-accent hover:bg-accent/90">Submit Check-in</Button>
+        <Button className="w-full bg-accent hover:bg-accent/90" onClick={handleSubmitCheckin}>Submit Check-in</Button>
       </CardContent>
     </Card>
   );
