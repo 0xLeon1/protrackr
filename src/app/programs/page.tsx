@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 const initialPrograms: Program[] = [
@@ -116,14 +116,16 @@ export default function ProgramsPage() {
         try {
           const programsCollection = collection(db, 'users', user.uid, 'programs');
           const querySnapshot = await getDocs(programsCollection);
+
           if (querySnapshot.empty) {
-            const batch = writeBatch(db);
-            initialPrograms.forEach(program => {
-              const programRef = doc(db, 'users', user.uid, 'programs', program.id);
-              batch.set(programRef, program);
+            // Seed initial data for a new user
+            const seedingPromises = initialPrograms.map(program => {
+                const programRef = doc(db, 'users', user.uid, 'programs', program.id);
+                return setDoc(programRef, program);
             });
-            await batch.commit();
+            await Promise.all(seedingPromises);
             setPrograms(initialPrograms);
+
           } else {
             const userPrograms = querySnapshot.docs.map(doc => ({ ...doc.data() } as Program));
             setPrograms(userPrograms);
@@ -268,7 +270,7 @@ export default function ProgramsPage() {
     <div className="space-y-6">
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Your Programs</h2>
-        {programs.length === 0 && (
+        {programs.length === 0 && !pageIsLoading && (
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-center text-muted-foreground">You haven't created any programs yet.</p>
@@ -455,3 +457,5 @@ export default function ProgramsPage() {
     </div>
   );
 }
+
+    
