@@ -1,4 +1,3 @@
-
 "use client";
 
 import { initializeApp, getApps, getApp, FirebaseOptions, FirebaseApp } from "firebase/app";
@@ -14,23 +13,17 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let db: Firestore | undefined;
 
-if (typeof window !== 'undefined') {
-  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-    try {
-      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-      auth = getAuth(app);
-      db = getFirestore(app);
-    } catch (error) {
-      console.error("Firebase initialization error:", error);
-    }
-  } else {
-    // This warning will show in the browser console if the config is incomplete
-    console.warn("Firebase configuration is missing or incomplete. Please check your environment variables. The app will not connect to Firebase.");
-  }
+if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  db = getFirestore(app);
+} else {
+  // This will only log on the client-side, thanks to 'use client'
+  console.warn("Firebase configuration is missing or incomplete. Please check your environment variables. The app will not connect to Firebase.");
 }
 
 export { app, auth, db };

@@ -28,7 +28,7 @@ export default function LoginPage() {
     if (!isFirebaseConfigured || !auth) {
         toast({
             title: "Configuration Error",
-            description: "Firebase is not configured correctly. Please contact support.",
+            description: "Firebase is not configured. Have you set up your .env file?",
             variant: "destructive"
         });
         setIsLoading(false);

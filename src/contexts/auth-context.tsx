@@ -19,8 +19,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState(false);
 
   useEffect(() => {
-    // This logic now correctly runs only on the client, after modules are loaded.
-    const configured = !!auth && !!db;
+    // auth will be undefined if the config is missing.
+    const configured = !!auth;
     setIsFirebaseConfigured(configured);
 
     if (configured) {
@@ -31,14 +31,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return () => unsubscribe();
     } else {
-      // Handles server-side rendering or cases where Firebase fails to initialize.
+      // If not configured, we're done loading.
       setLoading(false);
-      // We still log a warning in case the keys are truly missing.
-      if (typeof window !== 'undefined') {
-        console.warn("Firebase configuration is missing or incomplete. Please check your environment variables. The app will not connect to Firebase.");
-      }
     }
-  }, []); // The empty dependency array ensures this runs once on client mount.
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, isFirebaseConfigured }}>
