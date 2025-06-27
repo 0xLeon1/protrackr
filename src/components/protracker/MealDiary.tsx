@@ -80,13 +80,10 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
       const key = `${RECENT_FOODS_KEY_PREFIX}${userId}`;
       let recents = getRecentFoods(userId);
       
-      // Remove existing instance of the same food to move it to the front
       recents = recents.filter(f => f.name.toLowerCase() !== food.name.toLowerCase());
       
-      // Add new food to the front
       recents.unshift(food);
       
-      // Trim the list to the max size
       if (recents.length > MAX_RECENT_FOODS) {
           recents = recents.slice(0, MAX_RECENT_FOODS);
       }
@@ -109,19 +106,28 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     }
 
     const handler = setTimeout(async () => {
-      // Only start searching after 2 characters have been typed
       if (searchQuery.trim().length > 1) {
         setIsSearching(true);
-        const results = await searchFoods(searchQuery);
-        setSearchResults(results);
-        setIsSearching(false);
+        try {
+          const results = await searchFoods(searchQuery);
+          setSearchResults(results);
+        } catch (error: any) {
+          toast({
+            title: "API Error",
+            description: error.message,
+            variant: "destructive",
+          });
+          setSearchResults([]);
+        } finally {
+          setIsSearching(false);
+        }
       } else {
         setSearchResults([]);
       }
-    }, 300); // 300ms debounce
+    }, 300);
 
     return () => clearTimeout(handler);
-  }, [searchQuery, view, isDialogOpen, selectedFood]);
+  }, [searchQuery, view, isDialogOpen, selectedFood, toast]);
   
   // When a food is selected, intelligently set the default amount and unit.
   useEffect(() => {
@@ -185,11 +191,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     setEditingLog(log);
     setActiveMealType(log.mealType);
     
-    if (log.foodDetails) { // It's a food from the database
+    if (log.foodDetails) {
         setSelectedFood(log.foodDetails);
         setAmount(String(log.servingAmount));
         setUnit(log.servingUnit);
-    } else { // It's a custom/manual entry
+    } else {
         setView('manual');
         setCustomFood({
             name: log.name,
@@ -204,24 +210,22 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
 
   const handleSelectFood = async (food: FoodDataItem) => {
     if (food.dataType === 'branded' || food.calories) {
-        // If it's branded or already has details, select it.
         setSelectedFood(food);
     } else {
-        // It's a common food that needs details fetched.
         setIsFetchingDetails(true);
-        const detailedFood = await getCommonFoodDetails(food.name);
-        setIsFetchingDetails(false);
-        if (detailedFood) {
+        try {
+            const detailedFood = await getCommonFoodDetails(food.name);
             setSelectedFood(detailedFood);
-        } else {
+        } catch (error: any) {
             toast({
-                title: "Could not fetch details",
-                description: `We couldn't find nutritional information for "${food.name}". You can add it manually.`,
+                title: "Could Not Fetch Details",
+                description: error.message,
                 variant: "destructive"
             });
-            // Optional: switch to manual view with name pre-filled
             setCustomFood(prev => ({...prev, name: food.name}));
             setView('manual');
+        } finally {
+            setIsFetchingDetails(false);
         }
     }
   };
@@ -264,7 +268,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
           fats: parseFloat(customFood.fats) || 0,
           servingAmount: 1,
           servingUnit: 'serving',
-          foodDetails: null, // No details for custom food
+          foodDetails: null,
       };
       
       if (editingLog) {
@@ -309,7 +313,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     }
 
     if (selectedFood) {
-      // DETAILS VIEW
       return (
         <div className="space-y-4">
             <Button variant="ghost" size="sm" onClick={() => setSelectedFood(null)} className="-ml-4">
@@ -376,7 +379,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     }
 
     if (view === 'manual') {
-      // MANUAL INPUT VIEW
       return (
          <div className="space-y-4">
             {!editingLog && (
@@ -417,7 +419,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
       );
     }
     
-    // SEARCH VIEW (default)
     return (
       <div className="space-y-4">
         <div className="relative">

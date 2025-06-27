@@ -38,14 +38,19 @@ interface NutritionixNaturalResponse {
     }[];
 }
 
+const NUTRITIONIX_CREDENTIALS_ERROR = "Nutritionix API is not configured. Please add your credentials to the .env file.";
+
+function areCredentialsMissing(appId?: string, apiKey?: string): boolean {
+    return !appId || !apiKey || appId === "YOUR_APP_ID_HERE" || apiKey === "YOUR_API_KEY_HERE";
+}
+
 // Function to search for foods using the Nutritionix Instant Search endpoint
 export async function searchFoods(query: string): Promise<FoodDataItem[]> {
     const appId = process.env.NEXT_PUBLIC_NUTRITIONIX_APP_ID;
     const apiKey = process.env.NEXT_PUBLIC_NUTRITIONIX_API_KEY;
 
-    if (!appId || !apiKey || appId === "YOUR_APP_ID_HERE" || apiKey === "YOUR_API_KEY_HERE") {
-        console.error("Nutritionix API credentials are missing. Please add them to your .env file.");
-        return [];
+    if (areCredentialsMissing(appId, apiKey)) {
+        throw new Error(NUTRITIONIX_CREDENTIALS_ERROR);
     }
     
     if (!query.trim()) {
@@ -63,7 +68,11 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
         });
 
         if (!response.ok) {
-            console.error("Failed to fetch from Nutritionix API:", response.statusText);
+            if (response.status === 401) {
+                throw new Error("Nutritionix API authentication failed. Please check your credentials.");
+            }
+            // For other non-critical errors during search, just log it and return empty.
+            console.error("Failed to fetch from Nutritionix API:", response.status, response.statusText);
             return [];
         }
 
@@ -80,7 +89,6 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
                 servingWeightGrams: food.serving_weight_grams,
                 caloriesPerServing: food.nf_calories ? Math.round(food.nf_calories) : undefined,
             };
-            // Normalize nutrients to per 100g if possible
             if (food.serving_weight_grams && food.serving_weight_grams > 0) {
                 const ratio = 100 / food.serving_weight_grams;
                 item.calories = Math.round((food.nf_calories || 0) * ratio);
@@ -89,7 +97,7 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
                 item.fats = parseFloat(((food.nf_total_fat || 0) * ratio).toFixed(1));
             }
             return item;
-        }).filter(item => typeof item.calories !== 'undefined'); // Only include items where we could calculate calories
+        }).filter(item => typeof item.calories !== 'undefined');
 
         const commonResults: FoodDataItem[] = (data.common || []).map(food => ({
             id: food.food_name,
@@ -99,7 +107,6 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
 
         const allResults = [...commonResults, ...brandedResults];
 
-        // Deduplicate results based on capitalized name
         const uniqueResults = new Map<string, FoodDataItem>();
         allResults.forEach(item => {
             const capitalizedName = item.name.toUpperCase();
@@ -110,80 +117,74 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
 
         return Array.from(uniqueResults.values());
 
-
     } catch (error) {
-        console.error("Error searching for foods with Nutritionix:", error);
+        if (error instanceof Error && error.message.includes("Nutritionix")) {
+            throw error;
+        }
+        console.error("Error searching for foods:", error);
         return [];
     }
 }
 
 
 // Function to get detailed nutritional info for a common food
-export async function getCommonFoodDetails(foodName: string): Promise<FoodDataItem | null> {
+export async function getCommonFoodDetails(foodName: string): Promise<FoodDataItem> {
     const appId = process.env.NEXT_PUBLIC_NUTRITIONIX_APP_ID;
     const apiKey = process.env.NEXT_PUBLIC_NUTRITIONIX_API_KEY;
 
-    if (!appId || !apiKey || appId === "YOUR_APP_ID_HERE" || apiKey === "YOUR_API_KEY_HERE") {
-        return null;
+    if (areCredentialsMissing(appId, apiKey)) {
+        throw new Error(NUTRITIONIX_CREDENTIALS_ERROR);
     }
     
     const API_URL = `https://trackapi.nutritionix.com/v2/natural/nutrients`;
 
-    // Make the query more specific by prepending "1" to it, unless it already starts with a number.
-    // This helps the Nutritionix API better understand the query for a single serving.
     const query = /^\d/.test(foodName) ? foodName : `1 ${foodName}`;
 
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-app-id': appId,
-                'x-app-key': apiKey,
-            },
-            body: JSON.stringify({ query }),
-        });
+    const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-app-id': appId,
+            'x-app-key': apiKey,
+        },
+        body: JSON.stringify({ query }),
+    });
 
-        if (!response.ok) {
-            console.error(`Nutritionix API error for query "${query}":`, response.status, response.statusText);
-            return null;
+    if (!response.ok) {
+        if (response.status === 401) {
+            throw new Error("Nutritionix API authentication failed. Please check your credentials.");
         }
-
-        const data: NutritionixNaturalResponse = await response.json();
-        
-        if (!data.foods || data.foods.length === 0) {
-            return null;
-        }
-
-        const foodDetails = data.foods[0];
-        
-        const servingWeight = foodDetails.serving_weight_grams;
-        if (!servingWeight || servingWeight === 0) {
-            return null;
-        }
-        
-        const ratio = 100 / servingWeight;
-
-        return {
-            id: foodDetails.food_name, 
-            name: foodDetails.food_name,
-            dataType: 'common',
-            
-            // Per 100g values
-            calories: Math.round((foodDetails.nf_calories || 0) * ratio),
-            protein: parseFloat(((foodDetails.nf_protein || 0) * ratio).toFixed(1)),
-            carbs: parseFloat(((foodDetails.nf_total_carbohydrate || 0) * ratio).toFixed(1)),
-            fats: parseFloat(((foodDetails.nf_total_fat || 0) * ratio).toFixed(1)),
-
-            // Original serving info from API
-            servingQty: foodDetails.serving_qty,
-            servingUnit: foodDetails.serving_unit,
-            servingWeightGrams: foodDetails.serving_weight_grams,
-            caloriesPerServing: Math.round(foodDetails.nf_calories || 0),
-        };
-
-    } catch (error) {
-        console.error("Error fetching common food details:", error);
-        return null;
+        throw new Error(`Could not find nutrition data for "${foodName}".`);
     }
+
+    const data: NutritionixNaturalResponse = await response.json();
+    
+    if (!data.foods || data.foods.length === 0) {
+        throw new Error(`Could not find nutrition data for "${foodName}".`);
+    }
+
+    const foodDetails = data.foods[0];
+    
+    const servingWeight = foodDetails.serving_weight_grams;
+    if (!servingWeight || servingWeight === 0) {
+        throw new Error(`Could not calculate nutrition data for "${foodName}".`);
+    }
+    
+    const ratio = 100 / servingWeight;
+
+    return {
+        id: foodDetails.food_name, 
+        name: foodDetails.food_name,
+        dataType: 'common',
+        
+        calories: Math.round((foodDetails.nf_calories || 0) * ratio),
+        protein: parseFloat(((foodDetails.nf_protein || 0) * ratio).toFixed(1)),
+        carbs: parseFloat(((foodDetails.nf_total_carbohydrate || 0) * ratio).toFixed(1)),
+        fats: parseFloat(((foodDetails.nf_total_fat || 0) * ratio).toFixed(1)),
+
+        servingQty: foodDetails.serving_qty,
+        servingUnit: foodDetails.serving_unit,
+        servingWeightGrams: foodDetails.serving_weight_grams,
+        caloriesPerServing: Math.round(foodDetails.nf_calories || 0),
+    };
 }
