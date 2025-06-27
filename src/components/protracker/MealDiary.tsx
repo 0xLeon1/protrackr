@@ -16,6 +16,7 @@ import { GRAMS_PER_OUNCE } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 
 function capitalizeWords(str: string): string {
     if (!str) return '';
@@ -26,6 +27,8 @@ function capitalizeWords(str: string): string {
 }
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
+const RECENT_FOODS_KEY_PREFIX = 'protracker-recents-';
+const MAX_RECENT_FOODS = 5;
 
 interface MealDiaryProps {
   logs: FoodLogEntry[];
@@ -50,11 +53,52 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   // Serving size state
   const [amount, setAmount] = useState("1");
   const [unit, setUnit] = useState<string>("serving");
+  
+  // Recent foods state
+  const [recentFoods, setRecentFoods] = useState<FoodDataItem[]>([]);
 
   // Custom food form state
   const [customFood, setCustomFood] = useState({ name: '', calories: '', protein: '', carbs: '', fats: '' });
   
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const getRecentFoods = (userId: string): FoodDataItem[] => {
+      const key = `${RECENT_FOODS_KEY_PREFIX}${userId}`;
+      const stored = localStorage.getItem(key);
+      try {
+        return stored ? JSON.parse(stored) : [];
+      } catch (e) {
+        return [];
+      }
+  };
+
+  const addRecentFood = (userId: string, food: FoodDataItem) => {
+      if (!food.name || !food.calories) return; // Don't save incomplete items
+      const key = `${RECENT_FOODS_KEY_PREFIX}${userId}`;
+      let recents = getRecentFoods(userId);
+      
+      // Remove existing instance of the same food to move it to the front
+      recents = recents.filter(f => f.name.toLowerCase() !== food.name.toLowerCase());
+      
+      // Add new food to the front
+      recents.unshift(food);
+      
+      // Trim the list to the max size
+      if (recents.length > MAX_RECENT_FOODS) {
+          recents = recents.slice(0, MAX_RECENT_FOODS);
+      }
+      
+      localStorage.setItem(key, JSON.stringify(recents));
+  };
+  
+  // Effect to load recent foods when dialog opens
+  useEffect(() => {
+    if (isDialogOpen && user) {
+        const recents = getRecentFoods(user.uid);
+        setRecentFoods(recents);
+    }
+  }, [isDialogOpen, user]);
 
   // Effect to handle searching
   useEffect(() => {
@@ -135,7 +179,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   };
   
   const handleSelectFood = async (food: FoodDataItem) => {
-    if (food.calories) { // Branded food already has details
+    if (food.dataType === 'branded' || (food.dataType === 'common' && food.calories)) {
       setSelectedFood(food);
     } else { // Common food, needs details fetched
       setIsFetchingDetails(true);
@@ -158,14 +202,15 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   };
 
   const handleSaveSearchedMeal = () => {
-    if (!activeMealType || !selectedFood) return;
+    if (!activeMealType || !selectedFood || !user) return;
 
     const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
       mealType: activeMealType,
       name: selectedFood.name,
       ...calculatedMacros,
     };
-
+    
+    addRecentFood(user.uid, selectedFood);
     onAddMeal(newMeal);
     setIsDialogOpen(false);
   };
@@ -175,7 +220,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   };
   
   const handleSaveCustomMeal = () => {
-      if (!activeMealType || !customFood.name || !customFood.calories) return;
+      if (!activeMealType || !customFood.name || !customFood.calories || !user) return;
       
       const newMeal: Omit<FoodLogEntry, 'id' | 'date'> = {
           mealType: activeMealType,
@@ -185,6 +230,17 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
           carbs: parseFloat(customFood.carbs) || 0,
           fats: parseFloat(customFood.fats) || 0,
       };
+      
+      const customFoodItem: FoodDataItem = {
+        id: `custom-${customFood.name.toLowerCase()}`,
+        name: customFood.name,
+        calories: newMeal.calories,
+        protein: newMeal.protein,
+        carbs: newMeal.carbs,
+        fats: newMeal.fats,
+        dataType: 'branded' // Treat as branded to prevent re-fetching
+      };
+      addRecentFood(user.uid, customFoodItem);
 
       onAddMeal(newMeal);
       setIsDialogOpen(false);
@@ -352,6 +408,32 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
             </p>
           )}
         </ScrollArea>
+        
+        <Separator />
+        
+        <div className="space-y-2">
+            <h4 className="font-medium text-sm text-muted-foreground">Recently Logged</h4>
+            {recentFoods.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                    {recentFoods.map(food => (
+                        <Button
+                            key={`${food.id}-${food.name}`}
+                            variant="outline"
+                            size="sm"
+                            className="h-auto py-1 px-2.5"
+                            onClick={() => handleSelectFood(food)}
+                        >
+                            {capitalizeWords(food.name)}
+                        </Button>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-center text-xs text-muted-foreground py-2">
+                    Your recently logged foods will appear here.
+                </p>
+            )}
+        </div>
+
         <Separator />
         <Button variant="link" className="p-0 h-auto" onClick={() => setView('manual')}>
           Can't find it? Add a custom food
