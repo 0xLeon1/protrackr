@@ -135,7 +135,8 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            body: JSON.stringify({ query: foodName }),
+            // Prepending '1' makes the query less ambiguous for the API
+            body: JSON.stringify({ query: `1 ${foodName}` }),
         });
 
         if (!response.ok) {
@@ -146,7 +147,7 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
         const data: NutritionixNaturalResponse = await response.json();
         
         if (!data.foods || data.foods.length === 0) {
-            // This is a valid scenario where Nutritionix has no data.
+            // This is a valid scenario where Nutritionix has no data for the specific query.
             return null;
         }
 
