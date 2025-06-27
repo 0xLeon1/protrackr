@@ -41,7 +41,14 @@ export default function DailyCheckin() {
         </div>
         <div className="space-y-4">
             <Label htmlFor="energy">Energy</Label>
-            <Slider id="energy" defaultValue={[8]} max={10} step={1} />
+            <Slider id="energy" defaultValue={[3]} min={1} max={5} step={1} />
+            <div className="flex justify-between text-xs text-muted-foreground px-1">
+              <span>1</span>
+              <span>2</span>
+              <span>3</span>
+              <span>4</span>
+              <span>5</span>
+            </div>
         </div>
         <Button className="w-full bg-accent hover:bg-accent/90">Submit Check-in</Button>
       </CardContent>
