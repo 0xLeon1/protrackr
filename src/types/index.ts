@@ -1,22 +1,22 @@
 export type SetPerformance = {
   id: string;
-  reps: number;
-  weight: number;
+  reps: number | '';
+  weight: number | '';
   completed: boolean;
 };
 
 export type Exercise = {
   id: string;
   name: string;
-  sets: number;
-  reps: number;
-  weight: number;
+  sets: number | '';
+  reps: number | '';
+  weight: number | '';
   notes: string;
   performance?: SetPerformance[];
 };
 
 export type Workout = {
-  id: string;
+  id:string;
   name: string;
   exercises: Exercise[];
 };

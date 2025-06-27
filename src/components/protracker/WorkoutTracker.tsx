@@ -14,17 +14,35 @@ interface WorkoutEditorProps {
 
 export default function WorkoutTracker({ workout, onWorkoutChange }: WorkoutEditorProps) {
 
-  const handleExerciseChange = (id: string, field: keyof Exercise, value: string | number) => {
+  const handleExerciseChange = (id: string, field: keyof Omit<Exercise, 'id' | 'performance'>, value: string) => {
     const updatedExercises = workout.exercises.map(ex => {
       if (ex.id === id) {
-        const isNumericField = field === 'sets' || field === 'reps' || field === 'weight';
-        if (isNumericField) {
-            const minValue = (field === 'sets' || field === 'reps') ? 1 : 0;
-            return { ...ex, [field]: Math.max(minValue, Number(value)) };
+        if (field === 'name' || field === 'notes') {
+          return { ...ex, [field]: value };
         }
-        return { ...ex, [field]: value };
+        
+        // For numeric fields
+        if (value === '') {
+          return { ...ex, [field]: '' };
+        }
+
+        const num = Number(value);
+        if (!isNaN(num) && num >= 0) {
+          return { ...ex, [field]: num };
+        }
       }
       return ex;
+    });
+    onWorkoutChange({ ...workout, exercises: updatedExercises });
+  };
+  
+  const handleExerciseBlur = (id: string, field: 'sets' | 'reps' | 'weight') => {
+    const updatedExercises = workout.exercises.map(ex => {
+        if (ex.id === id && ex[field] === '') {
+            const minValue = (field === 'sets' || field === 'reps') ? 1 : 0;
+            return { ...ex, [field]: minValue };
+        }
+        return ex;
     });
     onWorkoutChange({ ...workout, exercises: updatedExercises });
   };
@@ -67,9 +85,9 @@ export default function WorkoutTracker({ workout, onWorkoutChange }: WorkoutEdit
                 {workout.exercises.map((exercise) => (
                   <TableRow key={exercise.id} className="transition-colors hover:bg-muted/50">
                     <TableCell><Input type="text" value={exercise.name} onChange={(e) => handleExerciseChange(exercise.id, 'name', e.target.value)} className="font-medium" /></TableCell>
-                    <TableCell><Input type="number" min="1" value={exercise.sets} onChange={(e) => handleExerciseChange(exercise.id, 'sets', e.target.value)} className="w-16" /></TableCell>
-                    <TableCell><Input type="number" min="1" value={exercise.reps} onChange={(e) => handleExerciseChange(exercise.id, 'reps', e.target.value)} className="w-16" /></TableCell>
-                    <TableCell><Input type="number" min="0" value={exercise.weight} onChange={(e) => handleExerciseChange(exercise.id, 'weight', e.target.value)} className="w-20" /></TableCell>
+                    <TableCell><Input type="number" min="1" value={exercise.sets} onChange={(e) => handleExerciseChange(exercise.id, 'sets', e.target.value)} onBlur={() => handleExerciseBlur(exercise.id, 'sets')} className="w-16" /></TableCell>
+                    <TableCell><Input type="number" min="1" value={exercise.reps} onChange={(e) => handleExerciseChange(exercise.id, 'reps', e.target.value)} onBlur={() => handleExerciseBlur(exercise.id, 'reps')} className="w-16" /></TableCell>
+                    <TableCell><Input type="number" min="0" value={exercise.weight} onChange={(e) => handleExerciseChange(exercise.id, 'weight', e.target.value)} onBlur={() => handleExerciseBlur(exercise.id, 'weight')} className="w-20" /></TableCell>
                     <TableCell><Input type="text" value={exercise.notes} onChange={(e) => handleExerciseChange(exercise.id, 'notes', e.target.value)} placeholder="Add a note..." /></TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => removeExercise(exercise.id)}>

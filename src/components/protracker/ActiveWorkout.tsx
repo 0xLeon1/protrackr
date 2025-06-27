@@ -13,16 +13,25 @@ interface ActiveWorkoutProps {
 
 export default function ActiveWorkout({ workout, onWorkoutChange }: ActiveWorkoutProps) {
 
-  const handleSetChange = (exerciseId: string, setId: string, field: keyof Omit<SetPerformance, 'id' | 'completed'>, value: string | number) => {
+  const handleSetChange = (exerciseId: string, setId: string, field: 'reps' | 'weight', value: string) => {
     const updatedWorkout = {
       ...workout,
       exercises: workout.exercises.map(ex => {
         if (ex.id === exerciseId) {
           return {
             ...ex,
-            performance: ex.performance?.map(set => 
-              set.id === setId ? { ...set, [field]: Math.max(field === 'reps' ? 1 : 0, Number(value)) } : set
-            )
+            performance: ex.performance?.map(set => {
+              if (set.id === setId) {
+                if (value === '') {
+                  return { ...set, [field]: '' };
+                }
+                const num = Number(value);
+                if (!isNaN(num) && num >= 0) {
+                  return { ...set, [field]: num };
+                }
+              }
+              return set;
+            })
           };
         }
         return ex;
@@ -31,6 +40,28 @@ export default function ActiveWorkout({ workout, onWorkoutChange }: ActiveWorkou
     onWorkoutChange(updatedWorkout);
   };
   
+  const handleSetBlur = (exerciseId: string, setId: string, field: 'reps' | 'weight') => {
+    const updatedWorkout = {
+      ...workout,
+      exercises: workout.exercises.map(ex => {
+        if (ex.id === exerciseId) {
+          return {
+            ...ex,
+            performance: ex.performance?.map(set => {
+              if (set.id === setId && set[field] === '') {
+                const minValue = field === 'reps' ? 1 : 0;
+                return { ...set, [field]: minValue };
+              }
+              return set;
+            })
+          };
+        }
+        return ex;
+      })
+    };
+    onWorkoutChange(updatedWorkout);
+  };
+
   const handleSetCompletion = (exerciseId: string, setId: string, completed: boolean) => {
      const updatedWorkout = {
       ...workout,
@@ -79,6 +110,7 @@ export default function ActiveWorkout({ workout, onWorkoutChange }: ActiveWorkou
                         min="0"
                         value={set.weight} 
                         onChange={(e) => handleSetChange(exercise.id, set.id, 'weight', e.target.value)}
+                        onBlur={() => handleSetBlur(exercise.id, set.id, 'weight')}
                         className="w-24"
                         placeholder="kg"
                       />
@@ -89,6 +121,7 @@ export default function ActiveWorkout({ workout, onWorkoutChange }: ActiveWorkou
                         min="1"
                         value={set.reps} 
                         onChange={(e) => handleSetChange(exercise.id, set.id, 'reps', e.target.value)}
+                        onBlur={() => handleSetBlur(exercise.id, set.id, 'reps')}
                         className="w-24"
                         placeholder="Reps"
                       />
