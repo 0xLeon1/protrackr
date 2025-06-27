@@ -2,14 +2,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry } from "@/types";
+import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry, SleepLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { History, TrendingUp, Scale } from "lucide-react";
+import { History, TrendingUp, Scale, Bed } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -18,15 +18,21 @@ interface DailyVolume {
   day: string;
   volume: number;
 }
+interface DailySleep {
+  day: string;
+  hours: number;
+}
+
 
 const renderCustomizedLabel = (props: any) => {
   const { x, y, width, value } = props;
 
-  if (value === 0) {
+  if (value === 0 || !value) {
     return null;
   }
-
-  const formattedValue = value > 1000 ? `${(value / 1000).toFixed(1)}k` : value.toString();
+  
+  const isFloat = value % 1 !== 0;
+  const formattedValue = value > 1000 ? `${(value / 1000).toFixed(1)}k` : (isFloat ? value.toFixed(1) : value.toString());
 
   return (
     <text x={x + width / 2} y={y} dy={-4} className="fill-foreground" fontSize={12} textAnchor="middle">
@@ -40,6 +46,8 @@ export default function AnalyticsPage() {
   const [logs, setLogs] = useState<WorkoutLogEntry[]>([]);
   const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
   const [bodyWeightLogs, setBodyWeightLogs] = useState<BodyWeightLogEntry[]>([]);
+  const [sleepLogs, setSleepLogs] = useState<SleepLogEntry[]>([]);
+  const [weeklySleep, setWeeklySleep] = useState<DailySleep[]>([]);
   const [currentWeight, setCurrentWeight] = useState('');
   const [checkinDays, setCheckinDays] = useState(0);
   const [workoutDays, setWorkoutDays] = useState(0);
@@ -83,6 +91,30 @@ export default function AnalyticsPage() {
         setBodyWeightLogs(exampleBodyWeightData);
         localStorage.setItem('protracker-bodyweight', JSON.stringify(exampleBodyWeightData));
     }
+    
+    // Load Sleep Logs
+    const storedSleep = localStorage.getItem('protracker-sleep-logs');
+    let sleepLogsData: SleepLogEntry[] = [];
+    if (storedSleep) {
+        try {
+            sleepLogsData = JSON.parse(storedSleep);
+            setSleepLogs(sleepLogsData);
+        } catch (e) {
+            console.error("Failed to parse sleep logs", e);
+        }
+    } else {
+        const exampleSleepData: SleepLogEntry[] = [
+            { id: 'sl-ex1', hours: 7.5, date: new Date(new Date().setDate(new Date().getDate() - 4)).toISOString() },
+            { id: 'sl-ex2', hours: 8, date: new Date(new Date().setDate(new Date().getDate() - 3)).toISOString() },
+            { id: 'sl-ex3', hours: 6, date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString() },
+            { id: 'sl-ex4', hours: 7, date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString() },
+        ];
+        sleepLogsData = exampleSleepData;
+        setSleepLogs(exampleSleepData);
+        localStorage.setItem('protracker-sleep-logs', JSON.stringify(exampleSleepData));
+    }
+    calculateWeeklySleep(sleepLogsData);
+
 
     // --- Weekly Adherence Data ---
     const today = new Date();
@@ -179,6 +211,33 @@ export default function AnalyticsPage() {
     setDailyVolume(volumeDataForWeek);
   };
 
+  const calculateWeeklySleep = (allLogs: SleepLogEntry[]) => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    let sleepDataForWeek: DailySleep[] = daysInWeek.map(day => ({
+        day: format(day, 'E'),
+        hours: 0,
+    }));
+
+    allLogs.forEach(log => {
+        if (log.date) {
+            const logDate = parseISO(log.date);
+            if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+                const dayOfWeek = format(logDate, 'E');
+                const dayIndex = sleepDataForWeek.findIndex(d => d.day === dayOfWeek);
+
+                if (dayIndex !== -1) {
+                    sleepDataForWeek[dayIndex].hours = log.hours;
+                }
+            }
+        }
+    });
+    setWeeklySleep(sleepDataForWeek);
+  };
+
   const handleAddBodyWeight = () => {
     const weight = parseFloat(currentWeight);
     if (!isNaN(weight) && weight > 0) {
@@ -202,10 +261,15 @@ export default function AnalyticsPage() {
     weight: {
         label: "Weight (lbs)",
         color: "hsl(var(--primary))",
+    },
+    sleep: {
+        label: "Sleep (hours)",
+        color: "hsl(var(--chart-3))",
     }
   };
 
   const hasLiftedThisWeek = dailyVolume.some(d => d.volume > 0);
+  const hasSleptThisWeek = weeklySleep.some(d => d.hours > 0);
 
   return (
     <div className="space-y-6">
@@ -241,8 +305,8 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+      <div className="space-y-6">
+        <Card>
             <CardHeader>
             <CardTitle>This Week's Volume</CardTitle>
             <CardDescription>Your total lifted volume for the current week.</CardDescription>
@@ -282,74 +346,116 @@ export default function AnalyticsPage() {
             </CardContent>
         </Card>
         
-        <Card>
-            <CardHeader>
-                <CardTitle>Body Weight Trend</CardTitle>
-                <CardDescription>Log your weight to track changes.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="h-[180px] -ml-2 pr-2">
-                    {bodyWeightLogs.length > 1 ? (
-                        <ChartContainer config={chartConfig} className="w-full h-full">
-                            <LineChart
-                                data={bodyWeightChartData}
-                                margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
-                            >
-                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                                <XAxis
-                                    dataKey="date"
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickMargin={8}
-                                    fontSize={12}
-                                />
-                                <YAxis 
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickMargin={8}
-                                    fontSize={12}
-                                    domain={['dataMin - 5', 'dataMax + 5']}
-                                />
-                                <ChartTooltip
-                                    cursor={false}
-                                    content={<ChartTooltipContent 
-                                        formatter={(value) => [`${value} lbs`, 'Weight']}
-                                        indicator="dot"
-                                        />}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="weight"
-                                    stroke="var(--color-weight)"
-                                    strokeWidth={2}
-                                    dot={{
-                                        fill: "var(--color-weight)",
-                                        r: 3
-                                    }}
-                                    activeDot={{ r: 5 }}
-                                />
-                            </LineChart>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Body Weight Trend</CardTitle>
+                    <CardDescription>Log your weight to track changes.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[180px] -ml-2 pr-2">
+                        {bodyWeightLogs.length > 1 ? (
+                            <ChartContainer config={chartConfig} className="w-full h-full">
+                                <LineChart
+                                    data={bodyWeightChartData}
+                                    margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
+                                >
+                                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tickMargin={8}
+                                        fontSize={12}
+                                    />
+                                    <YAxis 
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tickMargin={8}
+                                        fontSize={12}
+                                        domain={['dataMin - 5', 'dataMax + 5']}
+                                    />
+                                    <ChartTooltip
+                                        cursor={false}
+                                        content={<ChartTooltipContent 
+                                            formatter={(value) => [`${value} lbs`, 'Weight']}
+                                            indicator="dot"
+                                            />}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="weight"
+                                        stroke="var(--color-weight)"
+                                        strokeWidth={2}
+                                        dot={{
+                                            fill: "var(--color-weight)",
+                                            r: 3
+                                        }}
+                                        activeDot={{ r: 5 }}
+                                    />
+                                </LineChart>
+                            </ChartContainer>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center text-center h-full">
+                                <Scale className="w-12 h-12 text-muted-foreground mb-4" />
+                                <p className="text-sm text-muted-foreground">Log at least two entries to see your trendline.</p>
+                            </div>
+                        )}
+                    </div>
+                    <Separator className="my-4" />
+                    <div className="flex gap-2">
+                        <Input 
+                            type="number"
+                            placeholder="Enter weight in lbs"
+                            value={currentWeight}
+                            onChange={(e) => setCurrentWeight(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddBodyWeight()}
+                        />
+                        <Button onClick={handleAddBodyWeight}>Save</Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>This Week's Sleep</CardTitle>
+                    <CardDescription>Your nightly sleep duration for the current week.</CardDescription>
+                </CardHeader>
+                <CardContent className="pl-2">
+                    {hasSleptThisWeek ? (
+                        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                        <BarChart accessibilityLayer data={weeklySleep} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
+                            <XAxis
+                                dataKey="day"
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                            />
+                            <YAxis hide domain={[0, 12]}/>
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent 
+                                    formatter={(value) => `${Number(value).toFixed(1)} hours`}
+                                    indicator="dot"
+                                    nameKey="hours"
+                                    />}
+                            />
+                            <Bar dataKey="hours" fill="var(--color-sleep)" radius={[8, 8, 0, 0]}>
+                                <LabelList dataKey="hours" content={renderCustomizedLabel} />
+                            </Bar>
+                        </BarChart>
                         </ChartContainer>
                     ) : (
-                        <div className="flex flex-col items-center justify-center text-center h-full">
-                            <Scale className="w-12 h-12 text-muted-foreground mb-4" />
-                            <p className="text-sm text-muted-foreground">Log at least two entries to see your trendline.</p>
+                        <div className="flex flex-col items-center justify-center p-12 text-center h-[250px]">
+                            <Bed className="w-16 h-16 text-muted-foreground mb-4" />
+                            <p className="text-muted-foreground">
+                                Log your sleep via the Daily Check-in to see your sleep chart.
+                            </p>
                         </div>
                     )}
-                </div>
-                <Separator className="my-4" />
-                <div className="flex gap-2">
-                    <Input 
-                        type="number"
-                        placeholder="Enter weight in lbs"
-                        value={currentWeight}
-                        onChange={(e) => setCurrentWeight(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddBodyWeight()}
-                    />
-                    <Button onClick={handleAddBodyWeight}>Save</Button>
-                </div>
-            </CardContent>
-        </Card>
+                </CardContent>
+            </Card>
+        </div>
       </div>
       
       <Card>
@@ -416,5 +522,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
-    

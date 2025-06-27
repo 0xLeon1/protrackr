@@ -47,6 +47,12 @@ export type CheckinLogEntry = {
   date: string; // ISO String
 };
 
+export type SleepLogEntry = {
+  id: string;
+  date: string; // ISO String
+  hours: number;
+};
+
 export type MacroGoals = {
   calories: number;
   protein: number;

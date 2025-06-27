@@ -1,6 +1,6 @@
 "use client"
 import { useState } from 'react';
-import type { BodyWeightLogEntry, CheckinLogEntry } from '@/types';
+import type { BodyWeightLogEntry, CheckinLogEntry, SleepLogEntry } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function DailyCheckin() {
   const [morningWeight, setMorningWeight] = useState('');
+  const [sleepHours, setSleepHours] = useState('');
   const { toast } = useToast();
 
   const handleSaveWeight = () => {
@@ -51,7 +52,6 @@ export default function DailyCheckin() {
     const storedCheckins = localStorage.getItem('protracker-checkins');
     const checkinLogs: CheckinLogEntry[] = storedCheckins ? JSON.parse(storedCheckins) : [];
     
-    // To prevent duplicate check-ins for the same day
     const todayStr = new Date().toISOString().split('T')[0];
     const hasCheckedInToday = checkinLogs.some(log => log.date.startsWith(todayStr));
 
@@ -66,11 +66,34 @@ export default function DailyCheckin() {
 
     const updatedLogs = [newEntry, ...checkinLogs];
     localStorage.setItem('protracker-checkins', JSON.stringify(updatedLogs));
+    
+    const hours = parseFloat(sleepHours);
+    if (!isNaN(hours) && hours > 0) {
+        const newSleepEntry: SleepLogEntry = {
+            id: `sleep-${Date.now()}`,
+            hours: hours,
+            date: new Date().toISOString(),
+        };
+        const storedSleep = localStorage.getItem('protracker-sleep-logs');
+        const sleepLogs: SleepLogEntry[] = storedSleep ? JSON.parse(storedSleep) : [];
+        
+        const todaysLogIndex = sleepLogs.findIndex(log => log.date.startsWith(todayStr));
+        let updatedSleepLogs;
+        if (todaysLogIndex > -1) {
+            sleepLogs[todaysLogIndex] = newSleepEntry;
+            updatedSleepLogs = [...sleepLogs];
+        } else {
+            updatedSleepLogs = [newSleepEntry, ...sleepLogs];
+        }
+        localStorage.setItem('protracker-sleep-logs', JSON.stringify(updatedSleepLogs));
+    }
+
 
     toast({
       title: "Check-in Submitted!",
-      description: "Your daily check-in has been recorded.",
+      description: "Your daily check-in has been recorded." + (!isNaN(hours) && hours > 0 ? ` Sleep of ${hours} hours also logged.` : ""),
     });
+    setSleepHours('');
   };
 
 
@@ -137,7 +160,7 @@ export default function DailyCheckin() {
         </div>
         <div className="space-y-4">
           <Label htmlFor="sleep">Hours of Sleep</Label>
-          <Input id="sleep" type="number" placeholder="e.g., 8" />
+          <Input id="sleep" type="number" placeholder="e.g., 8" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} />
         </div>
         <Button className="w-full bg-accent hover:bg-accent/90" onClick={handleSubmitCheckin}>Submit Check-in</Button>
       </CardContent>
