@@ -35,7 +35,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 
 export default function Header() {
-  const { user, isFirebaseConfigured } = useAuth();
+  const { user, isFirebaseConfigured, refreshData } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -90,9 +90,10 @@ export default function Header() {
         
         toast({ title: "Success!", description: "All your account data has been reset." });
         
+        refreshData();
+        
         setIsResetDialogOpen(false);
         setPassword('');
-        router.refresh();
 
     } catch (error: any) {
         let errorMessage = "Failed to reset data. Please check your password and try again.";

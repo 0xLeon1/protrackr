@@ -23,7 +23,7 @@ const defaultGoals: MacroGoals = {
 export default function NutritionPage() {
   const [allMealLogs, setAllMealLogs] = useState<FoodLogEntry[]>([]);
   const { toast } = useToast();
-  const { user, loading } = useAuth();
+  const { user, loading, dataVersion } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function NutritionPage() {
         };
         fetchMealLogs();
     }
-  }, [user]);
+  }, [user, dataVersion]);
 
   const todaysLogs = useMemo(() => {
     const todayISO = startOfToday().toISOString();

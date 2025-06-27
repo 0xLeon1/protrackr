@@ -45,7 +45,7 @@ export default function ProgramsPage() {
   const [pageIsLoading, setPageIsLoading] = useState(true);
   const [newProgramName, setNewProgramName] = useState('');
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, dataVersion } = useAuth();
   const { toast } = useToast();
 
   const [itemToRename, setItemToRename] = useState<{ type: 'program' | 'workout'; id: string; programId?: string; name: string; } | null>(null);
@@ -82,7 +82,7 @@ export default function ProgramsPage() {
     } else if (!authLoading) {
       setPageIsLoading(false);
     }
-  }, [user, authLoading, toast]);
+  }, [user, authLoading, toast, dataVersion]);
 
   const handleAddProgram = async () => {
     if (newProgramName.trim() === '' || !user) return;

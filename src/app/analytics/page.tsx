@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
   const [workoutDays, setWorkoutDays] = useState(0);
   const [nutritionDays, setNutritionDays] = useState(0);
   const [weeklyAdherence, setWeeklyAdherence] = useState(0);
-  const { user, loading } = useAuth();
+  const { user, loading, dataVersion } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function AnalyticsPage() {
       };
       fetchData();
     }
-  }, [user]);
+  }, [user, dataVersion]);
 
   const bodyWeightChartData = useMemo(() => {
     if (bodyWeightLogs.length < 2) return [];

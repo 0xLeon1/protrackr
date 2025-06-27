@@ -9,6 +9,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isFirebaseConfigured: boolean;
+  dataVersion: number;
+  refreshData: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,6 +19,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0);
+
+  const refreshData = () => {
+    setDataVersion(v => v + 1);
+  };
 
   useEffect(() => {
     // auth will be undefined if the config is missing.
@@ -37,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isFirebaseConfigured }}>
+    <AuthContext.Provider value={{ user, loading, isFirebaseConfigured, dataVersion, refreshData }}>
       {children}
     </AuthContext.Provider>
   );

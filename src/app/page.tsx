@@ -25,7 +25,7 @@ export default function HomePage() {
   const [allMealLogs, setAllMealLogs] = useState<FoodLogEntry[]>([]);
   const [goals, setGoals] = useState<MacroGoals>(defaultGoals);
   const [consistencyData, setConsistencyData] = useState({ checkinDays: 0, workoutDays: 0, nutritionDays: 0 });
-  const { user, loading } = useAuth();
+  const { user, loading, dataVersion } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export default function HomePage() {
       
       fetchData();
     }
-  }, [user]);
+  }, [user, dataVersion]);
 
   const todaysLogs = useMemo(() => {
     const todayISO = startOfToday().toISOString();

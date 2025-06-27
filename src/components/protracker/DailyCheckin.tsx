@@ -33,7 +33,7 @@ export default function DailyCheckin() {
   const [trained, setTrained] = useState('yes');
   const [hitMacros, setHitMacros] = useState('yes');
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, dataVersion } = useAuth();
   
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
@@ -66,7 +66,7 @@ export default function DailyCheckin() {
     };
 
     checkStatus();
-  }, [user]);
+  }, [user, dataVersion]);
 
   const handleSaveWeight = async () => {
     if (!user) return;

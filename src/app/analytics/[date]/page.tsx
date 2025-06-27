@@ -27,7 +27,7 @@ interface DailyData {
 export default function DailyAnalyticsPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, dataVersion } = useAuth();
 
   const date = params.date as string; // YYYY-MM-DD
   const [data, setData] = useState<DailyData | null>(null);
@@ -115,7 +115,7 @@ export default function DailyAnalyticsPage() {
 
       fetchData();
     }
-  }, [user, date, router]);
+  }, [user, date, router, dataVersion]);
 
   if (isLoading || authLoading || !user) {
     return (
