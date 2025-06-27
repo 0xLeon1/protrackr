@@ -1,3 +1,4 @@
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -65,3 +66,13 @@ export type FoodLogEntry = {
   carbs: number;
   fats: number;
 };
+
+export interface FoodDataItem {
+    id: string;
+    name: string;
+    // Macros per 100g
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+}
