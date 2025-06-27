@@ -43,17 +43,25 @@ export async function searchFoods(query: string): Promise<FoodDataItem[]> {
 
         const data = await response.json();
         
-        const foods: FoodDataItem[] = (data.foods || []).map((food: FoodFromAPI) => ({
-            id: String(food.fdcId),
-            name: food.description,
-            // All values from USDA API are per 100g serving
-            calories: getNutrientValue(food.foodNutrients, 'Energy'),
-            protein: getNutrientValue(food.foodNutrients, 'Protein'),
-            carbs: getNutrientValue(food.foodNutrients, 'Carbohydrate, by difference'),
-            fats: getNutrientValue(food.foodNutrients, 'Total lipid (fat)'),
-        }));
+        // Use a Map to filter out duplicate food items by name, ignoring case.
+        const uniqueFoodMap = (data.foods || []).reduce((map: Map<string, FoodDataItem>, food: FoodFromAPI) => {
+            const name = food.description.trim();
+            const normalizedName = name.toLowerCase(); // Use lowercase for comparison key
+            if (name && !map.has(normalizedName)) {
+                map.set(normalizedName, {
+                    id: String(food.fdcId),
+                    name: name, // Keep original casing for display
+                    // All values from USDA API are per 100g serving
+                    calories: getNutrientValue(food.foodNutrients, 'Energy'),
+                    protein: getNutrientValue(food.foodNutrients, 'Protein'),
+                    carbs: getNutrientValue(food.foodNutrients, 'Carbohydrate, by difference'),
+                    fats: getNutrientValue(food.foodNutrients, 'Total lipid (fat)'),
+                });
+            }
+            return map;
+        }, new Map<string, FoodDataItem>());
 
-        return foods;
+        return Array.from(uniqueFoodMap.values());
 
     } catch (error) {
         console.error("Error searching for foods:", error);
