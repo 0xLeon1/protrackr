@@ -19,6 +19,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings } from "lucide-react";
 
+interface MacroTrackerProps {
+    currentIntake: {
+        calories: number;
+        protein: number;
+        carbs: number;
+        fats: number;
+    }
+}
+
 const defaultGoals: MacroGoals = {
   calories: 2500,
   protein: 180,
@@ -31,10 +40,7 @@ type TempMacroGoals = {
   [K in keyof MacroGoals]: MacroGoals[K] | '';
 };
 
-export default function MacroTracker() {
-  // Hardcoded current values for now. This would typically come from a meal log.
-  const currentIntake = { calories: 1890, protein: 150, carbs: 200, fats: 50 };
-
+export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
   const [goals, setGoals] = useState<MacroGoals>(defaultGoals);
   const [tempGoals, setTempGoals] = useState<TempMacroGoals>(defaultGoals);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -66,10 +72,7 @@ export default function MacroTracker() {
     const f = Number(tempGoals.fats) || 0;
     const calculatedCalories = (p * 4) + (c * 4) + (f * 9);
     
-    // Prevents updating state for the initial render if everything is default
-    if (tempGoals.calories !== calculatedCalories) {
-        setTempGoals(prev => ({ ...prev, calories: calculatedCalories }));
-    }
+    setTempGoals(prev => ({ ...prev, calories: calculatedCalories }));
   }, [tempGoals.protein, tempGoals.carbs, tempGoals.fats]);
 
 
@@ -85,6 +88,7 @@ export default function MacroTracker() {
   };
   
   const handleSaveGoals = () => {
+    // If a field is empty, default it to 0 before saving.
     const finalizedGoals: MacroGoals = {
         calories: Number(tempGoals.calories) || 0,
         protein: Number(tempGoals.protein) || 0,
@@ -126,15 +130,15 @@ export default function MacroTracker() {
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="protein-goal" className="text-right">Protein</Label>
-                            <Input id="protein-goal" type="number" value={tempGoals.protein} onChange={(e) => handleGoalChange('protein', e.target.value)} className="col-span-3" />
+                            <Input id="protein-goal" type="number" value={tempGoals.protein} onChange={(e) => handleGoalChange('protein', e.target.value)} className="col-span-3" placeholder="in grams"/>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="carbs-goal" className="text-right">Carbs</Label>
-                            <Input id="carbs-goal" type="number" value={tempGoals.carbs} onChange={(e) => handleGoalChange('carbs', e.target.value)} className="col-span-3" />
+                            <Input id="carbs-goal" type="number" value={tempGoals.carbs} onChange={(e) => handleGoalChange('carbs', e.target.value)} className="col-span-3" placeholder="in grams"/>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="fats-goal" className="text-right">Fats</Label>
-                            <Input id="fats-goal" type="number" value={tempGoals.fats} onChange={(e) => handleGoalChange('fats', e.target.value)} className="col-span-3" />
+                            <Input id="fats-goal" type="number" value={tempGoals.fats} onChange={(e) => handleGoalChange('fats', e.target.value)} className="col-span-3" placeholder="in grams"/>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="calories-goal" className="text-right">Calories</Label>
@@ -150,28 +154,28 @@ export default function MacroTracker() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex justify-between items-baseline">
-            <h3 className="text-3xl font-bold text-primary">{currentIntake.calories.toLocaleString()}</h3>
+            <h3 className="text-3xl font-bold text-primary">{Math.round(currentIntake.calories).toLocaleString()}</h3>
             <span className="font-medium text-muted-foreground">/ {goals.calories.toLocaleString()} kCal</span>
         </div>
         <div className="space-y-3 pt-2">
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Protein</span>
-              <span className="text-muted-foreground">{currentIntake.protein}g / {goals.protein}g</span>
+              <span className="text-muted-foreground">{Math.round(currentIntake.protein)}g / {goals.protein}g</span>
             </div>
             <Progress value={getProgressValue(currentIntake.protein, goals.protein)} className="h-2 [&>div]:bg-sky-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Carbs</span>
-              <span className="text-muted-foreground">{currentIntake.carbs}g / {goals.carbs}g</span>
+              <span className="text-muted-foreground">{Math.round(currentIntake.carbs)}g / {goals.carbs}g</span>
             </div>
             <Progress value={getProgressValue(currentIntake.carbs, goals.carbs)} className="h-2 [&>div]:bg-orange-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Fats</span>
-              <span className="text-muted-foreground">{currentIntake.fats}g / {goals.fats}g</span>
+              <span className="text-muted-foreground">{Math.round(currentIntake.fats)}g / {goals.fats}g</span>
             </div>
             <Progress value={getProgressValue(currentIntake.fats, goals.fats)} className="h-2 [&>div]:bg-amber-400" />
           </div>

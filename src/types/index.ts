@@ -47,3 +47,16 @@ export type MacroGoals = {
   carbs: number;
   fats: number;
 };
+
+export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks' | 'Other';
+
+export type FoodLogEntry = {
+  id: string;
+  date: string; // ISO string for the day
+  mealType: MealType;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+};
