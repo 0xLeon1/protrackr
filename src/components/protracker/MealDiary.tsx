@@ -2,20 +2,15 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import type { FoodLogEntry, MealType, FoodDataItem, Serving } from "@/types";
+import type { FoodLogEntry, MealType } from "@/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Loader2, ArrowLeft, Pencil } from "lucide-react";
+import { PlusCircle, Trash2, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getFoodDetails, searchFoods } from "@/lib/food";
-import { GRAMS_PER_OUNCE } from "@/lib/constants";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
 
 function capitalizeWords(str: string): string {
     if (!str) return '';
@@ -34,127 +29,23 @@ interface MealDiaryProps {
   onUpdateMeal: (meal: FoodLogEntry) => void;
 }
 
+const initialFoodState = { name: '', calories: '', protein: '', carbs: '', fats: '' };
+
 export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal }: MealDiaryProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
-
-  // Dialog view state
-  const [view, setView] = useState<'search' | 'manual'>('search');
-  const [selectedFood, setSelectedFood] = useState<FoodDataItem | null>(null);
   const [editingLog, setEditingLog] = useState<FoodLogEntry | null>(null);
+  const [manualFood, setManualFood] = useState(initialFoodState);
 
-  // Search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<FoodDataItem[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
-
-  // Serving size state
-  const [amount, setAmount] = useState("1");
-  const [unit, setUnit] = useState<string>(""); // Will be serving_id, 'g', or 'oz'
-  const [gramReferenceServing, setGramReferenceServing] = useState<Serving | null>(null);
-
-  // Custom food form state
-  const [customFood, setCustomFood] = useState({ name: '', calories: '', protein: '', carbs: '', fats: '' });
-  
-  const { toast } = useToast();
-  
-  // Effect to load recent foods when dialog opens
+  // When dialog closes, reset everything
   useEffect(() => {
-    if (selectedFood?.servings) {
-        const refServing = selectedFood.servings.find(s => s.weightGrams && s.weightGrams > 0) || null;
-        setGramReferenceServing(refServing);
-        
-        if (selectedFood.servings.length > 0) {
-            setUnit(selectedFood.servings[0].id);
-            setAmount("1");
-        } else if (refServing) {
-            setUnit('g');
-            setAmount('100');
-        }
+    if (!isDialogOpen) {
+      setActiveMealType(null);
+      setEditingLog(null);
+      setManualFood(initialFoodState);
     }
-  }, [selectedFood]);
-
-  // Effect to handle searching
-  useEffect(() => {
-    if (view !== 'search' || !isDialogOpen || selectedFood) {
-      return;
-    }
-
-    const handler = setTimeout(async () => {
-      if (searchQuery.trim().length > 1) {
-        setIsSearching(true);
-        try {
-          const results = await searchFoods(searchQuery);
-          setSearchResults(results);
-        } catch (error: any) {
-          toast({
-            title: "API Error",
-            description: error.message,
-            variant: "destructive",
-          });
-          setSearchResults([]);
-        } finally {
-          setIsSearching(false);
-        }
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(handler);
-  }, [searchQuery, view, isDialogOpen, selectedFood, toast]);
-
-
-  const resetDialogState = () => {
-    setSearchQuery("");
-    setSearchResults([]);
-    setIsSearching(false);
-    setIsFetchingDetails(false);
-    setSelectedFood(null);
-    setEditingLog(null);
-    setAmount("1");
-    setUnit("");
-    setView('search');
-    setCustomFood({ name: '', calories: '', protein: '', carbs: '', fats: '' });
-    setGramReferenceServing(null);
-  };
-
-  const calculatedMacros = useMemo(() => {
-    if (!selectedFood || !unit) {
-       return { calories: 0, protein: 0, carbs: 0, fats: 0 };
-    }
-    
-    const numAmount = parseFloat(amount) || 0;
-
-    // Case 1: Unit is 'g' or 'oz', and we have a serving with gram weight to calculate from
-    if ((unit === 'g' || unit === 'oz') && gramReferenceServing) {
-        const gramsPerRef = gramReferenceServing.weightGrams!;
-        
-        const totalGrams = unit === 'oz' ? numAmount * GRAMS_PER_OUNCE : numAmount;
-
-        return {
-            calories: Math.round(gramReferenceServing.calories / gramsPerRef * totalGrams),
-            protein: parseFloat((gramReferenceServing.protein / gramsPerRef * totalGrams).toFixed(1)),
-            carbs: parseFloat((gramReferenceServing.carbs / gramsPerRef * totalGrams).toFixed(1)),
-            fats: parseFloat((gramReferenceServing.fats / gramsPerRef * totalGrams).toFixed(1)),
-        }
-    }
-
-    // Case 2: Unit is a serving ID from the API
-    const selectedServing = selectedFood.servings?.find(s => s.id === unit);
-    if (selectedServing) {
-        return {
-          calories: Math.round(selectedServing.calories * numAmount),
-          protein: parseFloat((selectedServing.protein * numAmount).toFixed(1)),
-          carbs: parseFloat((selectedServing.carbs * numAmount).toFixed(1)),
-          fats: parseFloat((selectedServing.fats * numAmount).toFixed(1)),
-        };
-    }
-
-    return { calories: 0, protein: 0, carbs: 0, fats: 0 };
-  }, [selectedFood, amount, unit, gramReferenceServing]);
-
+  }, [isDialogOpen]);
+  
   const handleOpenDialog = (mealType: MealType) => {
     setActiveMealType(mealType);
     setIsDialogOpen(true);
@@ -163,94 +54,42 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
   const handleEditClick = (log: FoodLogEntry) => {
     setEditingLog(log);
     setActiveMealType(log.mealType);
-    
-    if (log.foodDetails) {
-        setSelectedFood(log.foodDetails);
-        setAmount(String(log.servingAmount));
-        setUnit(log.servingUnit);
-    } else {
-        setView('manual');
-        setCustomFood({
-            name: log.name,
-            calories: String(log.calories),
-            protein: String(log.protein),
-            carbs: String(log.carbs),
-            fats: String(log.fats),
-        });
-    }
+    setManualFood({
+        name: log.name,
+        calories: String(log.calories),
+        protein: String(log.protein),
+        carbs: String(log.carbs),
+        fats: String(log.fats),
+    });
     setIsDialogOpen(true);
   };
 
-  const handleSelectFood = async (food: FoodDataItem) => {
-    setIsFetchingDetails(true);
-    try {
-        const detailedFood = await getFoodDetails(food.id);
-        if (detailedFood) {
-          setSelectedFood(detailedFood);
-        } else {
-           throw new Error("Could not retrieve details for this food.");
-        }
-    } catch (error: any) {
-        toast({
-            title: "Could Not Fetch Details",
-            description: error.message,
-            variant: "destructive"
-        });
-        // Fallback to manual entry
-        setCustomFood(prev => ({...prev, name: food.name}));
-        setView('manual');
-    } finally {
-        setIsFetchingDetails(false);
+  const handleManualFoodChange = (field: keyof typeof manualFood, value: string) => {
+    if (field === 'name') {
+        setManualFood(prev => ({ ...prev, name: value }));
+    } else {
+        setManualFood(prev => ({ ...prev, [field]: value.replace(/[^0-9.]/g, '') }));
     }
   };
-
+  
   const handleSaveMeal = () => {
-    if (!activeMealType || !selectedFood || !unit) return;
-    
-    const numAmount = parseFloat(amount) || 0;
-    
+    if (!activeMealType || !manualFood.name || !manualFood.calories) return;
+      
     const mealData = {
-      mealType: activeMealType,
-      name: selectedFood.name,
-      ...calculatedMacros,
-      servingAmount: numAmount,
-      servingUnit: unit,
-      foodDetails: selectedFood,
+        mealType: activeMealType,
+        name: manualFood.name,
+        calories: parseFloat(manualFood.calories) || 0,
+        protein: parseFloat(manualFood.protein) || 0,
+        carbs: parseFloat(manualFood.carbs) || 0,
+        fats: parseFloat(manualFood.fats) || 0,
     };
-
+      
     if (editingLog) {
-        onUpdateMeal({ ...editingLog, ...mealData });
+        onUpdateMeal({ id: editingLog.id, date: editingLog.date, ...mealData });
     } else {
         onAddMeal(mealData);
     }
     setIsDialogOpen(false);
-  };
-
-  const handleCustomFoodChange = (field: keyof Omit<typeof customFood, 'name'>, value: string) => {
-    setCustomFood(prev => ({ ...prev, [field]: value.replace(/[^0-9.]/g, '') }));
-  };
-  
-  const handleSaveCustomMeal = () => {
-      if (!activeMealType || !customFood.name || !customFood.calories) return;
-      
-      const mealData = {
-          mealType: activeMealType,
-          name: customFood.name,
-          calories: parseFloat(customFood.calories) || 0,
-          protein: parseFloat(customFood.protein) || 0,
-          carbs: parseFloat(customFood.carbs) || 0,
-          fats: parseFloat(customFood.fats) || 0,
-          servingAmount: 1,
-          servingUnit: 'serving',
-          foodDetails: null,
-      };
-      
-      if (editingLog) {
-          onUpdateMeal({ ...editingLog, ...mealData });
-      } else {
-          onAddMeal(mealData);
-      }
-      setIsDialogOpen(false);
   };
 
   const mealsByType = useMemo(() => {
@@ -277,175 +116,43 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     return `${Math.round(totals.calories)} kcal, ${Math.round(totals.protein)}g P, ${Math.round(totals.carbs)}g C, ${Math.round(totals.fats)}g F`;
   };
 
-  const renderDialogContent = () => {
-    if (isFetchingDetails) {
-        return (
-            <div className="flex justify-center items-center h-60">
-                <Loader2 className="w-8 h-8 animate-spin" />
+  const renderDialogContent = () => (
+     <div className="space-y-4">
+        <div className="space-y-2">
+            <Label htmlFor="manual-name">Food Name</Label>
+            <Input id="manual-name" value={manualFood.name} onChange={e => handleManualFoodChange('name', e.target.value)} placeholder="e.g., Chicken and Rice" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+                <Label htmlFor="manual-calories">Calories</Label>
+                <Input id="manual-calories" type="number" value={manualFood.calories} onChange={e => handleManualFoodChange('calories', e.target.value)} placeholder="kcal"/>
             </div>
-        );
-    }
-
-    if (selectedFood) {
-      return (
-        <div className="space-y-4">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedFood(null)} className="-ml-4">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
+            <div className="space-y-2">
+                <Label htmlFor="manual-protein">Protein</Label>
+                <Input id="manual-protein" type="number" value={manualFood.protein} onChange={e => handleManualFoodChange('protein', e.target.value)} placeholder="grams"/>
+            </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+                <Label htmlFor="manual-carbs">Carbs</Label>
+                <Input id="manual-carbs" type="number" value={manualFood.carbs} onChange={e => handleManualFoodChange('carbs', e.target.value)} placeholder="grams"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="manual-fats">Fats</Label>
+                <Input id="manual-fats" type="number" value={manualFood.fats} onChange={e => handleManualFoodChange('fats', e.target.value)} placeholder="grams"/>
+            </div>
+        </div>
+        <DialogFooter>
+            <Button onClick={handleSaveMeal} className="w-full">
+            {editingLog ? 'Update Food' : `Add to ${activeMealType}`}
             </Button>
-            <h3 className="font-semibold text-lg">{selectedFood.brandName ? selectedFood.name : capitalizeWords(selectedFood.name)}</h3>
-            {selectedFood.brandName && (
-                <p className="text-sm text-muted-foreground -mt-3">{selectedFood.brandName}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount</Label>
-                <Input id="amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unit</Label>
-                <Select value={unit} onValueChange={(value: string) => setUnit(value)}>
-                  <SelectTrigger id="unit">
-                    <SelectValue placeholder="Select unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedFood.servings?.map(serving => (
-                       <SelectItem key={serving.id} value={serving.id}>
-                          {capitalizeWords(serving.name)}
-                       </SelectItem>
-                    ))}
-                    {gramReferenceServing && <SelectItem value="g">Grams (g)</SelectItem>}
-                    {gramReferenceServing && <SelectItem value="oz">Ounces (oz)</SelectItem>}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <Card className="p-4 bg-muted/50">
-              <h4 className="font-medium mb-2 text-center">Calculated Macros</h4>
-              <div className="flex justify-around text-center text-sm">
-                  <div>
-                      <p className="font-bold text-lg">{calculatedMacros.calories}</p>
-                      <p className="text-xs text-muted-foreground">kCal</p>
-                  </div>
-                  <div>
-                      <p className="font-bold text-lg">{calculatedMacros.protein}g</p>
-                      <p className="text-xs text-muted-foreground">Protein</p>
-                  </div>
-                  <div>
-                      <p className="font-bold text-lg">{calculatedMacros.carbs}g</p>
-                      <p className="text-xs text-muted-foreground">Carbs</p>
-                  </div>
-                  <div>
-                      <p className="font-bold text-lg">{calculatedMacros.fats}g</p>
-                      <p className="text-xs text-muted-foreground">Fats</p>
-                  </div>
-              </div>
-            </Card>
-
-            <DialogFooter>
-              <Button onClick={handleSaveMeal} className="w-full">
-                {editingLog ? 'Update Food' : `Add to ${activeMealType}`}
-              </Button>
-            </DialogFooter>
-        </div>
-      );
-    }
-
-    if (view === 'manual') {
-      return (
-         <div className="space-y-4">
-            {!editingLog && (
-                <Button variant="ghost" size="sm" onClick={() => setView('search')} className="-ml-4">
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
-                </Button>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="custom-name">Food Name</Label>
-              <Input id="custom-name" value={customFood.name} onChange={e => setCustomFood(prev => ({...prev, name: e.target.value}))} placeholder="e.g., Homemade Lasagna" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="custom-calories">Calories</Label>
-                    <Input id="custom-calories" type="number" value={customFood.calories} onChange={e => handleCustomFoodChange('calories', e.target.value)} placeholder="kcal"/>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="custom-protein">Protein</Label>
-                    <Input id="custom-protein" type="number" value={customFood.protein} onChange={e => handleCustomFoodChange('protein', e.target.value)} placeholder="grams"/>
-                </div>
-            </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="custom-carbs">Carbs</Label>
-                    <Input id="custom-carbs" type="number" value={customFood.carbs} onChange={e => handleCustomFoodChange('carbs', e.target.value)} placeholder="grams"/>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="custom-fats">Fats</Label>
-                    <Input id="custom-fats" type="number" value={customFood.fats} onChange={e => handleCustomFoodChange('fats', e.target.value)} placeholder="grams"/>
-                </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleSaveCustomMeal} className="w-full">
-                {editingLog ? 'Update Custom Food' : 'Log Custom Food'}
-              </Button>
-            </DialogFooter>
-         </div>
-      );
-    }
-    
-    return (
-      <div className="space-y-4">
-        <div className="relative">
-          <Input
-            placeholder="Search for a food..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
-        </div>
-        <ScrollArea className="h-60">
-          {searchResults.length > 0 ? (
-            <div className="space-y-2">
-              {searchResults.map(food => {
-                const subtitle = food.description || (food.dataType === 'branded' ? (food.brandName || 'Branded') : 'Common Food');
-                const displayName = capitalizeWords(food.name);
-
-                return (
-                  <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
-                    <p className="font-medium">{displayName}</p>
-                    {food.brandName && <p className="text-xs text-muted-foreground">{food.brandName}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {subtitle}
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-center text-sm text-muted-foreground py-4">
-              {searchQuery.trim().length > 1 ? (isSearching ? 'Searching...' : 'No results found.') : 'Type at least 2 characters to search.'}
-            </p>
-          )}
-        </ScrollArea>
-        
-        <Separator />
-        
-        <Button variant="link" className="p-0 h-auto" onClick={() => setView('manual')}>
-          Can't find it? Add a custom food
-        </Button>
-      </div>
-    );
-  };
-
+        </DialogFooter>
+     </div>
+  );
 
   return (
     <Card>
-      <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
-        setIsDialogOpen(isOpen);
-        if (!isOpen) {
-          setTimeout(resetDialogState, 200);
-        }
-      }}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <Accordion type="multiple" className="w-full" defaultValue={['Breakfast', 'Lunch']}>
           {MEAL_TYPES.map(mealType => (
             <AccordionItem value={mealType} key={mealType} className="border-b last:border-b-0">
@@ -474,7 +181,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                     (mealsByType[mealType] || []).map(meal => (
                       <div key={meal.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
                         <div>
-                          <p className="font-medium">{meal.foodDetails?.brandName ? meal.name : capitalizeWords(meal.name)}</p>
+                          <p className="font-medium">{capitalizeWords(meal.name)}</p>
                           <p className="text-muted-foreground text-xs">
                             {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
                           </p>
@@ -503,7 +210,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                 {editingLog ? `Edit Food in ${editingLog.mealType}` : `Add Food to ${activeMealType}`}
             </DialogTitle>
             <DialogDescription>
-              {selectedFood ? 'Adjust serving size and save.' : (view === 'search' ? 'Search for a food to log.' : 'Log a custom food.')}
+              {editingLog ? 'Update the nutritional information for this item.' : 'Log a new food by entering its details below.'}
             </DialogDescription>
           </DialogHeader>
           {renderDialogContent()}
