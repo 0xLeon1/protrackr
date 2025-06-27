@@ -429,6 +429,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                 
                 if (typeof food.caloriesPerServing !== 'undefined') {
                     subtitleParts.push(`${food.caloriesPerServing} kcal`);
+                } else if (food.dataType === 'common' && typeof food.calories !== 'undefined') {
+                    subtitleParts.push('Common Food');
+                    subtitleParts.push(`${food.calories} kcal per 100g`);
                 }
                 
                 const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' - ') : (food.dataType === 'common' ? 'Common Food' : 'Branded Food');

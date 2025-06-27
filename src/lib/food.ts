@@ -135,8 +135,8 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            // Query for a 100g serving to get standardized nutrient values
-            body: JSON.stringify({ query: foodName }),
+            // Use a more specific query to get standardized 100g data
+            body: JSON.stringify({ query: `100g ${foodName}` }),
         });
 
         if (!response.ok) {
@@ -152,26 +152,20 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
 
         const foodDetails = data.foods[0];
         
-        if (!foodDetails.serving_weight_grams || foodDetails.serving_weight_grams <= 0) {
-            return null;
-        }
-        
+        // The data is for a 100g serving.
+        // We can directly use these as our per-100g values.
         return {
             id: foodName, 
             name: foodName, 
             dataType: 'common',
             
-            // Serving info from API
-            servingQty: foodDetails.serving_qty,
-            servingUnit: foodDetails.serving_unit,
-            servingWeightGrams: foodDetails.serving_weight_grams,
-            caloriesPerServing: foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : 0,
+            // Per 100g values
+            calories: foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : undefined,
+            protein: foodDetails.nf_protein ? parseFloat(foodDetails.nf_protein.toFixed(1)) : undefined,
+            carbs: foodDetails.nf_total_carbohydrate ? parseFloat(foodDetails.nf_total_carbohydrate.toFixed(1)) : undefined,
+            fats: foodDetails.nf_total_fat ? parseFloat(foodDetails.nf_total_fat.toFixed(1)) : undefined,
 
-            // Calculate and store per 100g values for consistency
-            calories: Math.round((foodDetails.nf_calories / foodDetails.serving_weight_grams) * 100),
-            protein: parseFloat(((foodDetails.nf_protein / foodDetails.serving_weight_grams) * 100).toFixed(1)),
-            carbs: parseFloat(((foodDetails.nf_total_carbohydrate / foodDetails.serving_weight_grams) * 100).toFixed(1)),
-            fats: parseFloat(((foodDetails.nf_total_fat / foodDetails.serving_weight_grams) * 100).toFixed(1)),
+            // Explicitly leave serving info undefined for common foods to force gram-based logging
         };
 
     } catch (error) {
