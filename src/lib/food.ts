@@ -135,8 +135,8 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            // Use a more specific query to get standardized 100g data
-            body: JSON.stringify({ query: `100g ${foodName}` }),
+            // Use the food name directly, let Nutritionix parse it.
+            body: JSON.stringify({ query: foodName }),
         });
 
         if (!response.ok) {
@@ -152,20 +152,29 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
 
         const foodDetails = data.foods[0];
         
-        // The data is for a 100g serving.
-        // We can directly use these as our per-100g values.
+        const servingWeight = foodDetails.serving_weight_grams;
+        if (!servingWeight || servingWeight === 0) {
+            return null; // Can't normalize to 100g if we don't have a weight
+        }
+        
+        const ratio = 100 / servingWeight;
+
         return {
-            id: foodName, 
-            name: foodName, 
+            id: foodDetails.food_name, 
+            name: foodDetails.food_name,
             dataType: 'common',
             
             // Per 100g values
-            calories: foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : undefined,
-            protein: foodDetails.nf_protein ? parseFloat(foodDetails.nf_protein.toFixed(1)) : undefined,
-            carbs: foodDetails.nf_total_carbohydrate ? parseFloat(foodDetails.nf_total_carbohydrate.toFixed(1)) : undefined,
-            fats: foodDetails.nf_total_fat ? parseFloat(foodDetails.nf_total_fat.toFixed(1)) : undefined,
+            calories: Math.round((foodDetails.nf_calories || 0) * ratio),
+            protein: parseFloat(((foodDetails.nf_protein || 0) * ratio).toFixed(1)),
+            carbs: parseFloat(((foodDetails.nf_total_carbohydrate || 0) * ratio).toFixed(1)),
+            fats: parseFloat(((foodDetails.nf_total_fat || 0) * ratio).toFixed(1)),
 
-            // Explicitly leave serving info undefined for common foods to force gram-based logging
+            // Original serving info from API
+            servingQty: foodDetails.serving_qty,
+            servingUnit: foodDetails.serving_unit,
+            servingWeightGrams: foodDetails.serving_weight_grams,
+            caloriesPerServing: Math.round(foodDetails.nf_calories || 0),
         };
 
     } catch (error) {
