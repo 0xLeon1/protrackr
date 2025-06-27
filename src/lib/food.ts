@@ -152,20 +152,22 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
 
         const foodDetails = data.foods[0];
         
-        const caloriesPerServing = foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : undefined;
-        
         // The data returned is for the full query (e.g., '100g ground beef'), so the nutrients are for 100g
+        // For common foods fetched this way, we are ONLY interested in the per-100g data.
+        // We will intentionally leave serving info undefined to avoid calculation errors.
         return {
-            id: foodName, // Use foodName as a unique ID for common foods
-            name: foodName, // Use the original name from search results for display
+            id: foodName, 
+            name: foodName, 
             dataType: 'common',
-            // We can still use the serving info returned for the 100g query for display purposes.
-            // The API might return "1 serving" for "100g", which is fine.
-            servingQty: foodDetails.serving_qty,
-            servingUnit: foodDetails.serving_unit,
-            servingWeightGrams: foodDetails.serving_weight_grams,
-            caloriesPerServing: caloriesPerServing,
-            // These values are now correctly for 100g
+            
+            // Serving info is intentionally omitted for common foods to avoid the calculation error.
+            // The UI will default to grams/ounces, which is what we want.
+            servingQty: undefined,
+            servingUnit: undefined,
+            servingWeightGrams: undefined,
+            caloriesPerServing: undefined,
+
+            // These values are correctly for 100g
             calories: foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : 0,
             protein: foodDetails.nf_protein ? parseFloat(foodDetails.nf_protein.toFixed(1)) : 0,
             carbs: foodDetails.nf_total_carbohydrate ? parseFloat(foodDetails.nf_total_carbohydrate.toFixed(1)) : 0,
