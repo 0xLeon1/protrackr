@@ -203,26 +203,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
   };
 
   const handleSelectFood = async (food: FoodDataItem) => {
-    if (food.dataType === 'branded' || (food.dataType === 'common' && food.calories)) {
-      setSelectedFood(food);
-    } else { // Common food, needs details fetched
-      setIsFetchingDetails(true);
-      const detailedFood = await getCommonFoodDetails(food.name);
-      setIsFetchingDetails(false);
-      
-      if (detailedFood) {
-        setSelectedFood(detailedFood);
-      } else {
-        toast({
-            title: "Could not get details",
-            description: "Sorry, we couldn't fetch the nutritional details for that item. Please try adding it manually.",
-            variant: "destructive"
-        });
-        // Switch to manual entry view with the food name pre-filled
-        setView('manual');
-        setCustomFood(prev => ({...prev, name: food.name}));
-      }
-    }
+    // Since common foods are now pre-fetched with details, this logic simplifies
+    setSelectedFood(food);
   };
 
   const handleSaveMeal = () => {
@@ -333,7 +315,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                   <SelectContent>
                     {selectedFood.servingUnit && selectedFood.servingWeightGrams && (
                        <SelectItem value="serving">
-                          {capitalizeWords(selectedFood.servingUnit)} ({selectedFood.servingWeightGrams}g)
+                          {capitalizeWords(selectedFood.servingUnit)} ({Math.round(selectedFood.servingWeightGrams)}g)
                        </SelectItem>
                     )}
                     <SelectItem value="g">Grams (g)</SelectItem>
@@ -432,27 +414,30 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
             <div className="space-y-2">
               {searchResults.map(food => {
                 const subtitleParts = [];
-                if (food.dataType === 'branded') {
-                    if (food.brandName) {
-                        subtitleParts.push(capitalizeWords(food.brandName));
-                    }
-                    if (food.servingQty && food.servingUnit) {
-                        let servingString = `${food.servingQty} ${capitalizeWords(food.servingUnit)}`;
-                        if (food.servingWeightGrams) {
-                            servingString += ` (${food.servingWeightGrams}g)`;
-                        }
-                        subtitleParts.push(servingString);
-                    }
-                    if (typeof food.caloriesPerServing !== 'undefined') {
-                        subtitleParts.push(`${food.caloriesPerServing} kcal`);
-                    }
+
+                if (food.dataType === 'branded' && food.brandName) {
+                    subtitleParts.push(capitalizeWords(food.brandName));
                 }
+
+                if (food.servingQty && food.servingUnit) {
+                    let servingString = `${food.servingQty} ${capitalizeWords(food.servingUnit)}`;
+                    if (food.servingWeightGrams) {
+                        servingString += ` (${Math.round(food.servingWeightGrams)}g)`;
+                    }
+                    subtitleParts.push(servingString);
+                }
+                
+                if (typeof food.caloriesPerServing !== 'undefined') {
+                    subtitleParts.push(`${food.caloriesPerServing} kcal`);
+                }
+                
+                const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' - ') : (food.dataType === 'common' ? 'Common Food' : 'Branded Food');
 
                 return (
                   <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
                     <p>{capitalizeWords(food.name)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {food.dataType === 'branded' && subtitleParts.length > 0 ? subtitleParts.join(' - ') : 'Common Food'}
+                      {subtitle}
                     </p>
                   </button>
                 )
