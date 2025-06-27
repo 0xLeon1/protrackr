@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -10,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { PlusCircle, Trash2, Loader2, ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { searchFoods } from "@/lib/food";
+import { getCommonFoodDetails, searchFoods } from "@/lib/food";
 import { GRAMS_PER_OUNCE } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
 
@@ -35,6 +37,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<FoodDataItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
 
   // Serving size state
   const [amount, setAmount] = useState("100");
@@ -42,6 +45,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
   // Custom food form state
   const [customFood, setCustomFood] = useState({ name: '', calories: '', protein: '', carbs: '', fats: '' });
+  
+  const { toast } = useToast();
 
   // Effect to handle searching
   useEffect(() => {
@@ -69,6 +74,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     setSearchQuery("");
     setSearchResults([]);
     setIsSearching(false);
+    setIsFetchingDetails(false);
     setSelectedFood(null);
     setAmount("100");
     setUnit("g");
@@ -77,23 +83,49 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   };
 
   const calculatedMacros = useMemo(() => {
-    if (!selectedFood) return { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    if (!selectedFood || typeof selectedFood.calories === 'undefined') {
+       return { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    }
     
     const numAmount = parseFloat(amount) || 0;
     const totalGrams = unit === 'g' ? numAmount : numAmount * GRAMS_PER_OUNCE;
     const ratio = totalGrams / 100;
 
     return {
-      calories: Math.round(selectedFood.calories * ratio),
-      protein: parseFloat((selectedFood.protein * ratio).toFixed(1)),
-      carbs: parseFloat((selectedFood.carbs * ratio).toFixed(1)),
-      fats: parseFloat((selectedFood.fats * ratio).toFixed(1)),
+      calories: Math.round((selectedFood.calories || 0) * ratio),
+      protein: parseFloat(((selectedFood.protein || 0) * ratio).toFixed(1)),
+      carbs: parseFloat(((selectedFood.carbs || 0) * ratio).toFixed(1)),
+      fats: parseFloat(((selectedFood.fats || 0) * ratio).toFixed(1)),
     };
   }, [selectedFood, amount, unit]);
 
   const handleOpenDialog = (mealType: MealType) => {
     setActiveMealType(mealType);
     setIsDialogOpen(true);
+  };
+  
+  const handleSelectFood = async (food: FoodDataItem) => {
+    if (food.dataType === 'branded') {
+      setSelectedFood(food);
+    } else {
+      // It's a common food, we need to fetch its details
+      setIsFetchingDetails(true);
+      const detailedFood = await getCommonFoodDetails(food.name);
+      setIsFetchingDetails(false);
+      
+      if (detailedFood) {
+        setSelectedFood(detailedFood);
+      } else {
+        toast({
+            title: "Could not get details",
+            description: "Sorry, we couldn't fetch the nutritional details for that item. Please try adding it manually.",
+            variant: "destructive"
+        });
+        // Switch to manual entry view with the food name pre-filled
+        setView('manual');
+        setCustomFood(prev => ({...prev, name: food.name}));
+      }
+    }
   };
 
   const handleSaveSearchedMeal = () => {
@@ -154,6 +186,14 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   };
 
   const renderDialogContent = () => {
+    if (isFetchingDetails) {
+        return (
+            <div className="flex justify-center items-center h-60">
+                <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+        );
+    }
+
     if (selectedFood) {
       // DETAILS VIEW
       return (
@@ -254,7 +294,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       <div className="space-y-4">
         <div className="relative">
           <Input
-            placeholder="Search the food database..."
+            placeholder="Search for a food..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -264,9 +304,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
           {searchResults.length > 0 ? (
             <div className="space-y-2">
               {searchResults.map(food => (
-                <button key={food.id} onClick={() => setSelectedFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
+                <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
                   <p>{food.name}</p>
-                  <p className="text-xs text-muted-foreground">{Math.round(food.calories)} kcal per 100g</p>
+                  <p className="text-xs text-muted-foreground">
+                    {food.dataType === 'branded' ? `${Math.round(food.calories || 0)} kcal per 100g` : 'Common Food'}
+                  </p>
                 </button>
               ))}
             </div>

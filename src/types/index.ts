@@ -79,9 +79,10 @@ export type FoodLogEntry = {
 export interface FoodDataItem {
     id: string;
     name: string;
-    // Macros per 100g
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
+    // Macros per 100g, now optional as they might be fetched in a second step
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fats?: number;
+    dataType: 'branded' | 'common';
 }
