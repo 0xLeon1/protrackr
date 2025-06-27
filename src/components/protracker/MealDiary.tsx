@@ -230,7 +230,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
             <Button variant="ghost" size="sm" onClick={() => setSelectedFood(null)} className="-ml-4">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
             </Button>
-            <h3 className="font-semibold text-lg">{selectedFood.name}</h3>
+            <h3 className="font-semibold text-lg">{capitalizeWords(selectedFood.name)}</h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -339,7 +339,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
             <div className="space-y-2">
               {searchResults.map(food => (
                 <button key={`${food.id}-${food.name}`} onClick={() => handleSelectFood(food)} className="w-full text-left p-2 rounded-md hover:bg-muted text-sm">
-                  <p>{food.name}</p>
+                  <p>{capitalizeWords(food.name)}</p>
                   <p className="text-xs text-muted-foreground">
                     {food.dataType === 'branded' ? (food.servingUnit ? `${capitalizeWords(food.servingUnit)}` : `${Math.round(food.calories || 0)} kcal per 100g`) : 'Common Food'}
                   </p>
@@ -392,7 +392,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                     (mealsByType[mealType] || []).map(meal => (
                       <div key={meal.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
                         <div>
-                          <p className="font-medium">{meal.name}</p>
+                          <p className="font-medium">{capitalizeWords(meal.name)}</p>
                           <p className="text-muted-foreground text-xs">
                             {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
                           </p>
