@@ -135,12 +135,12 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
                 'x-app-id': appId,
                 'x-app-key': apiKey,
             },
-            // Query for the food name itself, API will return a default serving
-            body: JSON.stringify({ query: foodName }),
+            // Query for a 100g serving to get standardized nutrient values
+            body: JSON.stringify({ query: `100g ${foodName}` }),
         });
 
         if (!response.ok) {
-            console.error("Failed to fetch details from Nutritionix API:", response.statusText);
+            console.error(`Failed to fetch details for '100g ${foodName}' from Nutritionix API:`, response.statusText);
             return null;
         }
 
@@ -152,24 +152,24 @@ export async function getCommonFoodDetails(foodName: string): Promise<FoodDataIt
 
         const foodDetails = data.foods[0];
         
-        const ratio = foodDetails.serving_weight_grams ? 100 / foodDetails.serving_weight_grams : 0;
-        
         const caloriesPerServing = foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : undefined;
-
+        
+        // The data returned is for the full query (e.g., '100g ground beef'), so the nutrients are for 100g
         return {
-            id: foodDetails.food_name,
-            name: foodDetails.food_name,
+            id: foodName, // Use foodName as a unique ID for common foods
+            name: foodName, // Use the original name from search results for display
             dataType: 'common',
-            // Store serving info from the API response
+            // We can still use the serving info returned for the 100g query for display purposes.
+            // The API might return "1 serving" for "100g", which is fine.
             servingQty: foodDetails.serving_qty,
             servingUnit: foodDetails.serving_unit,
             servingWeightGrams: foodDetails.serving_weight_grams,
             caloriesPerServing: caloriesPerServing,
-            // Normalize and store nutrients per 100g
-            calories: ratio ? Math.round(foodDetails.nf_calories * ratio) : foodDetails.nf_calories,
-            protein: ratio ? parseFloat((foodDetails.nf_protein * ratio).toFixed(1)) : foodDetails.nf_protein,
-            carbs: ratio ? parseFloat((foodDetails.nf_total_carbohydrate * ratio).toFixed(1)) : foodDetails.nf_total_carbohydrate,
-            fats: ratio ? parseFloat((foodDetails.nf_total_fat * ratio).toFixed(1)) : foodDetails.nf_total_fat,
+            // These values are now correctly for 100g
+            calories: foodDetails.nf_calories ? Math.round(foodDetails.nf_calories) : 0,
+            protein: foodDetails.nf_protein ? parseFloat(foodDetails.nf_protein.toFixed(1)) : 0,
+            carbs: foodDetails.nf_total_carbohydrate ? parseFloat(foodDetails.nf_total_carbohydrate.toFixed(1)) : 0,
+            fats: foodDetails.nf_total_fat ? parseFloat(foodDetails.nf_total_fat.toFixed(1)) : 0,
         };
 
     } catch (error) {
