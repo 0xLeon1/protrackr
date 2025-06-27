@@ -1,45 +1,109 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import type { WorkoutLogEntry } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CheckCircle2, XCircle, TrendingUp } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { startOfWeek, endOfWeek, eachDayOfInterval, format, isWithinInterval, parseISO } from 'date-fns';
+
+interface DailyVolume {
+  day: string;
+  volume: number;
+}
 
 export default function ConsistencyMeter() {
-  const week = [
-    { day: 'M', complete: true },
-    { day: 'T', complete: true },
-    { day: 'W', complete: false },
-    { day: 'T', complete: true },
-    { day: 'F', complete: false },
-    { day: 'S', complete: true },
-    { day: 'S', complete: true },
-  ];
+  const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
+  
+  useEffect(() => {
+    // 1. Initialize volume data for the current week
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const completedDays = week.filter(d => d.complete).length;
+    let volumeDataForWeek: DailyVolume[] = daysInWeek.map(day => ({
+      day: format(day, 'E'), // Mon, Tue, etc.
+      volume: 0,
+    }));
+
+    // 2. Load logs from localStorage
+    const storedLogs = localStorage.getItem('protracker-logs');
+    if (storedLogs) {
+      try {
+        const parsedLogs: WorkoutLogEntry[] = JSON.parse(storedLogs);
+        
+        // 3. Filter logs for the current week and aggregate volume
+        parsedLogs.forEach(log => {
+          const logDate = parseISO(log.completedAt);
+          if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+            const dayOfWeek = format(logDate, 'E');
+            const dayIndex = volumeDataForWeek.findIndex(d => d.day === dayOfWeek);
+
+            if (dayIndex !== -1) {
+              const workoutVolume = log.workoutSnapshot.exercises.reduce((totalVolume, exercise) => {
+                const exerciseVolume = exercise.performance?.reduce((total, set) => {
+                  if (set.completed) {
+                    const reps = typeof set.reps === 'number' ? set.reps : 0;
+                    const weight = typeof set.weight === 'number' ? set.weight : 0;
+                    return total + (reps * weight);
+                  }
+                  return total;
+                }, 0) || 0;
+                return totalVolume + exerciseVolume;
+              }, 0);
+              volumeDataForWeek[dayIndex].volume += workoutVolume;
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Failed to parse logs for consistency meter", error);
+      }
+    }
+    
+    setDailyVolume(volumeDataForWeek);
+
+  }, []);
+
+  const chartConfig = {
+    volume: {
+      label: "Volume",
+      color: "hsl(var(--primary))",
+    },
+  };
 
   return (
     <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader>
-        <CardTitle className="font-headline">Consistency</CardTitle>
-        <CardDescription>Your weekly progress at a glance.</CardDescription>
+        <CardTitle className="font-headline">Daily Volume</CardTitle>
+        <CardDescription>Your total lifted volume for the current week.</CardDescription>
       </CardHeader>
-      <CardContent className="text-center">
-        <div className="flex justify-center items-center gap-4 mb-6">
-            <TrendingUp className="w-10 h-10 text-primary" />
-            <div>
-                <p className="text-4xl font-bold">{completedDays} / 7 Days</p>
-                <p className="text-sm font-medium text-muted-foreground">Current Streak</p>
-            </div>
-        </div>
-        <div className="flex justify-around items-center p-3 rounded-lg bg-muted/50">
-          {week.map((item, index) => (
-            <div key={index} className="flex flex-col items-center gap-1.5">
-              <span className="text-xs font-semibold text-muted-foreground">{item.day}</span>
-              {item.complete ? (
-                <CheckCircle2 className="w-7 h-7 text-green-500" />
-              ) : (
-                <XCircle className="w-7 h-7 text-red-500 opacity-50" />
-              )}
-            </div>
-          ))}
-        </div>
+      <CardContent>
+          <ChartContainer config={chartConfig} className="min-h-[180px] w-full">
+            <BarChart 
+                accessibilityLayer 
+                data={dailyVolume} 
+                margin={{ top: 20, right: 0, left: 0, bottom: 0 }}
+            >
+              <XAxis
+                dataKey="day"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tickFormatter={(value) => value.slice(0, 1)}
+              />
+              <YAxis hide domain={[0, 'dataMax + 500']}/>
+               <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent 
+                      formatter={(value) => `${Number(value).toLocaleString()} lbs`}
+                      indicator="dot"
+                      nameKey="volume"
+                      />}
+                  />
+              <Bar dataKey="volume" fill="var(--color-volume)" radius={4} barSize={30} />
+            </BarChart>
+          </ChartContainer>
       </CardContent>
     </Card>
   );
