@@ -40,10 +40,6 @@ export default function DailyCheckin() {
           </RadioGroup>
         </div>
         <div className="space-y-4">
-            <Label htmlFor="mood">Mood</Label>
-            <Slider id="mood" defaultValue={[7]} max={10} step={1} />
-        </div>
-        <div className="space-y-4">
             <Label htmlFor="energy">Energy</Label>
             <Slider id="energy" defaultValue={[8]} max={10} step={1} />
         </div>
