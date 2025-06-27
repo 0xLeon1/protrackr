@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -25,12 +26,17 @@ const defaultGoals: MacroGoals = {
   fats: 70,
 };
 
+// Create a version of the MacroGoals type that allows empty strings for form editing
+type TempMacroGoals = {
+  [K in keyof MacroGoals]: MacroGoals[K] | '';
+};
+
 export default function MacroTracker() {
   // Hardcoded current values for now. This would typically come from a meal log.
   const currentIntake = { calories: 1890, protein: 150, carbs: 200, fats: 50 };
 
   const [goals, setGoals] = useState<MacroGoals>(defaultGoals);
-  const [tempGoals, setTempGoals] = useState<MacroGoals>(defaultGoals);
+  const [tempGoals, setTempGoals] = useState<TempMacroGoals>(defaultGoals);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -47,17 +53,25 @@ export default function MacroTracker() {
   }, []);
 
   const handleGoalChange = (field: keyof MacroGoals, value: string) => {
+    if (value === "") {
+      setTempGoals(prev => ({ ...prev, [field]: "" }));
+      return;
+    }
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue >= 0) {
       setTempGoals(prev => ({ ...prev, [field]: numValue }));
-    } else if (value === "") {
-       setTempGoals(prev => ({ ...prev, [field]: 0 }));
     }
   };
   
   const handleSaveGoals = () => {
-    setGoals(tempGoals);
-    localStorage.setItem('protracker-macro-goals', JSON.stringify(tempGoals));
+    const finalizedGoals: MacroGoals = {
+        calories: Number(tempGoals.calories) || 0,
+        protein: Number(tempGoals.protein) || 0,
+        carbs: Number(tempGoals.carbs) || 0,
+        fats: Number(tempGoals.fats) || 0,
+    };
+    setGoals(finalizedGoals);
+    localStorage.setItem('protracker-macro-goals', JSON.stringify(finalizedGoals));
     setIsDialogOpen(false);
   };
   
@@ -67,6 +81,11 @@ export default function MacroTracker() {
       setTempGoals(goals);
     }
   }, [isDialogOpen, goals]);
+
+  const getProgressValue = (current: number, goal: number) => {
+    if (goal === 0) return 0;
+    return (current / goal) * 100;
+  };
 
   return (
     <Card className="transition-all duration-300 hover:shadow-lg">
@@ -126,21 +145,21 @@ export default function MacroTracker() {
               <span className="font-medium text-foreground">Protein</span>
               <span className="text-muted-foreground">{currentIntake.protein}g / {goals.protein}g</span>
             </div>
-            <Progress value={(currentIntake.protein / goals.protein) * 100} className="h-2 [&>div]:bg-sky-400" />
+            <Progress value={getProgressValue(currentIntake.protein, goals.protein)} className="h-2 [&>div]:bg-sky-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Carbs</span>
               <span className="text-muted-foreground">{currentIntake.carbs}g / {goals.carbs}g</span>
             </div>
-            <Progress value={(currentIntake.carbs / goals.carbs) * 100} className="h-2 [&>div]:bg-orange-400" />
+            <Progress value={getProgressValue(currentIntake.carbs, goals.carbs)} className="h-2 [&>div]:bg-orange-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Fats</span>
               <span className="text-muted-foreground">{currentIntake.fats}g / {goals.fats}g</span>
             </div>
-            <Progress value={(currentIntake.fats / goals.fats) * 100} className="h-2 [&>div]:bg-amber-400" />
+            <Progress value={getProgressValue(currentIntake.fats, goals.fats)} className="h-2 [&>div]:bg-amber-400" />
           </div>
         </div>
       </CardContent>
