@@ -12,9 +12,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { seedFoodDatabase } from '@/lib/seed';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const defaultGoals: MacroGoals = {
   calories: 2500,
@@ -28,7 +25,6 @@ export default function NutritionPage() {
   const { toast } = useToast();
   const { user, loading, dataVersion } = useAuth();
   const router = useRouter();
-  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -88,33 +84,6 @@ export default function NutritionPage() {
     }), { calories: 0, protein: 0, carbs: 0, fats: 0 });
   }, [todaysLogs]);
 
-  const handleSeedDatabase = async () => {
-    setIsSeeding(true);
-    try {
-      const result = await seedFoodDatabase();
-      if (result.success) {
-          toast({
-              title: "Database Seeded!",
-              description: result.message,
-          });
-      } else {
-          toast({
-              title: "Seeding Failed",
-              description: result.message,
-              variant: "destructive",
-          });
-      }
-    } catch (error: any) {
-        toast({
-            title: "Seeding Error",
-            description: error.message || "An unknown error occurred.",
-            variant: "destructive",
-        });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
   if (loading || !user) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
@@ -125,19 +94,6 @@ export default function NutritionPage() {
 
   return (
     <div className="space-y-6">
-       <Card>
-        <CardHeader>
-            <CardTitle>Admin Tools</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <Button onClick={handleSeedDatabase} disabled={isSeeding}>
-                {isSeeding ? 'Seeding...' : 'Seed Food Database'}
-            </Button>
-            <p className="text-sm text-muted-foreground mt-2">
-                Click this button to populate/update the food database with your initial data.
-            </p>
-        </CardContent>
-      </Card>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
           <MacroTracker currentIntake={currentIntake} />

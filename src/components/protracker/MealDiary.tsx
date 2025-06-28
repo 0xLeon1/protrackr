@@ -52,24 +52,36 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
   // Debounce search query
   useEffect(() => {
-    if (searchQuery.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
     const search = async () => {
       if (!db) return;
+      const terms = searchQuery.toLowerCase().trim().split(' ').filter(t => t);
+      if (terms.length === 0) {
+        setSearchResults([]);
+        return;
+      }
+      
       setIsSearching(true);
       try {
         const foodCollection = collection(db, 'foods');
+        // Query based on the first term
         const q = query(
           foodCollection,
-          where('search_terms', 'array-contains', searchQuery.toLowerCase()),
-          limit(10)
+          where('search_terms', 'array-contains', terms[0]),
+          limit(30) // fetch more to filter on client
         );
         
         const querySnapshot = await getDocs(q);
-        const results = querySnapshot.docs.map(doc => doc.data() as FoodDBItem);
+        let results = querySnapshot.docs.map(doc => doc.data() as FoodDBItem);
+
+        // If more than one search term, filter results on the client
+        if (terms.length > 1) {
+          const remainingTerms = terms.slice(1);
+          results = results.filter(food => {
+            // Check if all other terms are present in the food's search_terms array
+            return remainingTerms.every(term => food.search_terms?.includes(term));
+          });
+        }
+        
         setSearchResults(results);
       } catch (error) {
         console.error("Error searching for food:", error);
@@ -79,7 +91,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     };
 
     const debounceTimeout = setTimeout(() => {
-        search();
+        if (searchQuery.trim().length > 1) {
+          search();
+        } else {
+          setSearchResults([]);
+        }
     }, 300); // 300ms debounce
 
     return () => clearTimeout(debounceTimeout);
@@ -112,7 +128,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
     // Calculation logic
     let multiplier = numQuantity;
-    if (servingUnit !== 'default') {
+    if (servingUnit !== 'default' && selectedFood.unit_conversions[servingUnit]) {
         multiplier *= selectedFood.unit_conversions[servingUnit];
     }
     
@@ -172,7 +188,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
           return (
               <div className="space-y-4 pt-4">
                   <Card className="p-4 bg-muted/50">
-                      <CardTitle className="text-lg">{selectedFood.name}</CardTitle>
+                      <CardTitle className="text-lg">{capitalizeWords(selectedFood.name)}</CardTitle>
                       <CardDescription>
                           {`Per ${selectedFood.serving_size}: ${selectedFood.calories}kcal, ${selectedFood.protein_g}g P, ${selectedFood.carbs_g}g C, ${selectedFood.fat_g}g F`}
                       </CardDescription>
@@ -192,7 +208,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                             <SelectContent>
                                 <SelectItem value="default">{selectedFood.serving_size}</SelectItem>
                                 {Object.keys(selectedFood.unit_conversions).map(unit => (
-                                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                                    <SelectItem key={unit} value={unit}>{capitalizeWords(unit)}</SelectItem>
                                 ))}
                             </SelectContent>
                           </Select>
@@ -281,7 +297,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                           <div>
                             <p className="font-medium">{capitalizeWords(meal.name)}</p>
                             <p className="text-muted-foreground text-xs">
-                              {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
+                              {meal.calories} kcal &bull; P: {Math.round(meal.protein)}g, C: {Math.round(meal.carbs)}g, F: {Math.round(meal.fats)}g
                             </p>
                           </div>
                           <div className="flex items-center">
@@ -321,4 +337,3 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     </Card>
   );
 }
-
