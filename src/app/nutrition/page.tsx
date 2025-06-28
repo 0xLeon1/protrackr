@@ -3,25 +3,21 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FoodLogEntry, MacroGoals } from '@/types';
+import type { FoodLogEntry, MacroGoals, Recipe } from '@/types';
 import { startOfToday } from 'date-fns';
 import MacroTracker from "@/components/protracker/MacroTracker";
 import MealDiary from "@/components/protracker/MealDiary";
+import RecipeBook from "@/components/protracker/RecipeBook";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, addDoc, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 
-const defaultGoals: MacroGoals = {
-  calories: 2500,
-  protein: 180,
-  carbs: 250,
-  fats: 70,
-};
 
 export default function NutritionPage() {
   const [allMealLogs, setAllMealLogs] = useState<FoodLogEntry[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
   const { toast } = useToast();
   const { user, loading, dataVersion } = useAuth();
   const router = useRouter();
@@ -34,13 +30,20 @@ export default function NutritionPage() {
 
   useEffect(() => {
     if (user) {
-        const fetchMealLogs = async () => {
+        const fetchData = async () => {
+            // Fetch Meal Logs
             const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
             const mealLogsSnapshot = await getDocs(mealLogsCollection);
             const logs = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
             setAllMealLogs(logs);
+
+            // Fetch Recipes
+            const recipesCollection = collection(db, 'users', user.uid, 'recipes');
+            const recipesSnapshot = await getDocs(recipesCollection);
+            const userRecipes = recipesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Recipe));
+            setRecipes(userRecipes);
         };
-        fetchMealLogs();
+        fetchData();
     }
   }, [user, dataVersion]);
 
@@ -67,6 +70,7 @@ export default function NutritionPage() {
     };
     
     setAllMealLogs(prev => [...prev, newLogEntry]);
+    toast({ title: "Food Logged", description: `Added "${meal.name}" to your diary.` });
   };
 
   const handleUpdateMeal = async (meal: FoodLogEntry) => {
@@ -84,6 +88,34 @@ export default function NutritionPage() {
     setAllMealLogs(prev => prev.filter(log => log.id !== mealId));
   };
   
+  const handleSaveRecipe = async (recipe: Omit<Recipe, 'id'>) => {
+    if (!user) return;
+    const newRecipeData: Omit<Recipe, 'id'> = {
+      name: recipe.name,
+      servings: recipe.servings,
+      ingredients: recipe.ingredients,
+    };
+    const newRecipeRef = doc(collection(db, 'users', user.uid, 'recipes'));
+    await setDoc(newRecipeRef, newRecipeData);
+    setRecipes([...recipes, { ...newRecipeData, id: newRecipeRef.id }]);
+    toast({ title: "Recipe Saved", description: `"${recipe.name}" has been added to your recipes.` });
+  };
+
+  const handleUpdateRecipe = async (recipe: Recipe) => {
+    if (!user) return;
+    const { id, ...recipeData } = recipe;
+    const recipeRef = doc(db, 'users', user.uid, 'recipes', id);
+    await updateDoc(recipeRef, recipeData);
+    setRecipes(recipes.map(r => r.id === id ? recipe : r));
+    toast({ title: "Recipe Updated", description: `"${recipe.name}" has been updated.` });
+  };
+  
+  const handleDeleteRecipe = async (recipeId: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'recipes', recipeId));
+    setRecipes(recipes.filter(r => r.id !== recipeId));
+  };
+
   const currentIntake = useMemo(() => {
     return todaysLogs.reduce((acc, log) => ({
       calories: acc.calories + log.calories,
@@ -107,12 +139,19 @@ export default function NutritionPage() {
         <div className="lg:col-span-1">
           <MacroTracker currentIntake={currentIntake} />
         </div>
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
           <MealDiary 
             logs={todaysLogs} 
             onAddMeal={handleAddMeal} 
             onDeleteMeal={handleDeleteMeal}
             onUpdateMeal={handleUpdateMeal}
+          />
+          <RecipeBook 
+            recipes={recipes}
+            onAddMeal={handleAddMeal}
+            onSaveRecipe={handleSaveRecipe}
+            onUpdateRecipe={handleUpdateRecipe}
+            onDeleteRecipe={handleDeleteRecipe}
           />
         </div>
       </div>

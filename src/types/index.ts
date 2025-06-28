@@ -1,4 +1,5 @@
 
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -86,6 +87,32 @@ export type FoodLogEntry = {
   } | null;
 };
 
+export type RecipeIngredient = {
+  id: string; 
+  name: string;
+  quantity: number;
+  servingUnit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  foodId?: string | null;
+  customBaseMacros?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+  } | null;
+};
+
+export type Recipe = {
+  id: string;
+  name: string;
+  servings: number;
+  ingredients: RecipeIngredient[];
+};
+
+
 export type FoodDBItem = {
     food_id: string;
     name: string;
@@ -100,5 +127,6 @@ export type FoodDBItem = {
     unit_conversions: { [key: string]: number };
     search_terms?: string[];
 };
+
 
 
