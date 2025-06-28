@@ -11,14 +11,14 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
 
 export default function ActiveWorkoutPage() {
   const params = useParams();
   const router = useRouter();
   const workoutId = params.id as string;
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshData } = useAuth();
   
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [programName, setProgramName] = useState<string>('');
@@ -35,60 +35,71 @@ export default function ActiveWorkoutPage() {
     if (user && workoutId) {
       const fetchWorkoutData = async () => {
         setIsLoading(true);
-        // Load Programs to find the workout
-        const programsCollection = collection(db, 'users', user.uid, 'programs');
-        const programsSnapshot = await getDocs(programsCollection);
-        const programs: Program[] = programsSnapshot.docs.map(doc => doc.data() as Program);
-        
-        let foundWorkout: Workout | null = null;
-        let foundProgramName: string = '';
+        try {
+            // Load Programs to find the workout
+            const programsCollection = collection(db, 'users', user.uid, 'programs');
+            const programsSnapshot = await getDocs(programsCollection);
+            const programs: Program[] = programsSnapshot.docs.map(doc => doc.data() as Program);
+            
+            let foundWorkout: Workout | null = null;
+            let foundProgramName: string = '';
 
-        for (const program of programs) {
-          const matchingWorkout = program.workouts.find(w => w.id === workoutId);
-          if (matchingWorkout) {
-            foundWorkout = matchingWorkout;
-            foundProgramName = program.name;
-            break;
-          }
+            for (const program of programs) {
+              const matchingWorkout = program.workouts.find(w => w.id === workoutId);
+              if (matchingWorkout) {
+                foundWorkout = matchingWorkout;
+                foundProgramName = program.name;
+                break;
+              }
+            }
+            
+            if (foundWorkout) {
+              const workoutWithPerformance = {
+                ...foundWorkout,
+                exercises: foundWorkout.exercises.map(ex => ({
+                  ...ex,
+                  performance: Array.from({ length: ex.sets as number }, (_, i) => ({
+                    id: `set-${ex.id}-${i}`,
+                    reps: ex.reps,
+                    weight: ex.weight,
+                    completed: false,
+                  })),
+                })),
+              };
+              setWorkout(workoutWithPerformance);
+              setProgramName(foundProgramName);
+
+              // Load History to find the last completed session for this workout
+              const logsCollection = collection(db, 'users', user.uid, 'logs');
+              const q = query(
+                logsCollection, 
+                where("workoutId", "==", workoutId)
+              );
+              const logSnapshot = await getDocs(q);
+
+              if (!logSnapshot.empty) {
+                const allLogsForThisWorkout = logSnapshot.docs.map(doc => doc.data() as WorkoutLogEntry);
+                // Sort client-side to find the most recent
+                allLogsForThisWorkout.sort((a,b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+                const lastLog = allLogsForThisWorkout[0];
+                setLastWorkout(lastLog.workoutSnapshot);
+              }
+            }
+        } catch(error) {
+            console.error("Error fetching workout data: ", error);
+            toast({
+                title: "Error",
+                description: "Could not load workout data.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsLoading(false);
         }
-        
-        if (foundWorkout) {
-          const workoutWithPerformance = {
-            ...foundWorkout,
-            exercises: foundWorkout.exercises.map(ex => ({
-              ...ex,
-              performance: Array.from({ length: ex.sets as number }, (_, i) => ({
-                id: `set-${ex.id}-${i}`,
-                reps: ex.reps,
-                weight: ex.weight,
-                completed: false,
-              })),
-            })),
-          };
-          setWorkout(workoutWithPerformance);
-          setProgramName(foundProgramName);
-
-          // Load History to find the last completed session for this workout
-          const logsCollection = collection(db, 'users', user.uid, 'logs');
-          const q = query(
-            logsCollection, 
-            where("workoutId", "==", workoutId), 
-            orderBy("completedAt", "desc"),
-            limit(1)
-          );
-          const logSnapshot = await getDocs(q);
-
-          if (!logSnapshot.empty) {
-            const lastLog = logSnapshot.docs[0].data() as WorkoutLogEntry;
-            setLastWorkout(lastLog.workoutSnapshot);
-          }
-        }
-        setIsLoading(false);
       };
       
       fetchWorkoutData();
     }
-  }, [workoutId, user]);
+  }, [workoutId, user, toast]);
   
   const handleWorkoutChange = (updatedWorkout: Workout) => {
     setWorkout(updatedWorkout);
@@ -106,6 +117,8 @@ export default function ActiveWorkoutPage() {
     };
 
     await addDoc(collection(db, 'users', user.uid, 'logs'), newLog);
+
+    refreshData(); // To update analytics page, etc.
 
     toast({
         title: "Workout Complete!",
