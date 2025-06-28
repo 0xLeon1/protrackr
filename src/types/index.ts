@@ -75,3 +75,17 @@ export type FoodLogEntry = {
   carbs: number;
   fats: number;
 };
+
+export type FoodDBItem = {
+    food_id: string;
+    name: string;
+    category: string;
+    serving_size: string;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    fiber_g: number;
+    common_names: string[];
+    unit_conversions: { [key: string]: number };
+};
