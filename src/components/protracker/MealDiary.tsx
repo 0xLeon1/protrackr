@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Search } from "lucide-react";
+import { PlusCircle, Trash2, Search, FilePlus2 } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { foodDatabase } from '@/lib/food-data';
@@ -50,10 +51,18 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const [servingUnit, setServingUnit] = useState('default');
   const [recentFoods, setRecentFoods] = useState<FoodDBItem[]>([]);
   
-  // Directly use the imported food database.
+  // State for adding custom food
+  const [isAddingCustomFood, setIsAddingCustomFood] = useState(false);
+  const [customFoodData, setCustomFoodData] = useState({
+      name: '',
+      calories: '',
+      protein: '',
+      carbs: '',
+      fats: '',
+  });
+
   const allFoods = foodDatabase;
   
-  // Load recent foods from localStorage on initial render
   useEffect(() => {
     try {
       const storedRecents = localStorage.getItem(RECENT_FOODS_KEY);
@@ -66,11 +75,10 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     }
   }, []);
 
-  // Debounce the search query to make the search feel "snappier"
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 150); // 150ms delay
+    }, 150);
 
     return () => {
       clearTimeout(handler);
@@ -78,28 +86,20 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   }, [searchQuery]);
 
 
-  // Perform client-side search when debounced query changes
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
       setSearchResults([]);
       return;
     }
-
     const lowerCaseQuery = debouncedQuery.toLowerCase();
-    const queryTerms = lowerCaseQuery.split(' ').filter(t => t);
-
-    const filteredFoods = allFoods.filter(food => {
-      const searchableText = `${food.name.toLowerCase()} ${food.common_names.map(cn => cn.toLowerCase()).join(' ')}`;
-      
-      // Check if all words in query are present in searchable text
-      return queryTerms.every(term => searchableText.includes(term));
-    });
-    
-    setSearchResults(filteredFoods.slice(0, 50));
+    const filtered = allFoods.filter(food => 
+        food.name.toLowerCase().includes(lowerCaseQuery) ||
+        food.common_names.some(cn => cn.toLowerCase().includes(lowerCaseQuery))
+    );
+    setSearchResults(filtered.slice(0, 50));
   }, [debouncedQuery, allFoods]);
 
 
-  // When dialog closes, reset everything
   useEffect(() => {
     if (!isDialogOpen) {
       setActiveMealType(null);
@@ -108,6 +108,8 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       setSelectedFood(null);
       setQuantity(1);
       setServingUnit('default');
+      setIsAddingCustomFood(false);
+      setCustomFoodData({ name: '', calories: '', protein: '', carbs: '', fats: '' });
     }
   }, [isDialogOpen]);
   
@@ -122,17 +124,14 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     const numQuantity = Number(quantity);
     if (isNaN(numQuantity) || numQuantity <= 0) return;
 
-    // Save to recents
     const updatedRecents = [
         selectedFood,
         ...recentFoods.filter(food => food.food_id !== selectedFood.food_id)
-    ].slice(0, 5); // Limit to 5 recent items
+    ].slice(0, 5);
 
     setRecentFoods(updatedRecents);
     localStorage.setItem(RECENT_FOODS_KEY, JSON.stringify(updatedRecents));
 
-
-    // Calculation logic
     let multiplier = numQuantity;
     if (servingUnit !== 'default' && selectedFood.unit_conversions[servingUnit]) {
         multiplier *= selectedFood.unit_conversions[servingUnit];
@@ -149,6 +148,26 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       
     onAddMeal(mealData);
     setIsDialogOpen(false);
+  };
+
+  const handleSaveCustomMeal = () => {
+    if (!activeMealType || !customFoodData.name.trim() || !customFoodData.calories) return;
+
+    const mealData = {
+      mealType: activeMealType,
+      name: customFoodData.name,
+      calories: Number(customFoodData.calories) || 0,
+      protein: Number(customFoodData.protein) || 0,
+      carbs: Number(customFoodData.carbs) || 0,
+      fats: Number(customFoodData.fats) || 0,
+    };
+
+    onAddMeal(mealData);
+    setIsDialogOpen(false);
+  };
+  
+  const handleCustomFoodChange = (field: keyof typeof customFoodData, value: string) => {
+    setCustomFoodData(prev => ({...prev, [field]: value}));
   };
 
   const mealsByType = useMemo(() => {
@@ -176,6 +195,42 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   };
 
   const renderDialogContent = () => {
+      if (isAddingCustomFood) {
+        // --- Custom Food Form View ---
+        return (
+            <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                    <Label htmlFor="custom-name">Food Name</Label>
+                    <Input id="custom-name" value={customFoodData.name} onChange={(e) => handleCustomFoodChange('name', e.target.value)} placeholder="e.g., Grandma's Lasagna" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="custom-calories">Calories</Label>
+                        <Input id="custom-calories" type="number" value={customFoodData.calories} onChange={(e) => handleCustomFoodChange('calories', e.target.value)} placeholder="kcal" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="custom-protein">Protein (g)</Label>
+                        <Input id="custom-protein" type="number" value={customFoodData.protein} onChange={(e) => handleCustomFoodChange('protein', e.target.value)} placeholder="grams" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="custom-carbs">Carbs (g)</Label>
+                        <Input id="custom-carbs" type="number" value={customFoodData.carbs} onChange={(e) => handleCustomFoodChange('carbs', e.target.value)} placeholder="grams" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="custom-fats">Fats (g)</Label>
+                        <Input id="custom-fats" type="number" value={customFoodData.fats} onChange={(e) => handleCustomFoodChange('fats', e.target.value)} placeholder="grams" />
+                    </div>
+                </div>
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:pt-4">
+                    <Button variant="outline" onClick={() => setIsAddingCustomFood(false)}>Back to Search</Button>
+                    <Button onClick={handleSaveCustomMeal} disabled={!customFoodData.name.trim() || !customFoodData.calories} className="w-full sm:w-auto">
+                        Add to {activeMealType}
+                    </Button>
+                </DialogFooter>
+            </div>
+        )
+    }
+
       if (selectedFood) {
           // --- Confirmation View ---
           const numQuantity = Number(quantity) || 0;
@@ -262,9 +317,15 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                             </div>
                         ))
                     ) : debouncedQuery.trim().length > 1 ? (
-                        <div className="text-center text-muted-foreground pt-10">
+                        <div className="text-center text-muted-foreground pt-10 flex flex-col items-center">
                             <p>No results found for "{searchQuery}".</p>
-                            <p className="text-xs">Try a different search term.</p>
+                            <Button variant="link" className="mt-2" onClick={() => {
+                                setCustomFoodData(prev => ({ ...prev, name: capitalizeWords(searchQuery) }));
+                                setIsAddingCustomFood(true);
+                            }}>
+                                <FilePlus2 className="mr-2 h-4 w-4"/>
+                                Add as a custom food
+                            </Button>
                         </div>
                     ) : recentFoods.length > 0 ? (
                         <>
@@ -337,10 +398,10 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-                Add Food to {activeMealType}
+                {isAddingCustomFood ? `Add Custom Food to ${activeMealType}` : `Add Food to ${activeMealType}`}
             </DialogTitle>
             <DialogDescription>
-              Search the database for a food item to log.
+              {isAddingCustomFood ? "Enter the details for your custom food." : "Search the database or select a recent item."}
             </DialogDescription>
           </DialogHeader>
           {renderDialogContent()}
