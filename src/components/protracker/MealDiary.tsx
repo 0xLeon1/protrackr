@@ -42,6 +42,7 @@ interface MealDiaryProps {
 export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal }: MealDiaryProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
+  const [editingMeal, setEditingMeal] = useState<FoodLogEntry | null>(null);
 
   // State for search functionality
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,11 +62,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
       carbs: '',
       fats: '',
   });
-
-  // State for editing food
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [mealToEdit, setMealToEdit] = useState<FoodLogEntry | null>(null);
-  const [editQuantity, setEditQuantity] = useState<number | string>('');
 
   const allFoods = foodDatabase;
   
@@ -108,6 +104,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
 
   useEffect(() => {
     if (!isDialogOpen) {
+      // Reset all state when dialog closes
       setActiveMealType(null);
       setSearchQuery('');
       setSearchResults([]);
@@ -116,18 +113,38 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
       setServingUnit('default');
       setIsAddingCustomFood(false);
       setCustomFoodData({ name: '', calories: '', protein: '', carbs: '', fats: '' });
+      setEditingMeal(null);
     }
   }, [isDialogOpen]);
   
-  useEffect(() => {
-    if (!isEditDialogOpen) {
-        setMealToEdit(null);
-        setEditQuantity('');
-    }
-  }, [isEditDialogOpen]);
 
   const handleOpenDialog = (mealType: MealType) => {
     setActiveMealType(mealType);
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (meal: FoodLogEntry) => {
+    setEditingMeal(meal);
+    setActiveMealType(meal.mealType);
+    setQuantity(meal.quantity);
+    
+    if (meal.foodId) { // DB Food
+        const foodDbItem = allFoods.find(f => f.food_id === meal.foodId);
+        if (foodDbItem) {
+            setSelectedFood(foodDbItem);
+            setServingUnit(meal.servingUnit);
+            setIsAddingCustomFood(false);
+        }
+    } else if (meal.customBaseMacros) { // Custom Food
+        setCustomFoodData({
+            name: meal.name,
+            calories: String(meal.customBaseMacros.calories),
+            protein: String(meal.customBaseMacros.protein),
+            carbs: String(meal.customBaseMacros.carbs),
+            fats: String(meal.customBaseMacros.fats),
+        });
+        setIsAddingCustomFood(true);
+    }
     setIsDialogOpen(true);
   };
   
@@ -137,20 +154,12 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     const numQuantity = Number(quantity);
     if (isNaN(numQuantity) || numQuantity <= 0) return;
 
-    const updatedRecents = [
-        selectedFood,
-        ...recentFoods.filter(food => food.food_id !== selectedFood.food_id)
-    ].slice(0, 5);
-
-    setRecentFoods(updatedRecents);
-    localStorage.setItem(RECENT_FOODS_KEY, JSON.stringify(updatedRecents));
-
     let multiplier = numQuantity;
     if (servingUnit !== 'default' && selectedFood.unit_conversions[servingUnit]) {
         multiplier *= selectedFood.unit_conversions[servingUnit];
     }
     
-    const mealData: Omit<FoodLogEntry, 'id' | 'date'> = {
+    const mealData = {
         mealType: activeMealType,
         name: selectedFood.name,
         calories: selectedFood.calories * multiplier,
@@ -163,13 +172,26 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         customBaseMacros: null,
     };
       
-    onAddMeal(mealData);
+    if (editingMeal) {
+        onUpdateMeal({ ...mealData, id: editingMeal.id, date: editingMeal.date });
+    } else {
+        const updatedRecents = [
+            selectedFood,
+            ...recentFoods.filter(food => food.food_id !== selectedFood.food_id)
+        ].slice(0, 5);
+        setRecentFoods(updatedRecents);
+        localStorage.setItem(RECENT_FOODS_KEY, JSON.stringify(updatedRecents));
+        onAddMeal(mealData);
+    }
     setIsDialogOpen(false);
   };
 
   const handleSaveCustomMeal = () => {
     if (!activeMealType || !customFoodData.name.trim() || !customFoodData.calories) return;
     
+    const numQuantity = Number(quantity);
+    if(isNaN(numQuantity) || numQuantity <= 0) return;
+
     const baseMacros = {
         calories: Number(customFoodData.calories) || 0,
         protein: Number(customFoodData.protein) || 0,
@@ -177,75 +199,30 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         fats: Number(customFoodData.fats) || 0,
     };
 
-    const mealData: Omit<FoodLogEntry, 'id' | 'date'> = {
+    const mealData = {
       mealType: activeMealType,
       name: customFoodData.name,
-      calories: baseMacros.calories,
-      protein: baseMacros.protein,
-      carbs: baseMacros.carbs,
-      fats: baseMacros.fats,
+      calories: baseMacros.calories * numQuantity,
+      protein: baseMacros.protein * numQuantity,
+      carbs: baseMacros.carbs * numQuantity,
+      fats: baseMacros.fats * numQuantity,
       foodId: null,
-      quantity: 1,
+      quantity: numQuantity,
       servingUnit: 'serving',
       customBaseMacros: baseMacros,
     };
 
-    onAddMeal(mealData);
+    if (editingMeal) {
+        onUpdateMeal({ ...mealData, id: editingMeal.id, date: editingMeal.date });
+    } else {
+        onAddMeal(mealData);
+    }
     setIsDialogOpen(false);
   };
   
   const handleCustomFoodChange = (field: keyof typeof customFoodData, value: string) => {
     setCustomFoodData(prev => ({...prev, [field]: value}));
   };
-
-  const handleOpenEditDialog = (meal: FoodLogEntry) => {
-    setMealToEdit(meal);
-    setEditQuantity(meal.quantity);
-    setIsEditDialogOpen(true);
-  }
-  
-  const handleSaveEdit = () => {
-    if (!mealToEdit) return;
-
-    const numQuantity = Number(editQuantity);
-    if (isNaN(numQuantity) || numQuantity <= 0) return;
-
-    let updatedMeal: FoodLogEntry;
-
-    if (mealToEdit.foodId) {
-        const foodDbItem = allFoods.find(f => f.food_id === mealToEdit.foodId);
-        if (!foodDbItem) return;
-
-        let multiplier = numQuantity;
-        if (mealToEdit.servingUnit !== 'default' && foodDbItem.unit_conversions[mealToEdit.servingUnit]) {
-            multiplier *= foodDbItem.unit_conversions[mealToEdit.servingUnit];
-        }
-
-        updatedMeal = {
-            ...mealToEdit,
-            quantity: numQuantity,
-            calories: foodDbItem.calories * multiplier,
-            protein: foodDbItem.protein_g * multiplier,
-            carbs: foodDbItem.carbs_g * multiplier,
-            fats: foodDbItem.fat_g * multiplier,
-        };
-    } else if (mealToEdit.customBaseMacros) {
-        const base = mealToEdit.customBaseMacros;
-        updatedMeal = {
-            ...mealToEdit,
-            quantity: numQuantity,
-            calories: base.calories * numQuantity,
-            protein: base.protein * numQuantity,
-            carbs: base.carbs * numQuantity,
-            fats: base.fats * numQuantity,
-        };
-    } else {
-        return; // Should not happen with new data structure
-    }
-    
-    onUpdateMeal(updatedMeal);
-    setIsEditDialogOpen(false);
-  }
 
   const mealsByType = useMemo(() => {
     return logs.reduce((acc, log) => {
@@ -273,10 +250,12 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
 
   const renderDialogContent = () => {
       if (isAddingCustomFood) {
-        // --- Custom Food Form View ---
+        // --- Custom Food Form View (for adding or editing) ---
         return (
             <div className="space-y-4 pt-4">
-                <p className="text-sm text-muted-foreground">Enter the macros for a single serving of your custom food.</p>
+                <p className="text-sm text-muted-foreground">
+                    {editingMeal ? 'Edit the details for your custom food.' : 'Enter the macros for a single serving of your custom food.'}
+                </p>
                 <div className="space-y-2">
                     <Label htmlFor="custom-name">Food Name</Label>
                     <Input id="custom-name" value={customFoodData.name} onChange={(e) => handleCustomFoodChange('name', e.target.value)} placeholder="e.g., Grandma's Lasagna" />
@@ -299,10 +278,22 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                         <Input id="custom-fats" type="number" value={customFoodData.fats} onChange={(e) => handleCustomFoodChange('fats', e.target.value)} placeholder="grams" />
                     </div>
                 </div>
+                <div className="space-y-2">
+                    <Label htmlFor="custom-quantity">Quantity</Label>
+                    <Input id="custom-quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} min="1" step="1"/>
+                </div>
                 <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:pt-4">
-                    <Button variant="outline" onClick={() => setIsAddingCustomFood(false)}>Back to Search</Button>
+                    <Button variant="outline" onClick={() => {
+                        if (editingMeal) {
+                            setIsDialogOpen(false); // If editing, just cancel.
+                        } else {
+                            setIsAddingCustomFood(false); // If adding, go back to search.
+                        }
+                    }}>
+                      {editingMeal ? 'Cancel' : 'Back to Search'}
+                    </Button>
                     <Button onClick={handleSaveCustomMeal} disabled={!customFoodData.name.trim() || !customFoodData.calories} className="w-full sm:w-auto">
-                        Add to {activeMealType}
+                        {editingMeal ? 'Update Entry' : `Add to ${activeMealType}`}
                     </Button>
                 </DialogFooter>
             </div>
@@ -310,7 +301,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     }
 
       if (selectedFood) {
-          // --- Confirmation View ---
+          // --- Confirmation View (for adding or editing DB food) ---
           const numQuantity = Number(quantity) || 0;
           let multiplier = numQuantity;
           if (servingUnit !== 'default' && selectedFood.unit_conversions[servingUnit]) {
@@ -364,9 +355,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                   </div>
                   
                   <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:pt-4">
-                        <Button variant="outline" onClick={() => setSelectedFood(null)}>Back to Search</Button>
+                        <Button variant="outline" onClick={() => editingMeal ? setIsDialogOpen(false) : setSelectedFood(null)}>
+                            {editingMeal ? 'Cancel' : 'Back to Search'}
+                        </Button>
                         <Button onClick={handleSaveMeal} className="w-full sm:w-auto">
-                            Add to {activeMealType}
+                           {editingMeal ? 'Update Entry' : `Add to ${activeMealType}`}
                         </Button>
                   </DialogFooter>
               </div>
@@ -452,11 +445,9 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                             </p>
                           </div>
                           <div className="flex items-center">
-                              { (meal.foodId || meal.customBaseMacros) && (
-                                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => handleOpenEditDialog(meal)}>
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => handleOpenEditDialog(meal)}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
                               <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)}>
                                   <Trash2 className="w-4 h-4" />
                               </Button>
@@ -481,45 +472,16 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-                {isAddingCustomFood ? `Add Custom Food to ${activeMealType}` : `Add Food to ${activeMealType}`}
+              {editingMeal ? 'Edit Entry' : `Add Food to ${activeMealType}`}
             </DialogTitle>
             <DialogDescription>
-              {isAddingCustomFood ? "Enter the details for your custom food." : "Search the database or select a recent item."}
+              {editingMeal 
+                ? `Update the details for "${editingMeal.name}".`
+                : (isAddingCustomFood ? "Enter the details for your custom food." : "Search the database or select a recent item.")
+              }
             </DialogDescription>
           </DialogHeader>
           {renderDialogContent()}
-        </DialogContent>
-      </Dialog>
-      
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Food Entry</DialogTitle>
-                <DialogDescription>
-                    Update the quantity for "{mealToEdit?.name}".
-                </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <Label htmlFor="edit-quantity">
-                      {mealToEdit?.servingUnit === 'serving' ? 'Servings' : 'Quantity'}
-                    </Label>
-                    <Input 
-                        id="edit-quantity" 
-                        type="number" 
-                        value={editQuantity} 
-                        onChange={e => setEditQuantity(e.target.value)} 
-                        min="0.1" 
-                        step="0.1"
-                        autoFocus
-                    />
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleSaveEdit}>Save Changes</Button>
-            </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>
