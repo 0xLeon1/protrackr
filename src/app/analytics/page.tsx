@@ -363,6 +363,15 @@ export default function AnalyticsPage() {
     }
   };
   
+  const weeklyMacroCaloriesChartData = useMemo(() => {
+    return weeklyMacros.map(dayData => ({
+        day: dayData.day,
+        protein: Math.round(dayData.protein * 4),
+        carbs: Math.round(dayData.carbs * 4),
+        fats: Math.round(dayData.fats * 9),
+    }));
+  }, [weeklyMacros]);
+  
   const chartConfig = {
     volume: {
       label: "Volume (lbs)",
@@ -738,12 +747,12 @@ export default function AnalyticsPage() {
             <DialogHeader>
                 <DialogTitle>Weekly Macro Breakdown</DialogTitle>
                 <DialogDescription>
-                    Total grams of protein, carbs, and fats consumed each day this week.
+                    Caloric contribution from protein, carbs, and fats each day this week.
                 </DialogDescription>
             </DialogHeader>
             <div className="pt-4">
                 <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
-                    <BarChart accessibilityLayer data={weeklyMacros} margin={{ top: 20, right: 10, left: -10, bottom: 5 }}>
+                    <BarChart accessibilityLayer data={weeklyMacroCaloriesChartData} margin={{ top: 20, right: 10, left: -10, bottom: 5 }}>
                         <CartesianGrid vertical={false} />
                         <XAxis
                             dataKey="day"
@@ -751,15 +760,28 @@ export default function AnalyticsPage() {
                             axisLine={false}
                             tickMargin={8}
                         />
-                        <YAxis tickFormatter={(value) => `${value}g`} />
+                        <YAxis tickFormatter={(value) => `${value} kcal`} />
                         <ChartTooltip
                             cursor={false}
-                            content={<ChartTooltipContent />}
+                            content={<ChartTooltipContent formatter={(value, name, item) => (
+                                <div className="flex w-full justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-2.5 h-2.5 rounded-sm"
+                                            style={{ backgroundColor: item.color }}
+                                        />
+                                        <span className="text-muted-foreground">{name}</span>
+                                    </div>
+                                    <span className="font-mono font-medium tabular-nums text-foreground">
+                                        {Number(value).toLocaleString()} kcal
+                                    </span>
+                                </div>
+                            )} />}
                         />
                         <Legend content={<ChartLegendContent />} />
-                        <Bar dataKey="protein" stackId="a" fill="var(--color-protein)" />
-                        <Bar dataKey="carbs" stackId="a" fill="var(--color-carbs)" />
-                        <Bar dataKey="fats" stackId="a" fill="var(--color-fats)" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="protein" stackId="a" fill="var(--color-protein)" name="Protein" />
+                        <Bar dataKey="carbs" stackId="a" fill="var(--color-carbs)" name="Carbs" />
+                        <Bar dataKey="fats" stackId="a" fill="var(--color-fats)" radius={[4, 4, 0, 0]} name="Fats" />
                     </BarChart>
                 </ChartContainer>
             </div>
