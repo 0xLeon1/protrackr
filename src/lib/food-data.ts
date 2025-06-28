@@ -3547,6 +3547,19 @@ export const foodDatabase: FoodDBItem[] = [
     unit_conversions: { '4 oz': 1.13 }
   },
   {
+    food_id: 'ground_beef_93_7_pan_browned_0',
+    name: 'Ground Beef (93/7, Pan-browned)',
+    category: 'Protein',
+    serving_size: '100g',
+    calories: 185,
+    protein_g: 26,
+    carbs_g: 0,
+    fat_g: 8,
+    fiber_g: 0,
+    common_names: ['93% lean ground beef', 'lean ground beef'],
+    unit_conversions: { '4 oz': 1.13 }
+  },
+  {
     food_id: 'ground_beef_95_5_pan_browned_0',
     name: 'Ground Beef (95/5, Pan-browned)',
     category: 'Protein',
