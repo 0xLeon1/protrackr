@@ -8,10 +8,11 @@ import { useAuth } from '@/contexts/auth-context';
 import { auth, db } from '@/lib/firebase';
 import { collection, getDocs, writeBatch, doc, deleteDoc } from 'firebase/firestore';
 import React, { useState } from 'react';
+import { format, parseISO } from 'date-fns';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { Dumbbell, LogOut, Trash2, Loader2 } from "lucide-react";
+import { Dumbbell, LogOut, Trash2, Loader2, User as UserIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,18 +31,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 
 export default function Header() {
-  const { user, isFirebaseConfigured, refreshData } = useAuth();
+  const { user, profile, isFirebaseConfigured, refreshData } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
   const [password, setPassword] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 
   const handleLogout = async () => {
     if (!isFirebaseConfigured || !auth) {
@@ -121,60 +130,109 @@ export default function Header() {
       </Link>
       <div>
         {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Avatar className="cursor-pointer">
-                <AvatarImage src={user.photoURL || undefined} alt="@user" data-ai-hint="person" />
-                <AvatarFallback>{user.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    <span>Reset Data</span>
+          <>
+            <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Avatar className="cursor-pointer">
+                    <AvatarImage src={user.photoURL || undefined} alt="@user" data-ai-hint="person" />
+                    <AvatarFallback>{user.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setIsProfileDialogOpen(true)}>
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
                   </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action is irreversible. It will permanently delete all your programs, logs, and tracking data. To confirm, please enter your password.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <div className="space-y-2 py-2">
-                    <Label htmlFor="password-confirm" className="sr-only">Password</Label>
-                    <Input
-                      id="password-confirm"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      onKeyDown={(e) => {
-                          if (e.key === 'Enter' && password) {
-                              e.preventDefault();
-                              handleResetData();
-                          }
-                      }}
-                    />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Reset Data</span>
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action is irreversible. It will permanently delete all your programs, logs, and tracking data. To confirm, please enter your password.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <div className="space-y-2 py-2">
+                        <Label htmlFor="password-confirm" className="sr-only">Password</Label>
+                        <Input
+                          id="password-confirm"
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Enter your password"
+                          onKeyDown={(e) => {
+                              if (e.key === 'Enter' && password) {
+                                  e.preventDefault();
+                                  handleResetData();
+                              }
+                          }}
+                        />
+                      </div>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setPassword('')}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleResetData} disabled={isResetting || !password} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Confirm & Reset
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Your Profile</DialogTitle>
+                    <DialogDescription>This is the profile information you provided at sign up.</DialogDescription>
+                </DialogHeader>
+                {profile && (
+                  <div className="pt-4">
+                    <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
+                        <div className="space-y-1">
+                            <p className="text-muted-foreground">Name</p>
+                            <p className="font-medium">{profile.name}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-muted-foreground">Age</p>
+                            <p className="font-medium">{profile.age}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-muted-foreground">Gender</p>
+                            <p className="font-medium capitalize">{profile.gender}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-muted-foreground">Start Weight</p>
+                            <p className="font-medium">{profile.initialWeight} lbs</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-muted-foreground">Goal Weight</p>
+                            <p className="font-medium">{profile.goalWeight} lbs</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-muted-foreground">Experience</p>
+                            <p className="font-medium capitalize">{profile.experience}</p>
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                            <p className="text-muted-foreground">Target Date</p>
+                            <p className="font-medium">{format(parseISO(profile.targetDate), 'MMM d, yyyy')}</p>
+                        </div>
+                    </div>
                   </div>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setPassword('')}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleResetData} disabled={isResetting || !password} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Confirm & Reset
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                )}
+              </DialogContent>
+            </Dialog>
+          </>
         ) : (
           <div className="flex gap-2">
             <Button asChild variant="ghost">
