@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { History, TrendingUp, Scale, Bed, Loader2, List } from "lucide-react";
+import { History, TrendingUp, Scale, Bed, Loader2, List, UtensilsCrossed } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -35,6 +35,10 @@ interface DailyVolume {
 interface DailySleep {
   day: string;
   hours: number;
+}
+interface DailyCalories {
+  day: string;
+  calories: number;
 }
 
 
@@ -62,6 +66,7 @@ export default function AnalyticsPage() {
   const [bodyWeightLogs, setBodyWeightLogs] = useState<BodyWeightLogEntry[]>([]);
   const [sleepLogs, setSleepLogs] = useState<SleepLogEntry[]>([]);
   const [weeklySleep, setWeeklySleep] = useState<DailySleep[]>([]);
+  const [weeklyCalories, setWeeklyCalories] = useState<DailyCalories[]>([]);
   const [currentWeight, setCurrentWeight] = useState('');
   const [checkinDays, setCheckinDays] = useState(0);
   const [workoutDays, setWorkoutDays] = useState(0);
@@ -138,6 +143,7 @@ export default function AnalyticsPage() {
         const mealLogs: FoodLogEntry[] = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
         const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
         setNutritionDays(nutritionCount);
+        calculateWeeklyCalories(mealLogs);
 
         // Adherence
         const totalActivities = checkinsCount + workoutsCount + nutritionCount;
@@ -194,6 +200,33 @@ export default function AnalyticsPage() {
     });
     
     setDailyVolume(volumeDataForWeek);
+  };
+  
+  const calculateWeeklyCalories = (allLogs: FoodLogEntry[]) => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    let calorieDataForWeek: DailyCalories[] = daysInWeek.map(day => ({
+        day: format(day, 'E'),
+        calories: 0,
+    }));
+
+    allLogs.forEach(log => {
+        if (log.date) {
+            const logDate = parseISO(log.date);
+            if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+                const dayOfWeek = format(logDate, 'E');
+                const dayIndex = calorieDataForWeek.findIndex(d => d.day === dayOfWeek);
+
+                if (dayIndex !== -1) {
+                    calorieDataForWeek[dayIndex].calories += log.calories;
+                }
+            }
+        }
+    });
+    setWeeklyCalories(calorieDataForWeek.map(d => ({ ...d, calories: Math.round(d.calories) })));
   };
 
   const calculateWeeklySleep = (allLogs: SleepLogEntry[]) => {
@@ -265,11 +298,16 @@ export default function AnalyticsPage() {
     sleep: {
         label: "Sleep (hours)",
         color: "hsl(var(--chart-3))",
+    },
+    calories: {
+        label: "Calories (kcal)",
+        color: "hsl(var(--chart-1))",
     }
   };
 
   const hasLiftedThisWeek = dailyVolume.some(d => d.volume > 0);
   const hasSleptThisWeek = weeklySleep.some(d => d.hours > 0);
+  const hasConsumedThisWeek = weeklyCalories.some(d => d.calories > 0);
 
   if (loading || !user) {
     return (
@@ -348,6 +386,46 @@ export default function AnalyticsPage() {
                 <TrendingUp className="w-16 h-16 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
                     Complete a workout to see your volume chart.
+                </p>
+                </div>
+            )}
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+            <CardTitle>This Week's Calories</CardTitle>
+            <CardDescription>Your daily calorie intake for the current week.</CardDescription>
+            </CardHeader>
+            <CardContent className="pl-2">
+            {hasConsumedThisWeek ? (
+                <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
+                <BarChart accessibilityLayer data={weeklyCalories} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
+                    <XAxis
+                        dataKey="day"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                    />
+                    <YAxis hide domain={[0, 'dataMax + 500']}/>
+                    <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent 
+                            formatter={(value) => `${Number(value).toLocaleString()} kcal`}
+                            indicator="dot"
+                            nameKey="calories"
+                            />}
+                    />
+                    <Bar dataKey="calories" fill="var(--color-calories)" radius={[8, 8, 0, 0]}>
+                        <LabelList dataKey="calories" content={renderCustomizedLabel} />
+                    </Bar>
+                </BarChart>
+                </ChartContainer>
+            ) : (
+                <div className="flex flex-col items-center justify-center p-12 text-center h-[250px]">
+                <UtensilsCrossed className="w-16 h-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                    Log a meal to see your calorie chart.
                 </p>
                 </div>
             )}
