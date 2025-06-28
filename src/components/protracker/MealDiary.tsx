@@ -1,15 +1,26 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import type { FoodLogEntry, MealType } from "@/types";
+import type { FoodLogEntry, MealType, FoodDBItem } from "@/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Pencil } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { PlusCircle, Trash2, Search, Loader2 } from "lucide-react";
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select"
+
 
 function capitalizeWords(str: string): string {
     if (!str) return '';
@@ -25,23 +36,66 @@ interface MealDiaryProps {
   logs: FoodLogEntry[];
   onAddMeal: (meal: Omit<FoodLogEntry, 'id' | 'date'>) => void;
   onDeleteMeal: (mealId: string) => void;
-  onUpdateMeal: (meal: FoodLogEntry) => void;
 }
 
-const initialFoodState = { name: '', calories: '', protein: '', carbs: '', fats: '' };
-
-export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal }: MealDiaryProps) {
+export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
-  const [editingLog, setEditingLog] = useState<FoodLogEntry | null>(null);
-  const [manualFood, setManualFood] = useState(initialFoodState);
+
+  // New state for search functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<FoodDBItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedFood, setSelectedFood] = useState<FoodDBItem | null>(null);
+  const [quantity, setQuantity] = useState<number | string>(1);
+  const [servingUnit, setServingUnit] = useState('default'); // 'default' will be the food's serving_size
+
+  // Debounce search query
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const search = async () => {
+      if (!db) return;
+      setIsSearching(true);
+      try {
+        const foodCollection = collection(db, 'foods');
+        const q = query(
+          foodCollection,
+          where('search_terms', 'array-contains', searchQuery.toLowerCase()),
+          limit(10)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const results = querySnapshot.docs.map(doc => doc.data() as FoodDBItem);
+        setSearchResults(results);
+      } catch (error) {
+        console.error("Error searching for food:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    const debounceTimeout = setTimeout(() => {
+        search();
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(debounceTimeout);
+  }, [searchQuery]);
+
 
   // When dialog closes, reset everything
   useEffect(() => {
     if (!isDialogOpen) {
       setActiveMealType(null);
-      setEditingLog(null);
-      setManualFood(initialFoodState);
+      setSearchQuery('');
+      setSearchResults([]);
+      setIsSearching(false);
+      setSelectedFood(null);
+      setQuantity(1);
+      setServingUnit('default');
     }
   }, [isDialogOpen]);
   
@@ -50,44 +104,28 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     setIsDialogOpen(true);
   };
   
-  const handleEditClick = (log: FoodLogEntry) => {
-    setEditingLog(log);
-    setActiveMealType(log.mealType);
-    setManualFood({
-        name: log.name,
-        calories: String(log.calories),
-        protein: String(log.protein),
-        carbs: String(log.carbs),
-        fats: String(log.fats),
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleManualFoodChange = (field: keyof typeof manualFood, value: string) => {
-    if (field === 'name') {
-        setManualFood(prev => ({ ...prev, name: value }));
-    } else {
-        setManualFood(prev => ({ ...prev, [field]: value.replace(/[^0-9.]/g, '') }));
-    }
-  };
-  
   const handleSaveMeal = () => {
-    if (!activeMealType || !manualFood.name || !manualFood.calories) return;
+    if (!activeMealType || !selectedFood || !quantity) return;
       
+    const numQuantity = Number(quantity);
+    if (isNaN(numQuantity) || numQuantity <= 0) return;
+
+    // Calculation logic
+    let multiplier = numQuantity;
+    if (servingUnit !== 'default') {
+        multiplier *= selectedFood.unit_conversions[servingUnit];
+    }
+    
     const mealData = {
         mealType: activeMealType,
-        name: manualFood.name,
-        calories: parseFloat(manualFood.calories) || 0,
-        protein: parseFloat(manualFood.protein) || 0,
-        carbs: parseFloat(manualFood.carbs) || 0,
-        fats: parseFloat(manualFood.fats) || 0,
+        name: selectedFood.name,
+        calories: selectedFood.calories * multiplier,
+        protein: selectedFood.protein_g * multiplier,
+        carbs: selectedFood.carbs_g * multiplier,
+        fats: selectedFood.fat_g * multiplier,
     };
       
-    if (editingLog) {
-        onUpdateMeal({ id: editingLog.id, date: editingLog.date, ...mealData });
-    } else {
-        onAddMeal(mealData);
-    }
+    onAddMeal(mealData);
     setIsDialogOpen(false);
   };
 
@@ -115,39 +153,111 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     return `${Math.round(totals.calories)} kcal, ${Math.round(totals.protein)}g P, ${Math.round(totals.carbs)}g C, ${Math.round(totals.fats)}g F`;
   };
 
-  const renderDialogContent = () => (
-     <div className="space-y-4">
-        <div className="space-y-2">
-            <Label htmlFor="manual-name">Food Name</Label>
-            <Input id="manual-name" value={manualFood.name} onChange={e => handleManualFoodChange('name', e.target.value)} placeholder="e.g., Chicken and Rice" />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-                <Label htmlFor="manual-calories">Calories</Label>
-                <Input id="manual-calories" type="number" value={manualFood.calories} onChange={e => handleManualFoodChange('calories', e.target.value)} placeholder="kcal"/>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="manual-protein">Protein</Label>
-                <Input id="manual-protein" type="number" value={manualFood.protein} onChange={e => handleManualFoodChange('protein', e.target.value)} placeholder="grams"/>
-            </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-                <Label htmlFor="manual-carbs">Carbs</Label>
-                <Input id="manual-carbs" type="number" value={manualFood.carbs} onChange={e => handleManualFoodChange('carbs', e.target.value)} placeholder="grams"/>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="manual-fats">Fats</Label>
-                <Input id="manual-fats" type="number" value={manualFood.fats} onChange={e => handleManualFoodChange('fats', e.target.value)} placeholder="grams"/>
-            </div>
-        </div>
-        <DialogFooter>
-            <Button onClick={handleSaveMeal} className="w-full">
-            {editingLog ? 'Update Food' : `Add to ${activeMealType}`}
-            </Button>
-        </DialogFooter>
-     </div>
-  );
+  const renderDialogContent = () => {
+      if (selectedFood) {
+          // --- Confirmation View ---
+          const numQuantity = Number(quantity) || 0;
+          let multiplier = numQuantity;
+          if (servingUnit !== 'default' && selectedFood.unit_conversions[servingUnit]) {
+              multiplier *= selectedFood.unit_conversions[servingUnit];
+          }
+
+          const calculatedMacros = {
+              calories: Math.round(selectedFood.calories * multiplier),
+              protein: Math.round(selectedFood.protein_g * multiplier * 10) / 10,
+              carbs: Math.round(selectedFood.carbs_g * multiplier * 10) / 10,
+              fats: Math.round(selectedFood.fat_g * multiplier * 10) / 10,
+          }
+
+          return (
+              <div className="space-y-4 pt-4">
+                  <Card className="p-4 bg-muted/50">
+                      <CardTitle className="text-lg">{selectedFood.name}</CardTitle>
+                      <CardDescription>
+                          {`Per ${selectedFood.serving_size}: ${selectedFood.calories}kcal, ${selectedFood.protein_g}g P, ${selectedFood.carbs_g}g C, ${selectedFood.fat_g}g F`}
+                      </CardDescription>
+                  </Card>
+                  
+                  <div className="grid grid-cols-5 gap-4">
+                      <div className="space-y-2 col-span-2">
+                          <Label htmlFor="quantity">Quantity</Label>
+                          <Input id="quantity" type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="0.1" step="0.1"/>
+                      </div>
+                      <div className="space-y-2 col-span-3">
+                          <Label htmlFor="serving-unit">Serving</Label>
+                          <Select value={servingUnit} onValueChange={setServingUnit}>
+                            <SelectTrigger id="serving-unit">
+                                <SelectValue placeholder="Select a unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="default">{selectedFood.serving_size}</SelectItem>
+                                {Object.keys(selectedFood.unit_conversions).map(unit => (
+                                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                      </div>
+                  </div>
+                  
+                  <Separator />
+
+                  <div className="text-center font-medium">
+                      <p className="text-xl">{calculatedMacros.calories} kcal</p>
+                      <p className="text-sm text-muted-foreground">
+                          {calculatedMacros.protein}g P, {calculatedMacros.carbs}g C, {calculatedMacros.fats}g F
+                      </p>
+                  </div>
+                  
+                  <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:pt-4">
+                        <Button variant="outline" onClick={() => setSelectedFood(null)}>Back to Search</Button>
+                        <Button onClick={handleSaveMeal} className="w-full sm:w-auto">
+                            Add to {activeMealType}
+                        </Button>
+                  </DialogFooter>
+              </div>
+          )
+
+      } else {
+          // --- Search View ---
+          return (
+             <div className="space-y-4 pt-4">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search for a food..."
+                        className="pl-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        autoFocus
+                    />
+                </div>
+                <div className="h-60 overflow-y-auto pr-2 -mr-2 space-y-2">
+                    {isSearching ? (
+                        <div className="flex justify-center items-center h-full">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary"/>
+                        </div>
+                    ) : searchResults.length > 0 ? (
+                        searchResults.map(food => (
+                            <div key={food.food_id} className="p-3 rounded-md hover:bg-muted cursor-pointer" onClick={() => setSelectedFood(food)}>
+                                <p className="font-medium">{capitalizeWords(food.name)}</p>
+                                <p className="text-sm text-muted-foreground">{food.calories} kcal per {food.serving_size}</p>
+                            </div>
+                        ))
+                    ) : searchQuery.length > 1 ? (
+                        <div className="text-center text-muted-foreground pt-10">
+                            <p>No results found for "{searchQuery}".</p>
+                            <p className="text-xs">Try a different search term.</p>
+                        </div>
+                    ) : (
+                         <div className="text-center text-muted-foreground pt-10">
+                            <p>Start typing to search the food database.</p>
+                         </div>
+                    )}
+                </div>
+             </div>
+          );
+      }
+  };
 
   return (
     <Card>
@@ -164,38 +274,33 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
               <AccordionContent className="p-0">
                 <Separator />
                 <div className="p-4 space-y-2">
-                  {(mealsByType[mealType] || []).length > 0 ? (
-                    (mealsByType[mealType] || []).map(meal => (
-                      <div key={meal.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
-                        <div>
-                          <p className="font-medium">{capitalizeWords(meal.name)}</p>
-                          <p className="text-muted-foreground text-xs">
-                            {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
-                          </p>
+                  {(mealsByType[mealType] || []).length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      {(mealsByType[mealType] || []).map(meal => (
+                        <div key={meal.id} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
+                          <div>
+                            <p className="font-medium">{capitalizeWords(meal.name)}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {meal.calories} kcal &bull; P: {meal.protein}g, C: {meal.carbs}g, F: {meal.fats}g
+                            </p>
+                          </div>
+                          <div className="flex items-center">
+                              <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)}>
+                                  <Trash2 className="w-4 h-4" />
+                              </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center">
-                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary h-8 w-8" onClick={() => handleEditClick(meal)}>
-                                <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)}>
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-center text-muted-foreground py-2">No food logged for {mealType}.</p>
+                      ))}
+                    </div>
                   )}
-                  <DialogTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      className="w-full mt-4"
-                      onClick={() => handleOpenDialog(mealType)}
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Add Food
-                    </Button>
-                  </DialogTrigger>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => handleOpenDialog(mealType)}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Food to {mealType}
+                  </Button>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -204,10 +309,10 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-                {editingLog ? `Edit Food in ${editingLog.mealType}` : `Add Food to ${activeMealType}`}
+                Add Food to {activeMealType}
             </DialogTitle>
             <DialogDescription>
-              {editingLog ? 'Update the nutritional information for this item.' : 'Log a new food by entering its details below.'}
+              Search the database for a food item to log.
             </DialogDescription>
           </DialogHeader>
           {renderDialogContent()}
@@ -216,3 +321,4 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     </Card>
   );
 }
+

@@ -88,4 +88,6 @@ export type FoodDBItem = {
     fiber_g: number;
     common_names: string[];
     unit_conversions: { [key: string]: number };
+    search_terms?: string[];
 };
+

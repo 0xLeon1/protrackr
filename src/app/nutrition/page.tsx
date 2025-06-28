@@ -73,17 +73,6 @@ export default function NutritionPage() {
     setAllMealLogs(prev => [...prev, newLogEntry]);
   };
 
-  const handleUpdateMeal = async (meal: FoodLogEntry) => {
-    if (!user) return;
-    const mealDocRef = doc(db, 'users', user.uid, 'meal-logs', meal.id);
-    await updateDoc(mealDocRef, meal);
-    setAllMealLogs(prev => prev.map(log => (log.id === meal.id ? meal : log)));
-    toast({
-        title: "Meal Updated",
-        description: "Your meal log has been successfully updated.",
-    });
-  };
-
   const handleDeleteMeal = async (mealId: string) => {
     if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'meal-logs', mealId));
@@ -145,7 +134,7 @@ export default function NutritionPage() {
                 {isSeeding ? 'Seeding...' : 'Seed Food Database'}
             </Button>
             <p className="text-sm text-muted-foreground mt-2">
-                Click this button once to populate the food database with your initial data.
+                Click this button to populate/update the food database with your initial data.
             </p>
         </CardContent>
       </Card>
@@ -158,7 +147,6 @@ export default function NutritionPage() {
             logs={todaysLogs} 
             onAddMeal={handleAddMeal} 
             onDeleteMeal={handleDeleteMeal}
-            onUpdateMeal={handleUpdateMeal}
           />
         </div>
       </div>
