@@ -441,7 +441,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
                           <div>
                             <p className="font-medium">{capitalizeWords(meal.name)}</p>
                             <p className="text-muted-foreground text-xs">
-                              {meal.calories} kcal &bull; P: {Math.round(meal.protein)}g, C: {Math.round(meal.carbs)}g, F: {Math.round(meal.fats)}g
+                              {Math.round(meal.calories)} kcal &bull; P: {Math.round(meal.protein)}g, C: {Math.round(meal.carbs)}g, F: {Math.round(meal.fats)}g
                             </p>
                           </div>
                           <div className="flex items-center">
