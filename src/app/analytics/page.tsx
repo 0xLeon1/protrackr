@@ -432,8 +432,8 @@ export default function AnalyticsPage() {
                         <p className="font-medium">{profile.age}</p>
                     </div>
                     <div className="space-y-1">
-                        <p className="text-muted-foreground">Sex</p>
-                        <p className="font-medium capitalize">{profile.sex}</p>
+                        <p className="text-muted-foreground">Gender</p>
+                        <p className="font-medium capitalize">{profile.gender}</p>
                     </div>
                     <div className="space-y-1">
                         <p className="text-muted-foreground">Start Weight</p>

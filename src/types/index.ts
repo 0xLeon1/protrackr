@@ -3,6 +3,7 @@
 
 
 
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -71,7 +72,7 @@ export type SleepLogEntry = {
 export type UserProfile = {
   name: string;
   age: number;
-  sex: 'male' | 'female' | 'other';
+  gender: 'male' | 'female';
   initialWeight: number; // in lbs
   goalWeight: number; // in lbs
   experience: 'beginner' | 'intermediate' | 'advanced';
@@ -158,6 +159,7 @@ export type CustomFoodItem = {
   carbs: number;
   fats: number;
 };
+
 
 
 

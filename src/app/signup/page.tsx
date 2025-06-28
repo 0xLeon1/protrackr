@@ -25,7 +25,7 @@ const formSchema = z.object({
   confirmPassword: z.string(),
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   age: z.coerce.number().min(13, { message: "You must be at least 13 years old." }).max(120),
-  sex: z.enum(["male", "female", "other"]),
+  gender: z.enum(["male", "female"]),
   initialWeight: z.coerce.number().min(50, { message: "Weight must be at least 50 lbs." }).max(1000),
   goalWeight: z.coerce.number().min(50, { message: "Weight must be at least 50 lbs." }).max(1000),
   experience: z.enum(["beginner", "intermediate", "advanced"]),
@@ -52,7 +52,7 @@ export default function SignupPage() {
       confirmPassword: "",
       name: "",
       age: undefined,
-      sex: undefined,
+      gender: undefined,
       initialWeight: undefined,
       goalWeight: undefined,
       experience: undefined,
@@ -94,7 +94,7 @@ export default function SignupPage() {
       const userProfile = {
         name: values.name,
         age: values.age,
-        sex: values.sex,
+        gender: values.gender,
         initialWeight: values.initialWeight,
         goalWeight: values.goalWeight,
         experience: values.experience,
@@ -177,15 +177,14 @@ export default function SignupPage() {
                     
                     {step === 3 && (
                         <div className="space-y-6 animate-in fade-in duration-500">
-                            <FormField control={form.control} name="sex" render={({ field }) => (
+                            <FormField control={form.control} name="gender" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">What is your sex?</FormLabel>
-                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('sex');}} defaultValue={field.value}>
+                                    <FormLabel className="text-xl">What is your gender?</FormLabel>
+                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('gender');}} defaultValue={field.value}>
                                     <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="male">Male</SelectItem>
                                         <SelectItem value="female">Female</SelectItem>
-                                        <SelectItem value="other">Prefer not to say</SelectItem>
                                     </SelectContent>
                                     </Select>
                                     <FormMessage />
