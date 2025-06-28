@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -30,6 +29,7 @@ function capitalizeWords(str: string): string {
 }
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
+const RECENT_FOODS_KEY = 'protracker-recent-foods';
 
 interface MealDiaryProps {
   logs: FoodLogEntry[];
@@ -48,9 +48,23 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const [selectedFood, setSelectedFood] = useState<FoodDBItem | null>(null);
   const [quantity, setQuantity] = useState<number | string>(1);
   const [servingUnit, setServingUnit] = useState('default');
+  const [recentFoods, setRecentFoods] = useState<FoodDBItem[]>([]);
   
   // Directly use the imported food database.
   const allFoods = foodDatabase;
+  
+  // Load recent foods from localStorage on initial render
+  useEffect(() => {
+    try {
+      const storedRecents = localStorage.getItem(RECENT_FOODS_KEY);
+      if (storedRecents) {
+        setRecentFoods(JSON.parse(storedRecents));
+      }
+    } catch (error) {
+      console.error("Failed to parse recent foods from localStorage", error);
+      setRecentFoods([]);
+    }
+  }, []);
 
   // Debounce the search query to make the search feel "snappier"
   useEffect(() => {
@@ -107,6 +121,16 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       
     const numQuantity = Number(quantity);
     if (isNaN(numQuantity) || numQuantity <= 0) return;
+
+    // Save to recents
+    const updatedRecents = [
+        selectedFood,
+        ...recentFoods.filter(food => food.food_id !== selectedFood.food_id)
+    ].slice(0, 5); // Limit to 5 recent items
+
+    setRecentFoods(updatedRecents);
+    localStorage.setItem(RECENT_FOODS_KEY, JSON.stringify(updatedRecents));
+
 
     // Calculation logic
     let multiplier = numQuantity;
@@ -237,11 +261,21 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                                 <p className="text-sm text-muted-foreground">{food.calories} kcal per {food.serving_size}</p>
                             </div>
                         ))
-                    ) : debouncedQuery.length > 1 ? (
+                    ) : debouncedQuery.trim().length > 1 ? (
                         <div className="text-center text-muted-foreground pt-10">
                             <p>No results found for "{searchQuery}".</p>
                             <p className="text-xs">Try a different search term.</p>
                         </div>
+                    ) : recentFoods.length > 0 ? (
+                        <>
+                            <p className="text-xs font-semibold text-muted-foreground tracking-wider uppercase px-1 pb-1">RECENT FOODS</p>
+                            {recentFoods.map(food => (
+                                <div key={food.food_id} className="p-3 rounded-md hover:bg-muted cursor-pointer" onClick={() => setSelectedFood(food)}>
+                                    <p className="font-medium">{capitalizeWords(food.name)}</p>
+                                    <p className="text-sm text-muted-foreground">{food.calories} kcal per {food.serving_size}</p>
+                                </div>
+                            ))}
+                        </>
                     ) : (
                          <div className="text-center text-muted-foreground pt-10">
                             <p>Start typing to search the food database.</p>
