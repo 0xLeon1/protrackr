@@ -43,35 +43,46 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
   // State for search functionality
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [searchResults, setSearchResults] = useState<FoodDBItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<FoodDBItem | null>(null);
   const [quantity, setQuantity] = useState<number | string>(1);
   const [servingUnit, setServingUnit] = useState('default');
   
-  // Directly use the imported food database. No fetching needed.
+  // Directly use the imported food database.
   const allFoods = foodDatabase;
 
-  // Perform client-side search when query changes
+  // Debounce the search query to make the search feel "snappier"
   useEffect(() => {
-    if (searchQuery.trim().length < 2) {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 150); // 150ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+
+  // Perform client-side search when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery.trim().length < 2) {
       setSearchResults([]);
       return;
     }
 
-    const lowerCaseQuery = searchQuery.toLowerCase();
+    const lowerCaseQuery = debouncedQuery.toLowerCase();
     const queryTerms = lowerCaseQuery.split(' ').filter(t => t);
 
     const filteredFoods = allFoods.filter(food => {
-      const foodName = food.name.toLowerCase();
-      const commonNames = food.common_names.map(cn => cn.toLowerCase()).join(' ');
-      const searchableText = `${foodName} ${commonNames}`;
+      const searchableText = `${food.name.toLowerCase()} ${food.common_names.map(cn => cn.toLowerCase()).join(' ')}`;
       
       // Check if all words in query are present in searchable text
       return queryTerms.every(term => searchableText.includes(term));
     });
     
     setSearchResults(filteredFoods.slice(0, 50));
-  }, [searchQuery, allFoods]);
+  }, [debouncedQuery, allFoods]);
 
 
   // When dialog closes, reset everything
@@ -226,7 +237,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                                 <p className="text-sm text-muted-foreground">{food.calories} kcal per {food.serving_size}</p>
                             </div>
                         ))
-                    ) : searchQuery.length > 1 ? (
+                    ) : debouncedQuery.length > 1 ? (
                         <div className="text-center text-muted-foreground pt-10">
                             <p>No results found for "{searchQuery}".</p>
                             <p className="text-xs">Try a different search term.</p>
