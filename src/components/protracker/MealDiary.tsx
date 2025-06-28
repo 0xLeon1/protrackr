@@ -8,11 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Search, Loader2 } from "lucide-react";
+import { PlusCircle, Trash2, Search } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { foodDatabase } from '@/lib/food-data';
 import {
     Select,
     SelectContent,
@@ -49,32 +48,10 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const [quantity, setQuantity] = useState<number | string>(1);
   const [servingUnit, setServingUnit] = useState('default');
   
-  const [allFoods, setAllFoods] = useState<FoodDBItem[]>([]);
-  const [isFetchingFoods, setIsFetchingFoods] = useState(true);
+  // Directly use the imported food database. No fetching needed.
+  const allFoods = foodDatabase;
 
-  // Fetch all food items once on component mount
-  useEffect(() => {
-    const fetchAllFoods = async () => {
-      if (!db) {
-        setIsFetchingFoods(false);
-        return;
-      }
-      setIsFetchingFoods(true);
-      try {
-        const foodCollection = collection(db, 'foods');
-        const querySnapshot = await getDocs(foodCollection);
-        const foods = querySnapshot.docs.map(doc => doc.data() as FoodDBItem);
-        setAllFoods(foods);
-      } catch (error) {
-        console.error("Error fetching all foods:", error);
-      } finally {
-        setIsFetchingFoods(false);
-      }
-    };
-    fetchAllFoods();
-  }, []);
-
-  // Perform client-side search when query or food list changes
+  // Perform client-side search when query changes
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
       setSearchResults([]);
@@ -93,7 +70,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       return queryTerms.every(term => searchableText.includes(term));
     });
     
-    setSearchResults(filteredFoods.slice(0, 30));
+    setSearchResults(filteredFoods.slice(0, 50));
   }, [searchQuery, allFoods]);
 
 
@@ -242,11 +219,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                     />
                 </div>
                 <div className="h-60 overflow-y-auto pr-2 -mr-2 space-y-2">
-                    {isFetchingFoods ? (
-                        <div className="flex justify-center items-center h-full">
-                            <Loader2 className="w-6 h-6 animate-spin text-primary"/>
-                        </div>
-                    ) : searchResults.length > 0 ? (
+                    {searchResults.length > 0 ? (
                         searchResults.map(food => (
                             <div key={food.food_id} className="p-3 rounded-md hover:bg-muted cursor-pointer" onClick={() => setSelectedFood(food)}>
                                 <p className="font-medium">{capitalizeWords(food.name)}</p>
