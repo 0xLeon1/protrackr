@@ -40,6 +40,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
 
 export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -49,8 +50,12 @@ export default function ProgramsPage() {
   const { user, loading: authLoading, dataVersion, refreshData } = useAuth();
   const { toast } = useToast();
 
-  const [itemToRename, setItemToRename] = useState<{ type: 'program' | 'workout'; id: string; programId?: string; name: string; } | null>(null);
-  const [newName, setNewName] = useState('');
+  const [programToRename, setProgramToRename] = useState<Program | null>(null);
+  const [newProgramRename, setNewProgramRename] = useState('');
+  
+  const [editingWorkout, setEditingWorkout] = useState<{ programId: string; workout: Workout } | null>(null);
+  const [currentEditedWorkout, setCurrentEditedWorkout] = useState<Workout | null>(null);
+
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -105,14 +110,6 @@ export default function ProgramsPage() {
     await deleteDoc(doc(db, 'users', user.uid, 'programs', programId));
     setPrograms(programs.filter(p => p.id !== programId));
   };
-
-  const handleProgramNameChange = async (programId: string, name: string) => {
-    if (!user) return;
-    const programRef = doc(db, 'users', user.uid, 'programs', programId);
-    await updateDoc(programRef, { name });
-    const newPrograms = programs.map(p => p.id === programId ? {...p, name} : p);
-    setPrograms(newPrograms);
-  };
   
   const handleAddWorkout = async (programId: string) => {
     if (!user) return;
@@ -139,32 +136,6 @@ export default function ProgramsPage() {
     if (!program) return;
     
     const updatedWorkouts = program.workouts.filter(w => w.id !== workoutId);
-    const programRef = doc(db, 'users', user.uid, 'programs', programId);
-    await updateDoc(programRef, { workouts: updatedWorkouts });
-
-    const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
-    setPrograms(newPrograms);
-  };
-
-  const handleWorkoutNameChange = async (programId: string, workoutId: string, name:string) => {
-    if (!user) return;
-    const program = programs.find(p => p.id === programId);
-    if (!program) return;
-    
-    const updatedWorkouts = program.workouts.map(w => w.id === workoutId ? { ...w, name } : w);
-    const programRef = doc(db, 'users', user.uid, 'programs', programId);
-    await updateDoc(programRef, { workouts: updatedWorkouts });
-
-    const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
-    setPrograms(newPrograms);
-  };
-
-  const handleWorkoutChange = async (programId: string, updatedWorkout: Workout) => {
-    if (!user) return;
-    const program = programs.find(p => p.id === programId);
-    if (!program) return;
-    
-    const updatedWorkouts = program.workouts.map(w => w.id === updatedWorkout.id ? updatedWorkout : w);
     const programRef = doc(db, 'users', user.uid, 'programs', programId);
     await updateDoc(programRef, { workouts: updatedWorkouts });
 
@@ -200,22 +171,42 @@ export default function ProgramsPage() {
   const handleStartWorkout = (workoutId: string) => {
     router.push(`/workout/${workoutId}`);
   };
+  
+  const openEditWorkoutDialog = (programId: string, workout: Workout) => {
+    setEditingWorkout({ programId, workout });
+    setCurrentEditedWorkout(JSON.parse(JSON.stringify(workout))); // Deep copy for editing
+  };
+  
+  const handleSaveWorkout = async () => {
+    if (!editingWorkout || !currentEditedWorkout || !user) return;
+    const { programId } = editingWorkout;
 
-  const handleOpenRenameDialog = (item: { type: 'program' | 'workout'; id: string; programId?: string; name: string; }) => {
-    setItemToRename(item);
-    setNewName(item.name);
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+    
+    const updatedWorkouts = program.workouts.map(w => w.id === currentEditedWorkout.id ? currentEditedWorkout : w);
+    
+    const programRef = doc(db, 'users', user.uid, 'programs', programId);
+    await updateDoc(programRef, { workouts: updatedWorkouts });
+
+    const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
+    setPrograms(newPrograms);
+
+    setEditingWorkout(null);
+    setCurrentEditedWorkout(null);
   };
 
-  const handleSaveRename = async () => {
-    if (!itemToRename || !newName.trim()) return;
-
-    if (itemToRename.type === 'program') {
-      await handleProgramNameChange(itemToRename.id, newName);
-    } else if (itemToRename.type === 'workout' && itemToRename.programId) {
-      await handleWorkoutNameChange(itemToRename.programId, itemToRename.id, newName);
-    }
-    setItemToRename(null);
-    setNewName('');
+  const handleRenameProgram = async () => {
+    if (!programToRename || !newProgramRename.trim() || !user) return;
+    
+    const programRef = doc(db, 'users', user.uid, 'programs', programToRename.id);
+    await updateDoc(programRef, { name: newProgramRename });
+    
+    const newPrograms = programs.map(p => p.id === programToRename.id ? { ...p, name: newProgramRename } : p);
+    setPrograms(newPrograms);
+    
+    setProgramToRename(null);
+    setNewProgramRename('');
   };
 
 
@@ -252,7 +243,7 @@ export default function ProgramsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
-                        <DropdownMenuItem onSelect={() => handleOpenRenameDialog({ type: 'program', id: program.id, name: program.name })}>
+                        <DropdownMenuItem onSelect={() => { setProgramToRename(program); setNewProgramRename(program.name); }}>
                             <Edit className="mr-2 h-4 w-4" />
                             <span>Rename</span>
                         </DropdownMenuItem>
@@ -291,74 +282,72 @@ export default function ProgramsPage() {
                     </div>
                    
                     {program.workouts.length > 0 ? (
-                      <Accordion type="multiple" className="space-y-2">
-                         {program.workouts.map(workout => (
-                           <AccordionItem value={workout.id} key={workout.id} className="border rounded-lg bg-muted/30">
-                             <div className="flex items-center p-2">
-                                <AccordionTrigger className="flex-1 p-2 hover:no-underline font-medium">
-                                    {workout.name}
-                                </AccordionTrigger>
-                                <div className="flex items-center gap-2 ml-2">
-                                   <Button 
-                                      size="sm"
-                                      onClick={() => handleStartWorkout(workout.id)}
-                                      className="bg-green-500 hover:bg-green-600 text-white"
-                                  >
-                                      <Play className="mr-2 h-4 w-4" />
-                                      Start
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
-                                      <DropdownMenuItem onSelect={() => handleOpenRenameDialog({ type: 'workout', id: workout.id, programId: program.id, name: workout.name })}>
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        <span>Rename</span>
-                                      </DropdownMenuItem>
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <DropdownMenuItem
-                                            onSelect={(e) => e.preventDefault()}
-                                            className="text-destructive focus:text-destructive"
-                                          >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            <span>Delete Workout</span>
-                                          </DropdownMenuItem>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              This action cannot be undone. This will permanently delete the "{workout.name}" workout.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction
-                                              onClick={() => handleDeleteWorkout(program.id, workout.id)}
-                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                            >
-                                              Delete
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                      <div className="space-y-3">
+                        {program.workouts.map(workout => (
+                            <div key={workout.id} className="border p-4 rounded-lg bg-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div className="flex-1">
+                                    <h4 className="font-semibold">{workout.name}</h4>
+                                    <p className="text-sm text-muted-foreground mt-2 space-x-2">
+                                    {workout.exercises.map(ex => (
+                                        <span key={ex.id} className="inline-block after:content-['•'] after:ml-2 last:after:content-[]">{ex.name}</span>
+                                    ))}
+                                    {workout.exercises.length === 0 && <span>No exercises yet.</span>}
+                                    </p>
                                 </div>
-                             </div>
-                             <AccordionContent className="bg-background rounded-b-lg">
-                               <WorkoutTracker 
-                                  workout={workout} 
-                                  onWorkoutChange={(updatedWorkout) => handleWorkoutChange(program.id, updatedWorkout)} 
-                                />
-                             </AccordionContent>
-                           </AccordionItem>
-                         ))}
-                      </Accordion>
+                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                    <Button 
+                                        size="sm"
+                                        onClick={() => handleStartWorkout(workout.id)}
+                                        className="bg-green-500 hover:bg-green-600 text-white"
+                                    >
+                                        <Play className="mr-2 h-4 w-4" />
+                                        Start
+                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="shrink-0">
+                                            <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onSelect={() => openEditWorkoutDialog(program.id, workout)}>
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                <span>Edit</span>
+                                            </DropdownMenuItem>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                <DropdownMenuItem
+                                                    onSelect={(e) => e.preventDefault()}
+                                                    className="text-destructive focus:text-destructive"
+                                                >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    <span>Delete Workout</span>
+                                                </DropdownMenuItem>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the "{workout.name}" workout.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                    onClick={() => handleDeleteWorkout(program.id, workout.id)}
+                                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                    >
+                                                    Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </div>
+                        ))}
+                      </div>
                     ) : (
                       <div className="text-sm text-center text-muted-foreground py-4 border rounded-lg border-dashed">
                         <p>This program has no workouts yet.</p>
@@ -398,27 +387,64 @@ export default function ProgramsPage() {
         <CardioLogger onLogCardio={handleLogCardio} />
       </div>
       
-      {/* Rename Dialog */}
-      <Dialog open={!!itemToRename} onOpenChange={(isOpen) => !isOpen && setItemToRename(null)}>
+      {/* Program Rename Dialog */}
+      <Dialog open={!!programToRename} onOpenChange={(isOpen) => !isOpen && setProgramToRename(null)}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>Rename {itemToRename?.type}</DialogTitle>
+                  <DialogTitle>Rename Program</DialogTitle>
                   <DialogDescription>
-                      Enter a new name for "{itemToRename?.name}".
+                      Enter a new name for "{programToRename?.name}".
                   </DialogDescription>
               </DialogHeader>
               <Input 
-                  value={newName} 
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSaveRename()}
+                  value={newProgramRename} 
+                  onChange={(e) => setNewProgramRename(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRenameProgram()}
                   placeholder="New name"
               />
               <DialogFooter>
-                  <Button variant="outline" onClick={() => setItemToRename(null)}>Cancel</Button>
-                  <Button onClick={handleSaveRename}>Save Changes</Button>
+                  <Button variant="outline" onClick={() => setProgramToRename(null)}>Cancel</Button>
+                  <Button onClick={handleRenameProgram}>Save Changes</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+      
+      {/* Edit Workout Dialog */}
+      <Dialog open={!!editingWorkout} onOpenChange={(isOpen) => !isOpen && setEditingWorkout(null)}>
+          <DialogContent className="max-w-4xl min-h-[75vh] flex flex-col">
+              <DialogHeader>
+                  <DialogTitle>Edit Workout</DialogTitle>
+              </DialogHeader>
+              {currentEditedWorkout && (
+                <div className="flex-1 flex flex-col gap-4 overflow-y-auto">
+                    <div className="space-y-2">
+                        <Label htmlFor="workout-name">Workout Name</Label>
+                        <Input
+                            id="workout-name"
+                            value={currentEditedWorkout.name}
+                            onChange={(e) =>
+                                setCurrentEditedWorkout((prev) =>
+                                    prev ? { ...prev, name: e.target.value } : null
+                                )
+                            }
+                        />
+                    </div>
+                    <div className="flex-1">
+                        <WorkoutTracker
+                            workout={currentEditedWorkout}
+                            onWorkoutChange={setCurrentEditedWorkout}
+                        />
+                    </div>
+                </div>
+              )}
+              <DialogFooter className="mt-auto pt-4 border-t">
+                  <Button variant="outline" onClick={() => setEditingWorkout(null)}>Cancel</Button>
+                  <Button onClick={handleSaveWorkout}>Save Workout</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+    
