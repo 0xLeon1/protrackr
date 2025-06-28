@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Search, FilePlus2 } from "lucide-react";
+import { PlusCircle, Trash2, Search, FilePlus2, Pencil } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { foodDatabase } from '@/lib/food-data';
@@ -36,9 +36,10 @@ interface MealDiaryProps {
   logs: FoodLogEntry[];
   onAddMeal: (meal: Omit<FoodLogEntry, 'id' | 'date'>) => void;
   onDeleteMeal: (mealId: string) => void;
+  onUpdateMeal: (meal: FoodLogEntry) => void;
 }
 
-export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryProps) {
+export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal }: MealDiaryProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
 
@@ -60,6 +61,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       carbs: '',
       fats: '',
   });
+
+  // State for editing food
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [mealToEdit, setMealToEdit] = useState<FoodLogEntry | null>(null);
+  const [editQuantity, setEditQuantity] = useState<number | string>('');
 
   const allFoods = foodDatabase;
   
@@ -113,6 +119,13 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
     }
   }, [isDialogOpen]);
   
+  useEffect(() => {
+    if (!isEditDialogOpen) {
+        setMealToEdit(null);
+        setEditQuantity('');
+    }
+  }, [isEditDialogOpen]);
+
   const handleOpenDialog = (mealType: MealType) => {
     setActiveMealType(mealType);
     setIsDialogOpen(true);
@@ -137,13 +150,17 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
         multiplier *= selectedFood.unit_conversions[servingUnit];
     }
     
-    const mealData = {
+    const mealData: Omit<FoodLogEntry, 'id' | 'date'> = {
         mealType: activeMealType,
         name: selectedFood.name,
         calories: selectedFood.calories * multiplier,
         protein: selectedFood.protein_g * multiplier,
         carbs: selectedFood.carbs_g * multiplier,
         fats: selectedFood.fat_g * multiplier,
+        foodId: selectedFood.food_id,
+        quantity: numQuantity,
+        servingUnit: servingUnit,
+        customBaseMacros: null,
     };
       
     onAddMeal(mealData);
@@ -152,14 +169,25 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
 
   const handleSaveCustomMeal = () => {
     if (!activeMealType || !customFoodData.name.trim() || !customFoodData.calories) return;
+    
+    const baseMacros = {
+        calories: Number(customFoodData.calories) || 0,
+        protein: Number(customFoodData.protein) || 0,
+        carbs: Number(customFoodData.carbs) || 0,
+        fats: Number(customFoodData.fats) || 0,
+    };
 
-    const mealData = {
+    const mealData: Omit<FoodLogEntry, 'id' | 'date'> = {
       mealType: activeMealType,
       name: customFoodData.name,
-      calories: Number(customFoodData.calories) || 0,
-      protein: Number(customFoodData.protein) || 0,
-      carbs: Number(customFoodData.carbs) || 0,
-      fats: Number(customFoodData.fats) || 0,
+      calories: baseMacros.calories,
+      protein: baseMacros.protein,
+      carbs: baseMacros.carbs,
+      fats: baseMacros.fats,
+      foodId: null,
+      quantity: 1,
+      servingUnit: 'serving',
+      customBaseMacros: baseMacros,
     };
 
     onAddMeal(mealData);
@@ -169,6 +197,55 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const handleCustomFoodChange = (field: keyof typeof customFoodData, value: string) => {
     setCustomFoodData(prev => ({...prev, [field]: value}));
   };
+
+  const handleOpenEditDialog = (meal: FoodLogEntry) => {
+    setMealToEdit(meal);
+    setEditQuantity(meal.quantity);
+    setIsEditDialogOpen(true);
+  }
+  
+  const handleSaveEdit = () => {
+    if (!mealToEdit) return;
+
+    const numQuantity = Number(editQuantity);
+    if (isNaN(numQuantity) || numQuantity <= 0) return;
+
+    let updatedMeal: FoodLogEntry;
+
+    if (mealToEdit.foodId) {
+        const foodDbItem = allFoods.find(f => f.food_id === mealToEdit.foodId);
+        if (!foodDbItem) return;
+
+        let multiplier = numQuantity;
+        if (mealToEdit.servingUnit !== 'default' && foodDbItem.unit_conversions[mealToEdit.servingUnit]) {
+            multiplier *= foodDbItem.unit_conversions[mealToEdit.servingUnit];
+        }
+
+        updatedMeal = {
+            ...mealToEdit,
+            quantity: numQuantity,
+            calories: foodDbItem.calories * multiplier,
+            protein: foodDbItem.protein_g * multiplier,
+            carbs: foodDbItem.carbs_g * multiplier,
+            fats: foodDbItem.fat_g * multiplier,
+        };
+    } else if (mealToEdit.customBaseMacros) {
+        const base = mealToEdit.customBaseMacros;
+        updatedMeal = {
+            ...mealToEdit,
+            quantity: numQuantity,
+            calories: base.calories * numQuantity,
+            protein: base.protein * numQuantity,
+            carbs: base.carbs * numQuantity,
+            fats: base.fats * numQuantity,
+        };
+    } else {
+        return; // Should not happen with new data structure
+    }
+    
+    onUpdateMeal(updatedMeal);
+    setIsEditDialogOpen(false);
+  }
 
   const mealsByType = useMemo(() => {
     return logs.reduce((acc, log) => {
@@ -199,6 +276,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
         // --- Custom Food Form View ---
         return (
             <div className="space-y-4 pt-4">
+                <p className="text-sm text-muted-foreground">Enter the macros for a single serving of your custom food.</p>
                 <div className="space-y-2">
                     <Label htmlFor="custom-name">Food Name</Label>
                     <Input id="custom-name" value={customFoodData.name} onChange={(e) => handleCustomFoodChange('name', e.target.value)} placeholder="e.g., Grandma's Lasagna" />
@@ -374,6 +452,11 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                             </p>
                           </div>
                           <div className="flex items-center">
+                              { (meal.foodId || meal.customBaseMacros) && (
+                                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => handleOpenEditDialog(meal)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDeleteMeal(meal.id)}>
                                   <Trash2 className="w-4 h-4" />
                               </Button>
@@ -405,6 +488,38 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
             </DialogDescription>
           </DialogHeader>
           {renderDialogContent()}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Food Entry</DialogTitle>
+                <DialogDescription>
+                    Update the quantity for "{mealToEdit?.name}".
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="edit-quantity">
+                      {mealToEdit?.servingUnit === 'serving' ? 'Servings' : 'Quantity'}
+                    </Label>
+                    <Input 
+                        id="edit-quantity" 
+                        type="number" 
+                        value={editQuantity} 
+                        onChange={e => setEditQuantity(e.target.value)} 
+                        min="0.1" 
+                        step="0.1"
+                        autoFocus
+                    />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleSaveEdit}>Save Changes</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>

@@ -69,6 +69,15 @@ export default function NutritionPage() {
     setAllMealLogs(prev => [...prev, newLogEntry]);
   };
 
+  const handleUpdateMeal = async (meal: FoodLogEntry) => {
+    if (!user) return;
+    const { id, ...mealData } = meal;
+    const mealDocRef = doc(db, 'users', user.uid, 'meal-logs', id);
+    await updateDoc(mealDocRef, mealData);
+    setAllMealLogs(prev => prev.map(log => log.id === id ? meal : log));
+    toast({ title: "Meal Updated", description: `Your entry for "${meal.name}" has been updated.` });
+  };
+
   const handleDeleteMeal = async (mealId: string) => {
     if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'meal-logs', mealId));
@@ -103,6 +112,7 @@ export default function NutritionPage() {
             logs={todaysLogs} 
             onAddMeal={handleAddMeal} 
             onDeleteMeal={handleDeleteMeal}
+            onUpdateMeal={handleUpdateMeal}
           />
         </div>
       </div>

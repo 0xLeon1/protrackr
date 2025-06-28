@@ -74,6 +74,16 @@ export type FoodLogEntry = {
   protein: number;
   carbs: number;
   fats: number;
+  // Fields for editing
+  foodId?: string | null;
+  quantity: number;
+  servingUnit: string;
+  customBaseMacros?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+  } | null;
 };
 
 export type FoodDBItem = {
@@ -90,4 +100,5 @@ export type FoodDBItem = {
     unit_conversions: { [key: string]: number };
     search_terms?: string[];
 };
+
 
