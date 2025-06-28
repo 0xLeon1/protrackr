@@ -128,8 +128,17 @@ export default function SignupPage() {
     <div className="flex items-center justify-center min-h-[calc(100vh-200px)] py-8">
         <Card className="w-full max-w-lg">
             <CardHeader>
-                <CardTitle>Create Your ProTracker Account</CardTitle>
-                <CardDescription>Let's get you set up with a personalized plan.</CardDescription>
+                {step < 8 ? (
+                    <>
+                        <CardTitle>Let's Build Your Plan</CardTitle>
+                        <CardDescription>Tell us a bit about yourself to create your personalized gameplan.</CardDescription>
+                    </>
+                ) : (
+                    <>
+                        <CardTitle>Create Your ProTracker Account</CardTitle>
+                        <CardDescription>Almost there! Just a few more details to secure your account.</CardDescription>
+                    </>
+                )}
             </CardHeader>
             <CardContent>
                 <Form {...form}>
