@@ -4,10 +4,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Program, Workout, CardioLogEntry } from '@/types';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
 import CardioLogger from "@/components/protracker/CardioLogger";
 import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit, Zap } from 'lucide-react';
@@ -225,8 +224,8 @@ export default function ProgramsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
+    <div className="space-y-8">
+      <div className="space-y-6">
         <div className="flex justify-between items-center gap-4">
             <h2 className="text-2xl font-bold">Your Programs</h2>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -265,57 +264,55 @@ export default function ProgramsPage() {
             </CardContent>
           </Card>
         )}
-        <Accordion type="multiple" className="w-full space-y-4">
+        <div className="space-y-6">
           {programs.map((program) => (
             <Card key={program.id} className="overflow-hidden">
-              <AccordionItem value={program.id} className="border-none">
-                <AccordionTrigger className="flex items-center p-4 hover:no-underline text-lg font-semibold w-full">
-                  {program.name}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
-                        <MoreVertical className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
-                        <DropdownMenuItem onSelect={() => handleAddWorkout(program.id)}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            <span>Add Day</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => { setProgramToRename(program); setNewProgramRename(program.name); }}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            <span>Rename</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete Program</span>
+                <CardHeader className="flex flex-row items-center justify-between p-4 bg-muted/50">
+                    <CardTitle className="text-xl">{program.name}</CardTitle>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="shrink-0 ml-auto">
+                            <MoreVertical className="h-5 w-5" />
+                        </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => handleAddWorkout(program.id)}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                <span>Add Day</span>
                             </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the "{program.name}" program and all of its workouts.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteProgram(program.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </AccordionTrigger>
-                <AccordionContent className="p-4 border-t">
+                            <DropdownMenuItem onSelect={() => { setProgramToRename(program); setNewProgramRename(program.name); }}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Rename</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete Program</span>
+                                </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the "{program.name}" program and all of its workouts.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteProgram(program.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Delete
+                                </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                            </AlertDialog>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </CardHeader>
+
+                <CardContent className="p-4">
                   <div className="space-y-4">
-                    <h3 className="font-semibold">Workouts</h3>
-                   
                     {program.workouts.length > 0 ? (
                       <div className="space-y-3">
                         {program.workouts.map(workout => (
@@ -390,27 +387,24 @@ export default function ProgramsPage() {
                       </div>
                     )}
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                </CardContent>
             </Card>
           ))}
-        </Accordion>
+        </div>
       </div>
 
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="cardio-logger" className="border rounded-lg bg-card">
-          <AccordionTrigger className="p-4 w-full text-lg font-semibold flex justify-between hover:no-underline">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              <span>Log Cardio Session</span>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="p-4 pt-0">
-            <p className="text-muted-foreground mb-4">Record a one-off cardio workout.</p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary" />
+            <span>Log Cardio Session</span>
+          </CardTitle>
+          <CardDescription>Record a one-off cardio workout.</CardDescription>
+        </CardHeader>
+        <CardContent>
             <CardioLogger onLogCardio={handleLogCardio} />
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+        </CardContent>
+      </Card>
       
       {/* Program Rename Dialog */}
       <Dialog open={!!programToRename} onOpenChange={(isOpen) => !isOpen && setProgramToRename(null)}>
