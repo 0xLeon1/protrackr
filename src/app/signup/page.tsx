@@ -180,7 +180,7 @@ export default function SignupPage() {
                             <FormField control={form.control} name="gender" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xl">What is your gender?</FormLabel>
-                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('gender');}} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="male">Male</SelectItem>
@@ -190,8 +190,9 @@ export default function SignupPage() {
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                             <div className="flex justify-start">
+                             <div className="flex justify-between">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                                <Button type="button" onClick={() => handleNextStep('gender')}>Next</Button>
                             </div>
                         </div>
                     )}
@@ -233,7 +234,7 @@ export default function SignupPage() {
                              <FormField control={form.control} name="experience" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xl">What's your training experience?</FormLabel>
-                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('experience');}} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select level..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="beginner">Beginner (0-2 years)</SelectItem>
@@ -244,8 +245,9 @@ export default function SignupPage() {
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                             <div className="flex justify-start">
+                             <div className="flex justify-between">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                                <Button type="button" onClick={() => handleNextStep('experience')}>Next</Button>
                             </div>
                         </div>
                     )}
@@ -255,7 +257,7 @@ export default function SignupPage() {
                              <FormField control={form.control} name="transformationTarget" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xl">Choose your target timeline.</FormLabel>
-                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('transformationTarget');}} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select duration..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="8">8 Weeks</SelectItem>
@@ -266,8 +268,9 @@ export default function SignupPage() {
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                             <div className="flex justify-start">
+                             <div className="flex justify-between">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                                <Button type="button" onClick={() => handleNextStep('transformationTarget')}>Next</Button>
                             </div>
                         </div>
                     )}
@@ -323,5 +326,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-    
