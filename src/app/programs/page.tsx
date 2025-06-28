@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Program, Workout, CardioLogEntry } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -20,7 +20,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
@@ -36,6 +35,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
@@ -56,6 +56,8 @@ export default function ProgramsPage() {
   
   const [editingWorkout, setEditingWorkout] = useState<{ programId: string; workout: Workout } | null>(null);
   const [currentEditedWorkout, setCurrentEditedWorkout] = useState<Workout | null>(null);
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
 
   useEffect(() => {
@@ -104,6 +106,7 @@ export default function ProgramsPage() {
     
     setPrograms([...programs, newProgram]);
     setNewProgramName('');
+    setIsCreateDialogOpen(false);
   };
 
   const handleDeleteProgram = async (programId: string) => {
@@ -223,25 +226,41 @@ export default function ProgramsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="flex justify-between items-center gap-4">
             <h2 className="text-2xl font-bold">Your Programs</h2>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Input 
-                placeholder="Create a new program..." 
-                value={newProgramName}
-                onChange={(e) => setNewProgramName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
-              />
-              <Button onClick={handleAddProgram} className="shrink-0">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add
-              </Button>
-            </div>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Create Program
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create a New Program</DialogTitle>
+                        <DialogDescription>
+                            Give your new program a name to get started.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Input 
+                        value={newProgramName} 
+                        onChange={(e) => setNewProgramName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
+                        placeholder="e.g., Push Pull Legs"
+                        autoFocus
+                    />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddProgram}>Create</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
 
         {programs.length === 0 && !pageIsLoading && (
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-center text-muted-foreground">You haven't created any programs yet. Use the form above to get started.</p>
+              <p className="text-sm text-center text-muted-foreground">You haven't created any programs yet. Use the button above to get started.</p>
             </CardContent>
           </Card>
         )}
