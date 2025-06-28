@@ -435,10 +435,6 @@ export default function AnalyticsPage() {
                         <p className="text-muted-foreground">Sex</p>
                         <p className="font-medium capitalize">{profile.sex}</p>
                     </div>
-                     <div className="space-y-1">
-                        <p className="text-muted-foreground">Height</p>
-                        <p className="font-medium">{Math.floor(profile.height/12)}' {profile.height % 12}"</p>
-                    </div>
                     <div className="space-y-1">
                         <p className="text-muted-foreground">Start Weight</p>
                         <p className="font-medium">{profile.initialWeight} lbs</p>
