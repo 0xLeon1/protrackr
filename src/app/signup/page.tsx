@@ -127,15 +127,15 @@ export default function SignupPage() {
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-200px)] py-8">
         <Card className="w-full max-w-lg">
-            <CardHeader>
+            <CardHeader className="text-center">
                 {step < 8 ? (
                     <>
-                        <CardTitle>Welcome to Your Transformation with ProTracker...</CardTitle>
+                        <CardTitle className="text-3xl">Welcome to Your Transformation with ProTracker...</CardTitle>
                         <CardDescription>Let's build your gameplan so you can start getting the best results of your life.</CardDescription>
                     </>
                 ) : (
                     <>
-                        <CardTitle>Create Your ProTracker Account</CardTitle>
+                        <CardTitle className="text-3xl">Create Your ProTracker Account</CardTitle>
                         <CardDescription>Almost there! Just a few more details to secure your account.</CardDescription>
                     </>
                 )}
