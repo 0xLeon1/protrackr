@@ -39,7 +39,7 @@ type FormSchemaType = z.infer<typeof formSchema>;
 
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] useState(1);
+  const [step, setStep] = useState(1);
   const router = useRouter();
   const { toast } = useToast();
   const { isFirebaseConfigured, refreshData } = useAuth();
