@@ -30,6 +30,7 @@ import {
   } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
 
@@ -150,61 +151,63 @@ export default function RecipeBook({ recipes, onAddMeal, onSaveRecipe, onUpdateR
         </CardHeader>
         <CardContent>
           {recipes.length > 0 ? (
-            <Accordion type="multiple" className="w-full space-y-2">
-              {recipes.map((recipe) => {
-                const servingMacros = perServingMacros(recipe);
-                return (
-                    <AccordionItem value={recipe.id} key={recipe.id} className="border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                        <AccordionTrigger className="px-4 text-base font-medium hover:no-underline w-full">
-                            <div className="flex-1 text-left">
-                                <p className="font-semibold">{recipe.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {`1 serving: ${servingMacros.calories} kcal, ${servingMacros.protein}g P, ${servingMacros.carbs}g C, ${servingMacros.fats}g F`}
-                                </p>
-                            </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 border-t bg-background rounded-b-lg">
-                            <div className="space-y-4">
-                                <div>
-                                    <h4 className="font-semibold">Ingredients ({recipe.ingredients.length})</h4>
-                                    <p className="text-xs text-muted-foreground">{recipe.servings} serving(s) total</p>
-                                </div>
-                                <ul className="space-y-2 text-sm">
-                                    {recipe.ingredients.map(ing => (
-                                        <li key={ing.id} className="flex justify-between items-center bg-muted/30 p-2 rounded-md">
-                                            <span>{ing.quantity} {ing.servingUnit} {ing.name}</span>
-                                            <span className="text-muted-foreground text-xs">{Math.round(ing.calories)} kcal</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <Separator />
-                                <div className="flex justify-end gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenLogDialog(recipe)}>Log Serving</Button>
-                                    <Button variant="secondary" size="sm" onClick={() => handleEditRecipe(recipe)}><Edit className="h-4 w-4 mr-2" />Edit</Button>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="sm"><Trash2 className="h-4 w-4 mr-2" />Delete</Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Delete "{recipe.name}"?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                This action cannot be undone. This will permanently delete this recipe.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => onDeleteRecipe(recipe.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </div>
-                            </div>
-                        </AccordionContent>
-                    </AccordionItem>
-                );
-            })}
-            </Accordion>
+            <ScrollArea className="h-72 w-full pr-4">
+              <Accordion type="multiple" className="w-full space-y-2">
+                {recipes.map((recipe) => {
+                  const servingMacros = perServingMacros(recipe);
+                  return (
+                      <AccordionItem value={recipe.id} key={recipe.id} className="border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                          <AccordionTrigger className="px-4 text-base font-medium hover:no-underline w-full">
+                              <div className="flex-1 text-left">
+                                  <p className="font-semibold">{recipe.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                      {`1 serving: ${servingMacros.calories} kcal, ${servingMacros.protein}g P, ${servingMacros.carbs}g C, ${servingMacros.fats}g F`}
+                                  </p>
+                              </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="p-4 border-t bg-background rounded-b-lg">
+                              <div className="space-y-4">
+                                  <div>
+                                      <h4 className="font-semibold">Ingredients ({recipe.ingredients.length})</h4>
+                                      <p className="text-xs text-muted-foreground">{recipe.servings} serving(s) total</p>
+                                  </div>
+                                  <ul className="space-y-2 text-sm">
+                                      {recipe.ingredients.map(ing => (
+                                          <li key={ing.id} className="flex justify-between items-center bg-muted/30 p-2 rounded-md">
+                                              <span>{ing.quantity} {ing.servingUnit} {ing.name}</span>
+                                              <span className="text-muted-foreground text-xs">{Math.round(ing.calories)} kcal</span>
+                                          </li>
+                                      ))}
+                                  </ul>
+                                  <Separator />
+                                  <div className="flex justify-end gap-2">
+                                      <Button variant="outline" size="sm" onClick={() => handleOpenLogDialog(recipe)}>Log Serving</Button>
+                                      <Button variant="secondary" size="sm" onClick={() => handleEditRecipe(recipe)}><Edit className="h-4 w-4 mr-2" />Edit</Button>
+                                      <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                              <Button variant="destructive" size="sm"><Trash2 className="h-4 w-4 mr-2" />Delete</Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                  <AlertDialogTitle>Delete "{recipe.name}"?</AlertDialogTitle>
+                                                  <AlertDialogDescription>
+                                                  This action cannot be undone. This will permanently delete this recipe.
+                                                  </AlertDialogDescription>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                  <AlertDialogAction onClick={() => onDeleteRecipe(recipe.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                              </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                      </AlertDialog>
+                                  </div>
+                              </div>
+                          </AccordionContent>
+                      </AccordionItem>
+                  );
+              })}
+              </Accordion>
+            </ScrollArea>
           ) : (
              <div className="flex flex-col items-center justify-center p-12 text-center border-dashed border rounded-lg">
                <FilePlus className="w-16 h-16 text-muted-foreground mb-4" />
