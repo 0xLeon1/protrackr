@@ -2,14 +2,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry, SleepLogEntry, CardioLogEntry } from "@/types";
+import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry, SleepLogEntry, CardioLogEntry, UserProfile } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { History, TrendingUp, Scale, Bed, Loader2, List, UtensilsCrossed, Zap } from "lucide-react";
+import { History, TrendingUp, Scale, Bed, Loader2, List, UtensilsCrossed, Zap, User as UserIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -81,7 +81,7 @@ export default function AnalyticsPage() {
   const [workoutDays, setWorkoutDays] = useState(0);
   const [nutritionDays, setNutritionDays] = useState(0);
   const [weeklyAdherence, setWeeklyAdherence] = useState(0);
-  const { user, loading, dataVersion } = useAuth();
+  const { user, profile, loading, dataVersion } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -411,6 +411,54 @@ export default function AnalyticsPage() {
         <h1 className="text-3xl font-bold">Analytics</h1>
         <p className="text-muted-foreground">Your performance overview.</p>
       </header>
+      
+      {profile && (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <UserIcon className="h-5 w-5 text-primary"/>
+                    Your Profile
+                </CardTitle>
+                <CardDescription>This is the profile information you provided at sign up.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm">
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground">Name</p>
+                        <p className="font-medium">{profile.name}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground">Age</p>
+                        <p className="font-medium">{profile.age}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground">Sex</p>
+                        <p className="font-medium capitalize">{profile.sex}</p>
+                    </div>
+                     <div className="space-y-1">
+                        <p className="text-muted-foreground">Height</p>
+                        <p className="font-medium">{Math.floor(profile.height/12)}' {profile.height % 12}"</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground">Start Weight</p>
+                        <p className="font-medium">{profile.initialWeight} lbs</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground">Goal Weight</p>
+                        <p className="font-medium">{profile.goalWeight} lbs</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground">Experience</p>
+                        <p className="font-medium capitalize">{profile.experience}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-muted-foreground">Target Date</p>
+                        <p className="font-medium">{format(parseISO(profile.targetDate), 'MMM d, yyyy')}</p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>

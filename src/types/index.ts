@@ -1,6 +1,7 @@
 
 
 
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -64,6 +65,17 @@ export type SleepLogEntry = {
   id: string;
   date: string; // ISO String
   hours: number;
+};
+
+export type UserProfile = {
+  name: string;
+  age: number;
+  sex: 'male' | 'female' | 'other';
+  height: number; // in inches
+  initialWeight: number; // in lbs
+  goalWeight: number; // in lbs
+  experience: 'beginner' | 'intermediate' | 'advanced';
+  targetDate: string; // ISO string
 };
 
 export type MacroGoals = {
@@ -146,6 +158,7 @@ export type CustomFoodItem = {
   carbs: number;
   fats: number;
 };
+
 
 
 
