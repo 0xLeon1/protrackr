@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
 import CardioLogger from "@/components/protracker/CardioLogger";
-import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit, Zap } from 'lucide-react';
+import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit, Zap, Dumbbell } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -268,7 +268,10 @@ export default function ProgramsPage() {
           {programs.map((program) => (
             <Card key={program.id} className="overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between p-4 bg-muted/50">
-                    <CardTitle className="text-xl">{program.name}</CardTitle>
+                    <CardTitle className="text-2xl flex items-center gap-3">
+                        <Dumbbell className="h-6 w-6 text-primary" />
+                        {program.name}
+                    </CardTitle>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="shrink-0 ml-auto">
@@ -395,7 +398,7 @@ export default function ProgramsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-xl">
             <Zap className="h-5 w-5 text-primary" />
             <span>Log Cardio Session</span>
           </CardTitle>
