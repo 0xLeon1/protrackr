@@ -364,12 +364,18 @@ export default function AnalyticsPage() {
   };
   
   const weeklyMacroCaloriesChartData = useMemo(() => {
-    return weeklyMacros.map(dayData => ({
-        day: dayData.day,
-        protein: Math.round(dayData.protein * 4),
-        carbs: Math.round(dayData.carbs * 4),
-        fats: Math.round(dayData.fats * 9),
-    }));
+    return weeklyMacros.map(dayData => {
+        const proteinCals = Math.round(dayData.protein * 4);
+        const carbsCals = Math.round(dayData.carbs * 4);
+        const fatsCals = Math.round(dayData.fats * 9);
+        return {
+            day: dayData.day,
+            protein: proteinCals,
+            carbs: carbsCals,
+            fats: fatsCals,
+            total: proteinCals + carbsCals + fatsCals,
+        };
+    });
   }, [weeklyMacros]);
   
   const chartConfig = {
@@ -752,7 +758,7 @@ export default function AnalyticsPage() {
             </DialogHeader>
             <div className="pt-4">
                 <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
-                    <BarChart accessibilityLayer data={weeklyMacroCaloriesChartData} margin={{ top: 20, right: 10, left: -10, bottom: 5 }}>
+                    <BarChart accessibilityLayer data={weeklyMacroCaloriesChartData} margin={{ top: 30, right: 10, left: -10, bottom: 5 }}>
                         <CartesianGrid vertical={false} />
                         <XAxis
                             dataKey="day"
@@ -760,7 +766,7 @@ export default function AnalyticsPage() {
                             axisLine={false}
                             tickMargin={8}
                         />
-                        <YAxis tickFormatter={(value) => `${value} kcal`} />
+                        <YAxis tickFormatter={(value) => `${Number(value).toLocaleString()} kcal`} />
                         <ChartTooltip
                             cursor={false}
                             content={<ChartTooltipContent formatter={(value, name, item) => (
@@ -781,7 +787,9 @@ export default function AnalyticsPage() {
                         <Legend content={<ChartLegendContent />} />
                         <Bar dataKey="protein" stackId="a" fill="var(--color-protein)" name="Protein" />
                         <Bar dataKey="carbs" stackId="a" fill="var(--color-carbs)" name="Carbs" />
-                        <Bar dataKey="fats" stackId="a" fill="var(--color-fats)" radius={[4, 4, 0, 0]} name="Fats" />
+                        <Bar dataKey="fats" stackId="a" fill="var(--color-fats)" radius={[4, 4, 0, 0]} name="Fats">
+                           <LabelList dataKey="total" content={renderCustomizedLabel} />
+                        </Bar>
                     </BarChart>
                 </ChartContainer>
             </div>
