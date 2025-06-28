@@ -131,7 +131,7 @@ export default function SignupPage() {
                 {step < 8 ? (
                     <>
                         <CardTitle>Welcome to Your Transformation with ProTracker...</CardTitle>
-                        <CardDescription>Welcome! Let's build your personalized gameplan to achieve your goals.</CardDescription>
+                        <CardDescription>Let's build your gameplan so you can start getting the best results of your life.</CardDescription>
                     </>
                 ) : (
                     <>
@@ -324,3 +324,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    
