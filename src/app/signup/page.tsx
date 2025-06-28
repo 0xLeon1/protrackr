@@ -131,7 +131,7 @@ export default function SignupPage() {
                 {step < 8 ? (
                     <>
                         <CardTitle className="text-3xl font-bold">Welcome to Your Transformation with ProTracker...</CardTitle>
-                        <CardDescription className="pt-2">Let's build your gameplan so you can start getting the best results of your life.</CardDescription>
+                        <CardDescription className="pt-2">Let's build your gameplan to getting the best results of your life.</CardDescription>
                     </>
                 ) : (
                     <>
