@@ -223,11 +223,25 @@ export default function ProgramsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold">Your Programs</h2>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <h2 className="text-2xl font-bold">Your Programs</h2>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Input 
+                placeholder="Create a new program..." 
+                value={newProgramName}
+                onChange={(e) => setNewProgramName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
+              />
+              <Button onClick={handleAddProgram} className="shrink-0">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add
+              </Button>
+            </div>
+        </div>
+
         {programs.length === 0 && !pageIsLoading && (
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-center text-muted-foreground">You haven't created any programs yet.</p>
+              <p className="text-sm text-center text-muted-foreground">You haven't created any programs yet. Use the form above to get started.</p>
             </CardContent>
           </Card>
         )}
@@ -363,30 +377,7 @@ export default function ProgramsPage() {
         </Accordion>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Create a New Program</CardTitle>
-            <CardDescription>
-              Build a new workout program from scratch.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <Input 
-                placeholder="e.g., My Awesome Program" 
-                value={newProgramName}
-                onChange={(e) => setNewProgramName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
-              />
-              <Button onClick={handleAddProgram}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Program
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        <CardioLogger onLogCardio={handleLogCardio} />
-      </div>
+      <CardioLogger onLogCardio={handleLogCardio} />
       
       {/* Program Rename Dialog */}
       <Dialog open={!!programToRename} onOpenChange={(isOpen) => !isOpen && setProgramToRename(null)}>
