@@ -18,7 +18,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -40,7 +39,7 @@ type FormSchemaType = z.infer<typeof formSchema>;
 
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState(1);
+  const [step, setStep] useState(1);
   const router = useRouter();
   const { toast } = useToast();
   const { isFirebaseConfigured, refreshData } = useAuth();
@@ -61,7 +60,7 @@ export default function SignupPage() {
     },
   });
 
-  const handleNextStep = async (fieldsToValidate: (keyof FormSchemaType)[]) => {
+  const handleNextStep = async (fieldsToValidate: keyof FormSchemaType | (keyof FormSchemaType)[]) => {
     const isValid = await form.trigger(fieldsToValidate);
     if (isValid) {
         setStep(s => s + 1);
@@ -90,15 +89,14 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Create user profile document
       const targetDate = add(new Date(), { weeks: parseInt(values.transformationTarget) });
       
       const userProfile = {
         name: values.name,
         age: values.age,
         sex: values.sex,
-        initialWeight: values.initialWeight, // lbs
-        goalWeight: values.goalWeight, // lbs
+        initialWeight: values.initialWeight,
+        goalWeight: values.goalWeight,
         experience: values.experience,
         targetDate: targetDate.toISOString(),
       };
@@ -106,7 +104,6 @@ export default function SignupPage() {
       const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
       await setDoc(profileDocRef, userProfile);
 
-      // Create an initial bodyweight log with the initial weight
       const bodyWeightLog = {
           weight: values.initialWeight,
           date: new Date().toISOString(),
@@ -127,152 +124,180 @@ export default function SignupPage() {
     }
   };
   
-  const progressValue = (step / 4) * 100;
-
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-200px)] py-8">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-lg">
             <CardHeader>
                 <CardTitle>Create Your ProTracker Account</CardTitle>
-                <CardDescription>Tell us a bit about yourself to get started.</CardDescription>
+                <CardDescription>Let's get you set up with a personalized plan.</CardDescription>
             </CardHeader>
             <CardContent>
-                <Progress value={progressValue} className="mb-8" />
                 <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-8">
                     
                     {step === 1 && (
-                        <div className="space-y-6">
-                            <h3 className="text-lg font-medium">Personal Details</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <FormField control={form.control} name="name" render={({ field }) => (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <FormField control={form.control} name="name" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Name</FormLabel>
-                                    <FormControl><Input placeholder="Your Name" {...field} /></FormControl>
+                                    <FormLabel className="text-xl">First, what should we call you?</FormLabel>
+                                    <FormControl><Input placeholder="Your Name" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('name'); } }} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
-                                )} />
-                                <FormField control={form.control} name="age" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Age</FormLabel>
-                                    <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )} />
-                                <FormField control={form.control} name="sex" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Sex</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="male">Male</SelectItem>
-                                            <SelectItem value="female">Female</SelectItem>
-                                            <SelectItem value="other">Prefer not to say</SelectItem>
-                                        </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                            </div>
+                            )} />
                             <div className="flex justify-end">
-                                <Button type="button" onClick={() => handleNextStep(['name', 'age', 'sex'])}>Next</Button>
+                                <Button type="button" onClick={() => handleNextStep('name')}>Next</Button>
                             </div>
                         </div>
                     )}
 
                     {step === 2 && (
-                        <div className="space-y-6">
-                            <h3 className="text-lg font-medium">Your Stats</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="initialWeight" render={({ field }) => (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <FormField control={form.control} name="age" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Current Weight (lbs)</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g. 180" {...field} /></FormControl>
+                                    <FormLabel className="text-xl">How old are you?</FormLabel>
+                                    <FormControl><Input type="number" placeholder="25" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('age'); } }} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
-                                )} />
-                                <FormField control={form.control} name="goalWeight" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Goal Weight (lbs)</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g. 170" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )} />
-                            </div>
+                            )} />
                             <div className="flex justify-between">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
-                                <Button type="button" onClick={() => handleNextStep(['initialWeight', 'goalWeight'])}>Next</Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {step === 3 && (
-                        <div className="space-y-6">
-                            <h3 className="text-lg font-medium">Your Goals</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="experience" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Workout Experience</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select level..." /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="beginner">Beginner (0-2 years)</SelectItem>
-                                            <SelectItem value="intermediate">Intermediate (2-4 years)</SelectItem>
-                                            <SelectItem value="advanced">Advanced (5+ years)</SelectItem>
-                                        </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                                <FormField control={form.control} name="transformationTarget" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Target Timeline</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select duration..." /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="8">8 Weeks</SelectItem>
-                                            <SelectItem value="12">12 Weeks</SelectItem>
-                                            <SelectItem value="16">16 Weeks</SelectItem>
-                                        </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                            </div>
-                            <div className="flex justify-between">
-                                <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
-                                <Button type="button" onClick={() => handleNextStep(['experience', 'transformationTarget'])}>Next</Button>
+                                <Button type="button" onClick={() => handleNextStep('age')}>Next</Button>
                             </div>
                         </div>
                     )}
                     
-                    {step === 4 && (
-                        <div className="space-y-6">
-                            <h3 className="text-lg font-medium">Account Info</h3>
-                            <div className="space-y-4">
-                                <FormField control={form.control} name="email" render={({ field }) => (
+                    {step === 3 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <FormField control={form.control} name="sex" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl><Input placeholder="m@example.com" {...field} /></FormControl>
+                                    <FormLabel className="text-xl">What is your sex?</FormLabel>
+                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('sex');}} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="male">Male</SelectItem>
+                                        <SelectItem value="female">Female</SelectItem>
+                                        <SelectItem value="other">Prefer not to say</SelectItem>
+                                    </SelectContent>
+                                    </Select>
                                     <FormMessage />
                                 </FormItem>
-                                )} />
-                                <FormField control={form.control} name="password" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Password</FormLabel>
-                                    <FormControl><Input type="password" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )} />
-                                <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Confirm Password</FormLabel>
-                                    <FormControl><Input type="password" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )} />
+                            )} />
+                             <div className="flex justify-start">
+                                <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                             </div>
+                        </div>
+                    )}
+
+                    {step === 4 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <FormField control={form.control} name="initialWeight" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xl">What is your current weight? (lbs)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g. 180" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('initialWeight'); } }} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
                             <div className="flex justify-between">
+                                <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                                <Button type="button" onClick={() => handleNextStep('initialWeight')}>Next</Button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {step === 5 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <FormField control={form.control} name="goalWeight" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xl">What is your goal weight? (lbs)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g. 170" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('goalWeight'); } }} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <div className="flex justify-between">
+                                <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                                <Button type="button" onClick={() => handleNextStep('goalWeight')}>Next</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 6 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                             <FormField control={form.control} name="experience" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xl">What's your training experience?</FormLabel>
+                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('experience');}} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select level..." /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="beginner">Beginner (0-2 years)</SelectItem>
+                                        <SelectItem value="intermediate">Intermediate (2-4 years)</SelectItem>
+                                        <SelectItem value="advanced">Advanced (5+ years)</SelectItem>
+                                    </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <div className="flex justify-start">
+                                <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 7 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                             <FormField control={form.control} name="transformationTarget" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xl">Choose your target timeline.</FormLabel>
+                                    <Select onValueChange={(value) => {field.onChange(value); handleNextStep('transformationTarget');}} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select duration..." /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="8">8 Weeks</SelectItem>
+                                        <SelectItem value="12">12 Weeks</SelectItem>
+                                        <SelectItem value="16">16 Weeks</SelectItem>
+                                    </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <div className="flex justify-start">
+                                <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {step === 8 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                             <FormField control={form.control} name="email" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xl">What's your email address?</FormLabel>
+                                    <FormControl><Input type="email" placeholder="m@example.com" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('email'); } }} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <div className="flex justify-between">
+                                <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
+                                <Button type="button" onClick={() => handleNextStep('email')}>Next</Button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {step === 9 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <h3 className="text-xl font-medium">Last step, create your password.</h3>
+                            <FormField control={form.control} name="password" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl><Input type="password" {...field} className="h-12 text-lg" autoFocus /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )} />
+                            <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Confirm Password</FormLabel>
+                                <FormControl><Input type="password" {...field} className="h-12 text-lg" /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )} />
+                            <div className="flex justify-between pt-4">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="submit" disabled={isLoading}>
                                     {isLoading ? 'Creating account...' : 'Create Account & Start Tracking'}
