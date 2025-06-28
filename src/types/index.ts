@@ -126,6 +126,16 @@ export type FoodDBItem = {
     common_names: string[];
     unit_conversions: { [key: string]: number };
     search_terms?: string[];
+    isCustom?: boolean;
+};
+
+export type CustomFoodItem = {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
 };
 
 

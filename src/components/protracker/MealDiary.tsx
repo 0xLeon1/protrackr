@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import type { FoodLogEntry, MealType, FoodDBItem } from "@/types";
+import type { FoodLogEntry, MealType, FoodDBItem, CustomFoodItem } from "@/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -19,6 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
   } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast";
 
 
 function capitalizeWords(str: string): string {
@@ -34,12 +35,14 @@ const RECENT_FOODS_KEY = 'protracker-recent-foods';
 
 interface MealDiaryProps {
   logs: FoodLogEntry[];
+  customFoods: CustomFoodItem[];
   onAddMeal: (meal: Omit<FoodLogEntry, 'id' | 'date'>) => void;
   onDeleteMeal: (mealId: string) => void;
   onUpdateMeal: (meal: FoodLogEntry) => void;
+  onSaveCustomFood: (food: Omit<CustomFoodItem, 'id'>) => Promise<CustomFoodItem>;
 }
 
-export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal }: MealDiaryProps) {
+export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, onUpdateMeal, onSaveCustomFood }: MealDiaryProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
   const [editingMeal, setEditingMeal] = useState<FoodLogEntry | null>(null);
@@ -63,7 +66,26 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
       fats: '',
   });
 
-  const allFoods = foodDatabase;
+  const { toast } = useToast();
+
+  const searchableCustomFoods = useMemo(() => {
+    return customFoods.map(cf => ({
+        food_id: cf.id,
+        name: cf.name,
+        category: 'Custom',
+        serving_size: '1 serving',
+        calories: cf.calories,
+        protein_g: cf.protein,
+        carbs_g: cf.carbs,
+        fat_g: cf.fats,
+        fiber_g: 0,
+        common_names: [],
+        unit_conversions: {},
+        isCustom: true,
+    }));
+  }, [customFoods]);
+
+  const allFoods = useMemo(() => [...foodDatabase, ...searchableCustomFoods], [searchableCustomFoods]);
   
   useEffect(() => {
     try {
@@ -96,7 +118,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     const lowerCaseQuery = debouncedQuery.toLowerCase();
     const filtered = allFoods.filter(food => 
         food.name.toLowerCase().includes(lowerCaseQuery) ||
-        food.common_names.some(cn => cn.toLowerCase().includes(lowerCaseQuery))
+        (food.common_names && food.common_names.some(cn => cn.toLowerCase().includes(lowerCaseQuery)))
     );
     setSearchResults(filtered.slice(0, 50));
   }, [debouncedQuery, allFoods]);
@@ -128,14 +150,26 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     setActiveMealType(meal.mealType);
     setQuantity(meal.quantity);
     
-    if (meal.foodId) { // DB Food
+    if (meal.foodId) { // DB Food or Saved Custom Food
         const foodDbItem = allFoods.find(f => f.food_id === meal.foodId);
         if (foodDbItem) {
             setSelectedFood(foodDbItem);
             setServingUnit(meal.servingUnit);
             setIsAddingCustomFood(false);
+        } else {
+            // Food not found, treat as one-off
+             setIsAddingCustomFood(true);
+             if (meal.customBaseMacros) {
+                setCustomFoodData({
+                    name: meal.name,
+                    calories: String(meal.customBaseMacros.calories),
+                    protein: String(meal.customBaseMacros.protein),
+                    carbs: String(meal.customBaseMacros.carbs),
+                    fats: String(meal.customBaseMacros.fats),
+                });
+             }
         }
-    } else if (meal.customBaseMacros) { // Custom Food
+    } else if (meal.customBaseMacros) { // One-off custom food
         setCustomFoodData({
             name: meal.name,
             calories: String(meal.customBaseMacros.calories),
@@ -186,7 +220,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
     setIsDialogOpen(false);
   };
 
-  const handleSaveCustomMeal = () => {
+  const handleSaveCustomMeal = async () => {
     if (!activeMealType || !customFoodData.name.trim() || !customFoodData.calories) return;
     
     const numQuantity = Number(quantity);
@@ -199,23 +233,50 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal, onUpdateMeal 
         fats: Number(customFoodData.fats) || 0,
     };
 
-    const mealData = {
-      mealType: activeMealType,
-      name: customFoodData.name,
-      calories: baseMacros.calories * numQuantity,
-      protein: baseMacros.protein * numQuantity,
-      carbs: baseMacros.carbs * numQuantity,
-      fats: baseMacros.fats * numQuantity,
-      foodId: null,
-      quantity: numQuantity,
-      servingUnit: 'serving',
-      customBaseMacros: baseMacros,
-    };
-
     if (editingMeal) {
+        // We are just updating an existing log entry
+        const mealData = {
+          mealType: activeMealType,
+          name: customFoodData.name,
+          calories: baseMacros.calories * numQuantity,
+          protein: baseMacros.protein * numQuantity,
+          carbs: baseMacros.carbs * numQuantity,
+          fats: baseMacros.fats * numQuantity,
+          foodId: editingMeal.foodId,
+          quantity: numQuantity,
+          servingUnit: editingMeal.servingUnit,
+          customBaseMacros: editingMeal.foodId ? null : baseMacros,
+        };
         onUpdateMeal({ ...mealData, id: editingMeal.id, date: editingMeal.date });
     } else {
-        onAddMeal(mealData);
+        // Creating a NEW log entry AND a new custom food definition
+        try {
+            const newCustomFood = await onSaveCustomFood({
+                name: customFoodData.name,
+                calories: baseMacros.calories,
+                protein: baseMacros.protein,
+                carbs: baseMacros.carbs,
+                fats: baseMacros.fats,
+            });
+
+            const mealData = {
+              mealType: activeMealType,
+              name: newCustomFood.name,
+              calories: newCustomFood.calories * numQuantity,
+              protein: newCustomFood.protein * numQuantity,
+              carbs: newCustomFood.carbs * numQuantity,
+              fats: newCustomFood.fats * numQuantity,
+              foodId: newCustomFood.id,
+              quantity: numQuantity,
+              servingUnit: 'serving',
+              customBaseMacros: null,
+            };
+            onAddMeal(mealData);
+
+        } catch (error) {
+            console.error("Failed to save or log custom food:", error);
+            toast({ title: "Error", description: "Could not save custom food.", variant: "destructive" });
+        }
     }
     setIsDialogOpen(false);
   };

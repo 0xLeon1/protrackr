@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FoodLogEntry, MacroGoals, Recipe } from '@/types';
+import type { FoodLogEntry, CustomFoodItem, Recipe } from '@/types';
 import { startOfToday } from 'date-fns';
 import MacroTracker from "@/components/protracker/MacroTracker";
 import MealDiary from "@/components/protracker/MealDiary";
@@ -18,6 +18,7 @@ import { collection, getDocs, doc, addDoc, deleteDoc, updateDoc, setDoc } from '
 export default function NutritionPage() {
   const [allMealLogs, setAllMealLogs] = useState<FoodLogEntry[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [customFoods, setCustomFoods] = useState<CustomFoodItem[]>([]);
   const { toast } = useToast();
   const { user, loading, dataVersion } = useAuth();
   const router = useRouter();
@@ -42,6 +43,12 @@ export default function NutritionPage() {
             const recipesSnapshot = await getDocs(recipesCollection);
             const userRecipes = recipesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Recipe));
             setRecipes(userRecipes);
+
+            // Fetch Custom Foods
+            const customFoodsCollection = collection(db, 'users', user.uid, 'custom-foods');
+            const customFoodsSnapshot = await getDocs(customFoodsCollection);
+            const userCustomFoods = customFoodsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CustomFoodItem));
+            setCustomFoods(userCustomFoods);
         };
         fetchData();
     }
@@ -116,6 +123,17 @@ export default function NutritionPage() {
     setRecipes(recipes.filter(r => r.id !== recipeId));
   };
 
+  const handleSaveCustomFood = async (food: Omit<CustomFoodItem, 'id'>): Promise<CustomFoodItem> => {
+    if (!user) throw new Error("User not logged in");
+        
+    const customFoodsCollection = collection(db, 'users', user.uid, 'custom-foods');
+    const newDocRef = await addDoc(customFoodsCollection, food);
+    
+    const newCustomFood: CustomFoodItem = { ...food, id: newDocRef.id };
+    setCustomFoods(prev => [...prev, newCustomFood]);
+    return newCustomFood;
+  };
+
   const currentIntake = useMemo(() => {
     return todaysLogs.reduce((acc, log) => ({
       calories: acc.calories + log.calories,
@@ -141,10 +159,12 @@ export default function NutritionPage() {
         </div>
         <div className="lg:col-span-2 space-y-6">
           <MealDiary 
-            logs={todaysLogs} 
-            onAddMeal={handleAddMeal} 
+            logs={todaysLogs}
+            customFoods={customFoods}
+            onAddMeal={handleAddMeal}
             onDeleteMeal={handleDeleteMeal}
             onUpdateMeal={handleUpdateMeal}
+            onSaveCustomFood={handleSaveCustomFood}
           />
           <RecipeBook 
             recipes={recipes}
