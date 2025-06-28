@@ -672,10 +672,47 @@ export default function AnalyticsPage() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Cardio History</CardTitle>
-            <CardDescription>Review your past cardio sessions.</CardDescription>
-          </CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                    <CardTitle>Cardio History</CardTitle>
+                    <CardDescription>Review your past cardio sessions.</CardDescription>
+                </div>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="icon" className="shrink-0">
+                            <List className="h-4 w-4" />
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Full Cardio History</DialogTitle>
+                            <DialogDescription>All your recorded cardio sessions, sorted by most recent.</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-72">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Modality</TableHead>
+                                        <TableHead className="text-right">Duration</TableHead>
+                                        <TableHead className="text-right">Calories</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {cardioLogs.map(log => (
+                                        <TableRow key={log.id}>
+                                            <TableCell>{format(parseISO(log.date), 'MMM d, yyyy')}</TableCell>
+                                            <TableCell>{log.modality}</TableCell>
+                                            <TableCell className="text-right">{log.duration} min</TableCell>
+                                            <TableCell className="text-right">{log.calories} kcal</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </DialogContent>
+                </Dialog>
+            </CardHeader>
           <CardContent>
             {cardioLogs.length > 0 ? (
               <Accordion type="multiple" className="w-full space-y-2">
@@ -714,10 +751,45 @@ export default function AnalyticsPage() {
         </Card>
         
         <Card>
-          <CardHeader>
-            <CardTitle>Workout History</CardTitle>
-            <CardDescription>Review your past training sessions.</CardDescription>
-          </CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                    <CardTitle>Workout History</CardTitle>
+                    <CardDescription>Review your past training sessions.</CardDescription>
+                </div>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="icon" className="shrink-0">
+                            <List className="h-4 w-4" />
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Full Workout History</DialogTitle>
+                            <DialogDescription>All your completed workouts, sorted by most recent.</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-72">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Workout</TableHead>
+                                        <TableHead>Program</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {logs.map(log => (
+                                        <TableRow key={log.logId}>
+                                            <TableCell>{format(parseISO(log.completedAt), 'MMM d, yyyy')}</TableCell>
+                                            <TableCell className="font-medium">{log.workoutSnapshot.name}</TableCell>
+                                            <TableCell>{log.programName}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </DialogContent>
+                </Dialog>
+            </CardHeader>
           <CardContent>
             {logs.length > 0 ? (
               <Accordion type="multiple" className="w-full space-y-2">
