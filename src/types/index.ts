@@ -1,5 +1,6 @@
 
 
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -41,6 +42,14 @@ export type BodyWeightLogEntry = {
   id: string;
   weight: number;
   date: string; // ISO String
+};
+
+export type CardioLogEntry = {
+  id: string;
+  date: string; // ISO String
+  modality: string;
+  duration: number; // in minutes
+  calories: number;
 };
 
 export type CheckinLogEntry = {
@@ -137,6 +146,7 @@ export type CustomFoodItem = {
   carbs: number;
   fats: number;
 };
+
 
 
 

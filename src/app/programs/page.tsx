@@ -3,12 +3,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Program, Workout } from '@/types';
+import type { Program, Workout, CardioLogEntry } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
+import CardioLogger from "@/components/protracker/CardioLogger";
 import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit } from 'lucide-react';
 import {
   AlertDialog,
@@ -37,7 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ProgramsPage() {
@@ -45,7 +46,7 @@ export default function ProgramsPage() {
   const [pageIsLoading, setPageIsLoading] = useState(true);
   const [newProgramName, setNewProgramName] = useState('');
   const router = useRouter();
-  const { user, loading: authLoading, dataVersion } = useAuth();
+  const { user, loading: authLoading, dataVersion, refreshData } = useAuth();
   const { toast } = useToast();
 
   const [itemToRename, setItemToRename] = useState<{ type: 'program' | 'workout'; id: string; programId?: string; name: string; } | null>(null);
@@ -169,6 +170,31 @@ export default function ProgramsPage() {
 
     const newPrograms = programs.map(p => p.id === programId ? { ...p, workouts: updatedWorkouts } : p);
     setPrograms(newPrograms);
+  };
+  
+  const handleLogCardio = async (log: Omit<CardioLogEntry, 'id' | 'date'>) => {
+    if (!user) {
+        toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+        return;
+    }
+
+    try {
+        const newLogData = {
+            ...log,
+            date: new Date().toISOString(),
+        };
+        const cardioLogsCollection = collection(db, 'users', user.uid, 'cardio-logs');
+        await addDoc(cardioLogsCollection, newLogData);
+
+        toast({
+            title: "Cardio Logged!",
+            description: `${log.modality} for ${log.duration} minutes has been saved.`
+        });
+        refreshData(); // Triggers re-fetch on other pages
+    } catch (error) {
+        console.error("Error logging cardio:", error);
+        toast({ title: "Logging Failed", description: "Could not save your cardio session.", variant: "destructive" });
+    }
   };
 
   const handleStartWorkout = (workoutId: string) => {
@@ -347,27 +373,30 @@ export default function ProgramsPage() {
         </Accordion>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create a New Program</CardTitle>
-          <CardDescription>
-            Build a new workout program from scratch.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Input 
-              placeholder="e.g., My Awesome Program" 
-              value={newProgramName}
-              onChange={(e) => setNewProgramName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
-            />
-            <Button onClick={handleAddProgram}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Program
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Create a New Program</CardTitle>
+            <CardDescription>
+              Build a new workout program from scratch.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Input 
+                placeholder="e.g., My Awesome Program" 
+                value={newProgramName}
+                onChange={(e) => setNewProgramName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
+              />
+              <Button onClick={handleAddProgram}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Program
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <CardioLogger onLogCardio={handleLogCardio} />
+      </div>
       
       {/* Rename Dialog */}
       <Dialog open={!!itemToRename} onOpenChange={(isOpen) => !isOpen && setItemToRename(null)}>

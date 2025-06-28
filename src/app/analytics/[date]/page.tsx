@@ -6,12 +6,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import type { FoodLogEntry, WorkoutLogEntry, BodyWeightLogEntry, SleepLogEntry, CheckinLogEntry } from '@/types';
+import type { FoodLogEntry, WorkoutLogEntry, BodyWeightLogEntry, SleepLogEntry, CheckinLogEntry, CardioLogEntry } from '@/types';
 import { format, parseISO } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Dumbbell, UtensilsCrossed, Scale, Bed, HeartPulse } from 'lucide-react';
+import { ArrowLeft, Loader2, Dumbbell, UtensilsCrossed, Scale, Bed, HeartPulse, Zap } from 'lucide-react';
 
 interface DailyData {
   weight?: number;
@@ -22,6 +22,8 @@ interface DailyData {
   trained: boolean;
   sleep?: number;
   energy?: number;
+  cardioDuration?: number;
+  cardioCalories?: number;
 }
 
 export default function DailyAnalyticsPage() {
@@ -104,6 +106,20 @@ export default function DailyAnalyticsPage() {
               dailyData.energy = checkinLog.energy;
           }
           
+          // Fetch cardio logs
+          const cardioQuery = query(collection(db, 'users', user.uid, 'cardio-logs'), where('date', '>=', isoStart), where('date', '<=', isoEnd));
+          const cardioSnapshot = await getDocs(cardioQuery);
+          if (!cardioSnapshot.empty) {
+              const { duration, calories } = cardioSnapshot.docs.reduce((acc, doc) => {
+                  const log = doc.data() as CardioLogEntry;
+                  acc.duration += log.duration;
+                  acc.calories += log.calories;
+                  return acc;
+              }, { duration: 0, calories: 0 });
+              dailyData.cardioDuration = duration;
+              dailyData.cardioCalories = calories;
+          }
+
           setData(dailyData);
 
         } catch (error) {
@@ -197,6 +213,23 @@ export default function DailyAnalyticsPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">{typeof data.energy !== 'undefined' ? `${data.energy} / 5` : 'Not Logged'}</div>
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Cardio</CardTitle>
+                    <Zap className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">{data.cardioDuration ? `${data.cardioDuration} min` : 'Not Logged'}</div>
+                    {data.cardioCalories ? (
+                        <p className="text-xs text-muted-foreground">
+                            {data.cardioCalories} kcal burned
+                        </p>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">No cardio logged.</p>
+                    )}
                 </CardContent>
             </Card>
 

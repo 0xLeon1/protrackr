@@ -2,14 +2,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry, SleepLogEntry } from "@/types";
+import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry, SleepLogEntry, CardioLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { History, TrendingUp, Scale, Bed, Loader2, List, UtensilsCrossed } from "lucide-react";
+import { History, TrendingUp, Scale, Bed, Loader2, List, UtensilsCrossed, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -68,6 +68,7 @@ const renderCustomizedLabel = (props: any) => {
 
 export default function AnalyticsPage() {
   const [logs, setLogs] = useState<WorkoutLogEntry[]>([]);
+  const [cardioLogs, setCardioLogs] = useState<CardioLogEntry[]>([]);
   const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
   const [bodyWeightLogs, setBodyWeightLogs] = useState<BodyWeightLogEntry[]>([]);
   const [sleepLogs, setSleepLogs] = useState<SleepLogEntry[]>([]);
@@ -99,6 +100,13 @@ export default function AnalyticsPage() {
         const sortedLogs = [...workoutLogs].sort((a, b) => parseISO(b.completedAt).getTime() - parseISO(a.completedAt).getTime());
         setLogs(sortedLogs);
         calculateDailyVolume(sortedLogs);
+        
+        // --- Cardio Logs ---
+        const cardioLogsCollection = collection(db, 'users', user.uid, 'cardio-logs');
+        const cardioLogsSnapshot = await getDocs(cardioLogsCollection);
+        const userCardioLogs: CardioLogEntry[] = cardioLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CardioLogEntry));
+        const sortedCardioLogs = [...userCardioLogs].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+        setCardioLogs(sortedCardioLogs);
         
         // --- Body Weight Logs ---
         const bodyWeightCollection = collection(db, 'users', user.uid, 'bodyweight-logs');
@@ -661,6 +669,48 @@ export default function AnalyticsPage() {
             </Card>
         </div>
       </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Cardio History</CardTitle>
+          <CardDescription>Review your past cardio sessions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {cardioLogs.length > 0 ? (
+            <Accordion type="multiple" className="w-full space-y-2">
+              {cardioLogs.map((log) => (
+                <AccordionItem value={log.id} key={log.id} className="border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                  <AccordionTrigger className="px-4 text-base font-medium hover:no-underline">
+                    <div className="flex flex-col items-start text-left">
+                        <span className="font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-primary"/>{log.modality}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground mr-4 font-normal">{format(parseISO(log.date), 'MMM d, yyyy')}</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="p-4 bg-background rounded-b-lg">
+                    <div className="flex justify-around text-center">
+                        <div>
+                            <p className="text-muted-foreground text-sm">Duration</p>
+                            <p className="font-semibold text-lg">{log.duration} min</p>
+                        </div>
+                         <div>
+                            <p className="text-muted-foreground text-sm">Calories</p>
+                            <p className="font-semibold text-lg">{log.calories} kcal</p>
+                        </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          ) : (
+             <div className="flex flex-col items-center justify-center p-12 text-center">
+               <Zap className="w-16 h-16 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">
+                Your completed cardio sessions will appear here.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       
       <Card>
         <CardHeader>
