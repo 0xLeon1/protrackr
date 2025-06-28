@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { PlusCircle, Trash2, Search, Loader2 } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
     Select,
@@ -42,64 +42,59 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
 
-  // New state for search functionality
+  // State for search functionality
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodDBItem[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedFood, setSelectedFood] = useState<FoodDBItem | null>(null);
   const [quantity, setQuantity] = useState<number | string>(1);
-  const [servingUnit, setServingUnit] = useState('default'); // 'default' will be the food's serving_size
+  const [servingUnit, setServingUnit] = useState('default');
+  
+  const [allFoods, setAllFoods] = useState<FoodDBItem[]>([]);
+  const [isFetchingFoods, setIsFetchingFoods] = useState(true);
 
-  // Debounce search query
+  // Fetch all food items once on component mount
   useEffect(() => {
-    const search = async () => {
-      if (!db) return;
-      const terms = searchQuery.toLowerCase().trim().split(' ').filter(t => t);
-      if (terms.length === 0) {
-        setSearchResults([]);
+    const fetchAllFoods = async () => {
+      if (!db) {
+        setIsFetchingFoods(false);
         return;
       }
-      
-      setIsSearching(true);
+      setIsFetchingFoods(true);
       try {
         const foodCollection = collection(db, 'foods');
-        // Query based on the first term
-        const q = query(
-          foodCollection,
-          where('search_terms', 'array-contains', terms[0]),
-          limit(30) // fetch more to filter on client
-        );
-        
-        const querySnapshot = await getDocs(q);
-        let results = querySnapshot.docs.map(doc => doc.data() as FoodDBItem);
-
-        // If more than one search term, filter results on the client
-        if (terms.length > 1) {
-          const remainingTerms = terms.slice(1);
-          results = results.filter(food => {
-            // Check if all other terms are present in the food's search_terms array
-            return remainingTerms.every(term => food.search_terms?.includes(term));
-          });
-        }
-        
-        setSearchResults(results);
+        const querySnapshot = await getDocs(foodCollection);
+        const foods = querySnapshot.docs.map(doc => doc.data() as FoodDBItem);
+        setAllFoods(foods);
       } catch (error) {
-        console.error("Error searching for food:", error);
+        console.error("Error fetching all foods:", error);
       } finally {
-        setIsSearching(false);
+        setIsFetchingFoods(false);
       }
     };
+    fetchAllFoods();
+  }, []);
 
-    const debounceTimeout = setTimeout(() => {
-        if (searchQuery.trim().length > 1) {
-          search();
-        } else {
-          setSearchResults([]);
-        }
-    }, 300); // 300ms debounce
+  // Perform client-side search when query or food list changes
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
 
-    return () => clearTimeout(debounceTimeout);
-  }, [searchQuery]);
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    const queryTerms = lowerCaseQuery.split(' ').filter(t => t);
+
+    const filteredFoods = allFoods.filter(food => {
+      const foodName = food.name.toLowerCase();
+      const commonNames = food.common_names.map(cn => cn.toLowerCase()).join(' ');
+      const searchableText = `${foodName} ${commonNames}`;
+      
+      // Check if all words in query are present in searchable text
+      return queryTerms.every(term => searchableText.includes(term));
+    });
+    
+    setSearchResults(filteredFoods.slice(0, 30));
+  }, [searchQuery, allFoods]);
 
 
   // When dialog closes, reset everything
@@ -108,7 +103,6 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
       setActiveMealType(null);
       setSearchQuery('');
       setSearchResults([]);
-      setIsSearching(false);
       setSelectedFood(null);
       setQuantity(1);
       setServingUnit('default');
@@ -248,7 +242,7 @@ export default function MealDiary({ logs, onAddMeal, onDeleteMeal }: MealDiaryPr
                     />
                 </div>
                 <div className="h-60 overflow-y-auto pr-2 -mr-2 space-y-2">
-                    {isSearching ? (
+                    {isFetchingFoods ? (
                         <div className="flex justify-center items-center h-full">
                             <Loader2 className="w-6 h-6 animate-spin text-primary"/>
                         </div>
