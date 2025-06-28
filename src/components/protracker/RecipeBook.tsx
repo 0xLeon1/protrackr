@@ -6,8 +6,8 @@ import type { Recipe, MealType, FoodLogEntry } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Trash2, Edit, FilePlus, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { PlusCircle, Trash2, Edit, FilePlus } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
 import RecipeEditorDialog from "./RecipeEditorDialog";
 import {
@@ -27,7 +27,9 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-  } from "@/components/ui/select"
+  } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
 
@@ -46,6 +48,7 @@ export default function RecipeBook({ recipes, onAddMeal, onSaveRecipe, onUpdateR
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
   const [recipeToLog, setRecipeToLog] = useState<Recipe | null>(null);
   const [logToMealType, setLogToMealType] = useState<MealType>('Breakfast');
+  const [logQuantity, setLogQuantity] = useState<number | string>(1);
 
 
   const handleCreateNew = () => {
@@ -69,11 +72,15 @@ export default function RecipeBook({ recipes, onAddMeal, onSaveRecipe, onUpdateR
 
   const handleOpenLogDialog = (recipe: Recipe) => {
     setRecipeToLog(recipe);
+    setLogQuantity(1);
     setIsLogDialogOpen(true);
   };
 
   const handleConfirmLogRecipe = () => {
-    if (!recipeToLog) return;
+    if (!recipeToLog || !logQuantity) return;
+
+    const numQuantity = Number(logQuantity);
+    if (isNaN(numQuantity) || numQuantity <= 0) return;
     
     const totalMacros = recipeToLog.ingredients.reduce((acc, ing) => {
       acc.calories += ing.calories;
@@ -85,16 +92,25 @@ export default function RecipeBook({ recipes, onAddMeal, onSaveRecipe, onUpdateR
 
     const servings = recipeToLog.servings || 1;
 
-    const mealLog = {
+    const macrosPerServing = {
+        calories: totalMacros.calories / servings,
+        protein: totalMacros.protein / servings,
+        carbs: totalMacros.carbs / servings,
+        fats: totalMacros.fats / servings,
+    };
+
+    const mealLog: Omit<FoodLogEntry, 'id' | 'date'> = {
       mealType: logToMealType,
-      name: `${recipeToLog.name} (1 serving)`,
-      calories: totalMacros.calories / servings,
-      protein: totalMacros.protein / servings,
-      carbs: totalMacros.carbs / servings,
-      fats: totalMacros.fats / servings,
-      quantity: 1,
-      servingUnit: "serving",
-    }
+      name: recipeToLog.name,
+      calories: macrosPerServing.calories * numQuantity,
+      protein: macrosPerServing.protein * numQuantity,
+      carbs: macrosPerServing.carbs * numQuantity,
+      fats: macrosPerServing.fats * numQuantity,
+      quantity: numQuantity,
+      servingUnit: "serving(s)",
+      foodId: null,
+      customBaseMacros: macrosPerServing,
+    };
 
     onAddMeal(mealLog);
     setIsLogDialogOpen(false);
@@ -214,29 +230,44 @@ export default function RecipeBook({ recipes, onAddMeal, onSaveRecipe, onUpdateR
       
       {/* Log Recipe Dialog */}
       <Dialog open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
-        <DialogContent className="sm:max-w-xs">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Log Recipe</DialogTitle>
             <DialogDescription>
-              Add 1 serving of "{recipeToLog?.name}" to which meal?
+              Add servings of "{recipeToLog?.name}" to your meal log.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Select value={logToMealType} onValueChange={(v) => setLogToMealType(v as MealType)}>
-                <SelectTrigger>
-                    <SelectValue placeholder="Select a meal" />
-                </SelectTrigger>
-                <SelectContent>
-                    {MEAL_TYPES.map(mealType => (
-                        <SelectItem key={mealType} value={mealType}>{mealType}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+                <Label htmlFor="log-quantity">Number of Servings</Label>
+                <Input
+                    id="log-quantity"
+                    type="number"
+                    value={logQuantity}
+                    onChange={(e) => setLogQuantity(e.target.value)}
+                    min="0.1"
+                    step="0.1"
+                />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="log-meal-type">Meal</Label>
+                <Select value={logToMealType} onValueChange={(v) => setLogToMealType(v as MealType)}>
+                    <SelectTrigger id="log-meal-type">
+                        <SelectValue placeholder="Select a meal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {MEAL_TYPES.map(mealType => (
+                            <SelectItem key={mealType} value={mealType}>{mealType}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
-          <Button onClick={handleConfirmLogRecipe} className="w-full">
-            Log to {logToMealType}
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
+          <DialogFooter>
+            <Button onClick={handleConfirmLogRecipe} className="w-full">
+                Log to {logToMealType}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
