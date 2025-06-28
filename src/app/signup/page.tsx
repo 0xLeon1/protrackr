@@ -130,8 +130,8 @@ export default function SignupPage() {
             <CardHeader>
                 {step < 8 ? (
                     <>
-                        <CardTitle>Let's Build Your Plan</CardTitle>
-                        <CardDescription>Tell us a bit about yourself to create your personalized gameplan.</CardDescription>
+                        <CardTitle>Start Your Transformation</CardTitle>
+                        <CardDescription>Welcome! Let's build your personalized gameplan to achieve your goals.</CardDescription>
                     </>
                 ) : (
                     <>
