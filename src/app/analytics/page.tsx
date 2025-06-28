@@ -670,109 +670,111 @@ export default function AnalyticsPage() {
         </div>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Cardio History</CardTitle>
-          <CardDescription>Review your past cardio sessions.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {cardioLogs.length > 0 ? (
-            <Accordion type="multiple" className="w-full space-y-2">
-              {cardioLogs.map((log) => (
-                <AccordionItem value={log.id} key={log.id} className="border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                  <AccordionTrigger className="px-4 text-base font-medium hover:no-underline">
-                    <div className="flex flex-col items-start text-left">
-                        <span className="font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-primary"/>{log.modality}</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground mr-4 font-normal">{format(parseISO(log.date), 'MMM d, yyyy')}</span>
-                  </AccordionTrigger>
-                  <AccordionContent className="p-4 bg-background rounded-b-lg">
-                    <div className="flex justify-around text-center">
-                        <div>
-                            <p className="text-muted-foreground text-sm">Duration</p>
-                            <p className="font-semibold text-lg">{log.duration} min</p>
-                        </div>
-                         <div>
-                            <p className="text-muted-foreground text-sm">Calories</p>
-                            <p className="font-semibold text-lg">{log.calories} kcal</p>
-                        </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          ) : (
-             <div className="flex flex-col items-center justify-center p-12 text-center">
-               <Zap className="w-16 h-16 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Your completed cardio sessions will appear here.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Workout History</CardTitle>
-          <CardDescription>Review your past training sessions.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {logs.length > 0 ? (
-            <Accordion type="multiple" className="w-full space-y-2">
-              {logs.map((log) => (
-                <AccordionItem value={log.logId} key={log.logId} className="border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                  <AccordionTrigger className="px-4 text-base font-medium hover:no-underline">
-                    <div className="flex flex-col items-start text-left">
-                        <span className="font-semibold">{log.workoutSnapshot.name}</span>
-                        <span className="text-sm text-muted-foreground">{log.programName}</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground mr-4 font-normal">{format(parseISO(log.completedAt), 'MMM d, yyyy')}</span>
-                  </AccordionTrigger>
-                  <AccordionContent className="p-2 md:p-4 bg-background rounded-b-lg">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-2/5">Exercise</TableHead>
-                          <TableHead className="text-center">Set</TableHead>
-                          <TableHead className="text-center">Reps</TableHead>
-                          <TableHead className="text-center">Weight (lbs)</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {log.workoutSnapshot.exercises.map((exercise) => {
-                          const completedSets = exercise.performance?.filter(set => set.completed) || [];
-                          if (completedSets.length === 0) return null;
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Cardio History</CardTitle>
+            <CardDescription>Review your past cardio sessions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {cardioLogs.length > 0 ? (
+              <Accordion type="multiple" className="w-full space-y-2">
+                {cardioLogs.map((log) => (
+                  <AccordionItem value={log.id} key={log.id} className="border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                    <AccordionTrigger className="px-4 text-base font-medium hover:no-underline">
+                      <div className="flex flex-col items-start text-left">
+                          <span className="font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-primary"/>{log.modality}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground mr-4 font-normal">{format(parseISO(log.date), 'MMM d, yyyy')}</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="p-4 bg-background rounded-b-lg">
+                      <div className="flex justify-around text-center">
+                          <div>
+                              <p className="text-muted-foreground text-sm">Duration</p>
+                              <p className="font-semibold text-lg">{log.duration} min</p>
+                          </div>
+                          <div>
+                              <p className="text-muted-foreground text-sm">Calories</p>
+                              <p className="font-semibold text-lg">{log.calories} kcal</p>
+                          </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-12 text-center">
+                <Zap className="w-16 h-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  Your completed cardio sessions will appear here.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Workout History</CardTitle>
+            <CardDescription>Review your past training sessions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {logs.length > 0 ? (
+              <Accordion type="multiple" className="w-full space-y-2">
+                {logs.map((log) => (
+                  <AccordionItem value={log.logId} key={log.logId} className="border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                    <AccordionTrigger className="px-4 text-base font-medium hover:no-underline">
+                      <div className="flex flex-col items-start text-left">
+                          <span className="font-semibold">{log.workoutSnapshot.name}</span>
+                          <span className="text-sm text-muted-foreground">{log.programName}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground mr-4 font-normal">{format(parseISO(log.completedAt), 'MMM d, yyyy')}</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="p-2 md:p-4 bg-background rounded-b-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-2/5">Exercise</TableHead>
+                            <TableHead className="text-center">Set</TableHead>
+                            <TableHead className="text-center">Reps</TableHead>
+                            <TableHead className="text-center">Weight (lbs)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {log.workoutSnapshot.exercises.map((exercise) => {
+                            const completedSets = exercise.performance?.filter(set => set.completed) || [];
+                            if (completedSets.length === 0) return null;
 
-                          return completedSets.map((set, setIndex) => (
-                            <TableRow key={`${exercise.id}-${set.id}`}>
-                              {setIndex === 0 ? (
-                                <TableCell rowSpan={completedSets.length} className="font-medium align-top pt-4">
-                                  {exercise.name}
-                                </TableCell>
-                              ) : null}
-                              <TableCell className="text-center">{setIndex + 1}</TableCell>
-                              <TableCell className="text-center">{set.reps}</TableCell>
-                              <TableCell className="text-center">{set.weight}</TableCell>
-                            </TableRow>
-                          ))
-                        })}
-                      </TableBody>
-                    </Table>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          ) : (
-             <div className="flex flex-col items-center justify-center p-12 text-center">
-               <History className="w-16 h-16 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Your completed workouts will appear here.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                            return completedSets.map((set, setIndex) => (
+                              <TableRow key={`${exercise.id}-${set.id}`}>
+                                {setIndex === 0 ? (
+                                  <TableCell rowSpan={completedSets.length} className="font-medium align-top pt-4">
+                                    {exercise.name}
+                                  </TableCell>
+                                ) : null}
+                                <TableCell className="text-center">{setIndex + 1}</TableCell>
+                                <TableCell className="text-center">{set.reps}</TableCell>
+                                <TableCell className="text-center">{set.weight}</TableCell>
+                              </TableRow>
+                            ))
+                          })}
+                        </TableBody>
+                      </Table>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-12 text-center">
+                <History className="w-16 h-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  Your completed workouts will appear here.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={isMacroDetailOpen} onOpenChange={setIsMacroDetailOpen}>
         <DialogContent className="max-w-3xl">
