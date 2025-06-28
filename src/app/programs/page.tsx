@@ -27,6 +27,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -118,7 +119,7 @@ export default function ProgramsPage() {
     
     const newWorkout: Workout = {
       id: `work-${Date.now()}`,
-      name: 'New Workout',
+      name: 'New Day',
       exercises: []
     };
     
@@ -243,10 +244,15 @@ export default function ProgramsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="end">
+                        <DropdownMenuItem onSelect={() => handleAddWorkout(program.id)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            <span>Add Day</span>
+                        </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => { setProgramToRename(program); setNewProgramRename(program.name); }}>
                             <Edit className="mr-2 h-4 w-4" />
                             <span>Rename</span>
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
@@ -274,12 +280,7 @@ export default function ProgramsPage() {
                 </AccordionTrigger>
                 <AccordionContent className="p-4 border-t">
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="font-semibold">Workouts</h3>
-                        <Button onClick={() => handleAddWorkout(program.id)} variant="outline" size="sm">
-                          <PlusCircle className="mr-2 h-4 w-4" /> Add Workout
-                        </Button>
-                    </div>
+                    <h3 className="font-semibold">Workouts</h3>
                    
                     {program.workouts.length > 0 ? (
                       <div className="space-y-3">
@@ -351,7 +352,7 @@ export default function ProgramsPage() {
                     ) : (
                       <div className="text-sm text-center text-muted-foreground py-4 border rounded-lg border-dashed">
                         <p>This program has no workouts yet.</p>
-                        <p>Click "Add Workout" to get started.</p>
+                        <p>Use the menu to add a day to get started.</p>
                       </div>
                     )}
                   </div>
@@ -446,5 +447,7 @@ export default function ProgramsPage() {
     </div>
   );
 }
+
+    
 
     
