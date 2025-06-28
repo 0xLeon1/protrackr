@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation';
 import { signOut, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useAuth } from '@/contexts/auth-context';
 import { auth, db } from '@/lib/firebase';
-import { collection, getDocs, writeBatch, doc, deleteDoc } from 'firebase/firestore';
-import React, { useState } from 'react';
+import { collection, getDocs, writeBatch, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
+import type { UserProfile } from '@/types';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { Dumbbell, LogOut, Trash2, Loader2, User as UserIcon } from "lucide-react";
+import { Dumbbell, LogOut, Trash2, Loader2, User as UserIcon, Edit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,10 +38,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function Header() {
   const { user, profile, isFirebaseConfigured, refreshData } = useAuth();
@@ -51,6 +54,13 @@ export default function Header() {
   const [isResetting, setIsResetting] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [editableProfile, setEditableProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    if (isProfileDialogOpen && profile) {
+      setEditableProfile(profile);
+    }
+  }, [isProfileDialogOpen, profile]);
 
   const handleLogout = async () => {
     if (!isFirebaseConfigured || !auth) {
@@ -79,7 +89,7 @@ export default function Header() {
         // 2. Delete all user data from Firestore
         toast({ title: "Deleting data...", description: "This may take a moment."});
 
-        const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs'];
+        const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes'];
         
         for (const coll of collectionsToDelete) {
             const collRef = collection(db, 'users', user.uid, coll);
@@ -92,10 +102,12 @@ export default function Header() {
                 await batch.commit();
             }
         }
-
-        // Delete the goals document separately
-        const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
-        await deleteDoc(goalsDocRef).catch(() => {}); // Fails silently if doc doesn't exist
+        
+        const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
+        for (const docId of dataDocsToDelete) {
+            const docRef = doc(db, 'users', user.uid, 'data', docId);
+            await deleteDoc(docRef).catch(() => {});
+        }
         
         toast({ title: "Success!", description: "All your account data has been reset." });
         
@@ -116,6 +128,28 @@ export default function Header() {
         });
     } finally {
         setIsResetting(false);
+    }
+  };
+
+  const handleProfileChange = (field: keyof UserProfile, value: string | number) => {
+    if (editableProfile) {
+        setEditableProfile({ ...editableProfile, [field]: value });
+    }
+  };
+  
+  const handleSaveChanges = async () => {
+    if (!user || !db || !editableProfile) return;
+
+    try {
+        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+        await setDoc(profileDocRef, editableProfile, { merge: true });
+        
+        refreshData();
+        toast({ title: "Profile Updated", description: "Your changes have been saved." });
+        setIsProfileDialogOpen(false);
+    } catch (error) {
+        console.error("Error updating profile:", error);
+        toast({ title: "Error", description: "Could not save your changes.", variant: "destructive" });
     }
   };
 
@@ -193,43 +227,58 @@ export default function Header() {
 
               <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Your Profile</DialogTitle>
-                    <DialogDescription>This is the profile information you provided at sign up.</DialogDescription>
+                    <DialogTitle>Edit Your Profile</DialogTitle>
+                    <DialogDescription>Make changes to your profile. Click save when you're done.</DialogDescription>
                 </DialogHeader>
-                {profile && (
-                  <div className="pt-4">
-                    <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">Name</p>
-                            <p className="font-medium">{profile.name}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">Age</p>
-                            <p className="font-medium">{profile.age}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">Gender</p>
-                            <p className="font-medium capitalize">{profile.gender}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">Start Weight</p>
-                            <p className="font-medium">{profile.initialWeight} lbs</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">Goal Weight</p>
-                            <p className="font-medium">{profile.goalWeight} lbs</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-muted-foreground">Experience</p>
-                            <p className="font-medium capitalize">{profile.experience}</p>
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                            <p className="text-muted-foreground">Target Date</p>
-                            <p className="font-medium">{format(parseISO(profile.targetDate), 'MMM d, yyyy')}</p>
-                        </div>
+                {editableProfile && (
+                  <div className="pt-4 grid gap-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">Name</Label>
+                        <Input id="name" value={editableProfile.name} onChange={(e) => handleProfileChange('name', e.target.value)} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="age" className="text-right">Age</Label>
+                        <Input id="age" type="number" value={editableProfile.age} onChange={(e) => handleProfileChange('age', e.target.value)} className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="gender" className="text-right">Gender</Label>
+                        <Select value={editableProfile.gender} onValueChange={(value) => handleProfileChange('gender', value)}>
+                            <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="male">Male</SelectItem>
+                                <SelectItem value="female">Female</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="initialWeight" className="text-right">Start Weight</Label>
+                        <Input id="initialWeight" type="number" value={editableProfile.initialWeight} onChange={(e) => handleProfileChange('initialWeight', e.target.value)} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="goalWeight" className="text-right">Goal Weight</Label>
+                        <Input id="goalWeight" type="number" value={editableProfile.goalWeight} onChange={(e) => handleProfileChange('goalWeight', e.target.value)} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="experience" className="text-right">Experience</Label>
+                         <Select value={editableProfile.experience} onValueChange={(value) => handleProfileChange('experience', value)}>
+                            <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="beginner">Beginner</SelectItem>
+                                <SelectItem value="intermediate">Intermediate</SelectItem>
+                                <SelectItem value="advanced">Advanced</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right text-muted-foreground">Target Date</Label>
+                        <p className="col-span-3 text-sm font-medium text-muted-foreground">{format(parseISO(editableProfile.targetDate), 'MMM d, yyyy')}</p>
                     </div>
                   </div>
                 )}
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsProfileDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSaveChanges}>Save Changes</Button>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
           </>
