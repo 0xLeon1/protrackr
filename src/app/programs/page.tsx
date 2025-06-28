@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
 import CardioLogger from "@/components/protracker/CardioLogger";
-import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit } from 'lucide-react';
+import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit, Zap } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -397,7 +397,20 @@ export default function ProgramsPage() {
         </Accordion>
       </div>
 
-      <CardioLogger onLogCardio={handleLogCardio} />
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="cardio-logger" className="border rounded-lg bg-card">
+          <AccordionTrigger className="p-4 w-full text-lg font-semibold flex justify-between hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <span>Log Cardio Session</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="p-4 pt-0">
+            <p className="text-muted-foreground mb-4">Record a one-off cardio workout.</p>
+            <CardioLogger onLogCardio={handleLogCardio} />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
       
       {/* Program Rename Dialog */}
       <Dialog open={!!programToRename} onOpenChange={(isOpen) => !isOpen && setProgramToRename(null)}>
@@ -458,7 +471,3 @@ export default function ProgramsPage() {
     </div>
   );
 }
-
-    
-
-    
