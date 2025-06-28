@@ -20,6 +20,9 @@ import {
     SelectValue,
   } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 
 function capitalizeWords(str: string): string {
@@ -31,7 +34,6 @@ function capitalizeWords(str: string): string {
 }
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
-const RECENT_FOODS_KEY = 'protracker-recent-foods';
 
 interface MealDiaryProps {
   logs: FoodLogEntry[];
@@ -43,6 +45,7 @@ interface MealDiaryProps {
 }
 
 export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, onUpdateMeal, onSaveCustomFood }: MealDiaryProps) {
+  const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType | null>(null);
   const [editingMeal, setEditingMeal] = useState<FoodLogEntry | null>(null);
@@ -88,16 +91,20 @@ export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, 
   const allFoods = useMemo(() => [...foodDatabase, ...searchableCustomFoods], [searchableCustomFoods]);
   
   useEffect(() => {
-    try {
-      const storedRecents = localStorage.getItem(RECENT_FOODS_KEY);
-      if (storedRecents) {
-        setRecentFoods(JSON.parse(storedRecents));
-      }
-    } catch (error) {
-      console.error("Failed to parse recent foods from localStorage", error);
-      setRecentFoods([]);
-    }
-  }, []);
+    if (!user) return;
+    
+    const fetchRecentFoods = async () => {
+        const recentsDocRef = doc(db, 'users', user.uid, 'data', 'recent-foods');
+        const docSnap = await getDoc(recentsDocRef);
+        if (docSnap.exists() && docSnap.data().recents) {
+            setRecentFoods(docSnap.data().recents);
+        } else {
+            setRecentFoods([]);
+        }
+    };
+    fetchRecentFoods();
+
+  }, [user]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -182,8 +189,8 @@ export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, 
     setIsDialogOpen(true);
   };
   
-  const handleSaveMeal = () => {
-    if (!activeMealType || !selectedFood || !quantity) return;
+  const handleSaveMeal = async () => {
+    if (!activeMealType || !selectedFood || !quantity || !user) return;
       
     const numQuantity = Number(quantity);
     if (isNaN(numQuantity) || numQuantity <= 0) return;
@@ -214,7 +221,11 @@ export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, 
             ...recentFoods.filter(food => food.food_id !== selectedFood.food_id)
         ].slice(0, 5);
         setRecentFoods(updatedRecents);
-        localStorage.setItem(RECENT_FOODS_KEY, JSON.stringify(updatedRecents));
+        
+        // Save recents to Firestore
+        const recentsDocRef = doc(db, 'users', user.uid, 'data', 'recent-foods');
+        await setDoc(recentsDocRef, { recents: updatedRecents });
+
         onAddMeal(mealData);
     }
     setIsDialogOpen(false);
@@ -381,7 +392,7 @@ export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, 
                   <Card className="p-4 bg-muted/50">
                       <CardTitle className="text-lg">{capitalizeWords(selectedFood.name)}</CardTitle>
                       <CardDescription>
-                          {`Per ${selectedFood.serving_size}: ${selectedFood.calories}kcal, ${selectedFood.protein_g}g P, ${selectedFood.carbs_g}g C, ${selectedFood.fat_g}g F`}
+                          {`Per ${selectedFood.serving_size}: ${Math.round(selectedFood.calories)}kcal, ${selectedFood.protein_g}g P, ${selectedFood.carbs_g}g C, ${selectedFood.fat_g}g F`}
                       </CardDescription>
                   </Card>
                   
@@ -445,7 +456,7 @@ export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, 
                         searchResults.map(food => (
                             <div key={food.food_id} className="p-3 rounded-md hover:bg-muted cursor-pointer" onClick={() => setSelectedFood(food)}>
                                 <p className="font-medium">{capitalizeWords(food.name)}</p>
-                                <p className="text-sm text-muted-foreground">{food.calories} kcal per {food.serving_size}</p>
+                                <p className="text-sm text-muted-foreground">{Math.round(food.calories)} kcal per {food.serving_size}</p>
                             </div>
                         ))
                     ) : debouncedQuery.trim().length > 1 ? (
@@ -465,7 +476,7 @@ export default function MealDiary({ logs, customFoods, onAddMeal, onDeleteMeal, 
                             {recentFoods.map(food => (
                                 <div key={food.food_id} className="p-3 rounded-md hover:bg-muted cursor-pointer" onClick={() => setSelectedFood(food)}>
                                     <p className="font-medium">{capitalizeWords(food.name)}</p>
-                                    <p className="text-sm text-muted-foreground">{food.calories} kcal per {food.serving_size}</p>
+                                    <p className="text-sm text-muted-foreground">{Math.round(food.calories)} kcal per {food.serving_size}</p>
                                 </div>
                             ))}
                         </>
