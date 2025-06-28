@@ -6,8 +6,8 @@ import type { WorkoutLogEntry, BodyWeightLogEntry, FoodLogEntry, CheckinLogEntry
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, Tooltip, LabelList, YAxis, LineChart, Line, CartesianGrid, Legend } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { format, startOfWeek, parseISO, endOfWeek, eachDayOfInterval, isWithinInterval } from 'date-fns';
 import { History, TrendingUp, Scale, Bed, Loader2, List, UtensilsCrossed } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,12 @@ interface DailyCalories {
   day: string;
   calories: number;
 }
+interface DailyMacros {
+  day: string;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
 
 
 const renderCustomizedLabel = (props: any) => {
@@ -67,6 +73,8 @@ export default function AnalyticsPage() {
   const [sleepLogs, setSleepLogs] = useState<SleepLogEntry[]>([]);
   const [weeklySleep, setWeeklySleep] = useState<DailySleep[]>([]);
   const [weeklyCalories, setWeeklyCalories] = useState<DailyCalories[]>([]);
+  const [weeklyMacros, setWeeklyMacros] = useState<DailyMacros[]>([]);
+  const [isMacroDetailOpen, setIsMacroDetailOpen] = useState(false);
   const [currentWeight, setCurrentWeight] = useState('');
   const [checkinDays, setCheckinDays] = useState(0);
   const [workoutDays, setWorkoutDays] = useState(0);
@@ -144,6 +152,7 @@ export default function AnalyticsPage() {
         const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
         setNutritionDays(nutritionCount);
         calculateWeeklyCalories(mealLogs);
+        calculateWeeklyMacros(mealLogs);
 
         // Adherence
         const totalActivities = checkinsCount + workoutsCount + nutritionCount;
@@ -228,6 +237,42 @@ export default function AnalyticsPage() {
     });
     setWeeklyCalories(calorieDataForWeek.map(d => ({ ...d, calories: Math.round(d.calories) })));
   };
+  
+  const calculateWeeklyMacros = (allLogs: FoodLogEntry[]) => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    let macroDataForWeek: DailyMacros[] = daysInWeek.map(day => ({
+        day: format(day, 'E'),
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+    }));
+
+    allLogs.forEach(log => {
+        if (log.date) {
+            const logDate = parseISO(log.date);
+            if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+                const dayOfWeek = format(logDate, 'E');
+                const dayIndex = macroDataForWeek.findIndex(d => d.day === dayOfWeek);
+
+                if (dayIndex !== -1) {
+                    macroDataForWeek[dayIndex].protein += log.protein;
+                    macroDataForWeek[dayIndex].carbs += log.carbs;
+                    macroDataForWeek[dayIndex].fats += log.fats;
+                }
+            }
+        }
+    });
+    setWeeklyMacros(macroDataForWeek.map(d => ({ 
+        ...d,
+        protein: Math.round(d.protein),
+        carbs: Math.round(d.carbs),
+        fats: Math.round(d.fats),
+    })));
+  };
 
   const calculateWeeklySleep = (allLogs: SleepLogEntry[]) => {
     const today = new Date();
@@ -302,6 +347,18 @@ export default function AnalyticsPage() {
     calories: {
         label: "Calories (kcal)",
         color: "hsl(var(--chart-1))",
+    },
+    protein: {
+        label: "Protein",
+        color: "hsl(var(--chart-1))",
+    },
+    carbs: {
+        label: "Carbs",
+        color: "hsl(var(--chart-2))",
+    },
+    fats: {
+        label: "Fats",
+        color: "hsl(var(--chart-4))",
     }
   };
 
@@ -395,32 +452,34 @@ export default function AnalyticsPage() {
         <Card>
             <CardHeader>
             <CardTitle>This Week's Calories</CardTitle>
-            <CardDescription>Your daily calorie intake for the current week.</CardDescription>
+            <CardDescription>Your daily calorie intake. Click the chart for a macro breakdown.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
             {hasConsumedThisWeek ? (
-                <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
-                <BarChart accessibilityLayer data={weeklyCalories} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
-                    <XAxis
-                        dataKey="day"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                    />
-                    <YAxis hide domain={[0, 'dataMax + 500']}/>
-                    <ChartTooltip
-                        cursor={false}
-                        content={<ChartTooltipContent 
-                            formatter={(value) => `${Number(value).toLocaleString()} kcal`}
-                            indicator="dot"
-                            nameKey="calories"
-                            />}
-                    />
-                    <Bar dataKey="calories" fill="var(--color-calories)" radius={[8, 8, 0, 0]}>
-                        <LabelList dataKey="calories" content={renderCustomizedLabel} />
-                    </Bar>
-                </BarChart>
-                </ChartContainer>
+                <div className="cursor-pointer" onClick={() => setIsMacroDetailOpen(true)}>
+                    <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
+                    <BarChart accessibilityLayer data={weeklyCalories} margin={{ top: 30, right: 10, left: 10, bottom: 5 }}>
+                        <XAxis
+                            dataKey="day"
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                        />
+                        <YAxis hide domain={[0, 'dataMax + 500']}/>
+                        <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent 
+                                formatter={(value) => `${Number(value).toLocaleString()} kcal`}
+                                indicator="dot"
+                                nameKey="calories"
+                                />}
+                        />
+                        <Bar dataKey="calories" fill="var(--color-calories)" radius={[8, 8, 0, 0]}>
+                            <LabelList dataKey="calories" content={renderCustomizedLabel} />
+                        </Bar>
+                    </BarChart>
+                    </ChartContainer>
+                </div>
             ) : (
                 <div className="flex flex-col items-center justify-center p-12 text-center h-[250px]">
                 <UtensilsCrossed className="w-16 h-16 text-muted-foreground mb-4" />
@@ -641,6 +700,39 @@ export default function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isMacroDetailOpen} onOpenChange={setIsMacroDetailOpen}>
+        <DialogContent className="max-w-3xl">
+            <DialogHeader>
+                <DialogTitle>Weekly Macro Breakdown</DialogTitle>
+                <DialogDescription>
+                    Total grams of protein, carbs, and fats consumed each day this week.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="pt-4">
+                <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
+                    <BarChart accessibilityLayer data={weeklyMacros} margin={{ top: 20, right: 10, left: -10, bottom: 5 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis
+                            dataKey="day"
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                        />
+                        <YAxis tickFormatter={(value) => `${value}g`} />
+                        <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent />}
+                        />
+                        <Legend content={<ChartLegendContent />} />
+                        <Bar dataKey="protein" stackId="a" fill="var(--color-protein)" />
+                        <Bar dataKey="carbs" stackId="a" fill="var(--color-carbs)" />
+                        <Bar dataKey="fats" stackId="a" fill="var(--color-fats)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ChartContainer>
+            </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
