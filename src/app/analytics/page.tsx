@@ -241,13 +241,6 @@ export default function AnalyticsPage() {
                 }
             }
         });
-    } else {
-        // Fill with example data if no logs exist for this week
-        const exampleCalories = [2200, 2500, 2100, 2600, 2800, 3000, 2400];
-        calorieDataForWeek = daysInWeek.map((day, index) => ({
-            day: format(day, 'E'),
-            calories: exampleCalories[index],
-        }));
     }
     setWeeklyCalories(calorieDataForWeek.map(d => ({ ...d, calories: Math.round(d.calories) })));
   };
@@ -278,23 +271,6 @@ export default function AnalyticsPage() {
                     macroDataForWeek[dayIndex].fats += log.fats;
                 }
             }
-        });
-    } else {
-        // Fill with example data
-        const exampleMacros = [
-            { p: 160, c: 250, f: 60 }, { p: 180, c: 280, f: 70 },
-            { p: 150, c: 240, f: 55 }, { p: 190, c: 290, f: 75 },
-            { p: 200, c: 320, f: 80 }, { p: 210, c: 350, f: 85 },
-            { p: 170, c: 270, f: 65 },
-        ];
-        macroDataForWeek = daysInWeek.map((day, index) => {
-            const macros = exampleMacros[index];
-            return {
-                day: format(day, 'E'),
-                protein: macros.p,
-                carbs: macros.c,
-                fats: macros.f,
-            };
         });
     }
 
@@ -766,7 +742,7 @@ export default function AnalyticsPage() {
                             axisLine={false}
                             tickMargin={8}
                         />
-                        <YAxis tickFormatter={(value) => `${Number(value).toLocaleString()} kcal`} />
+                        <YAxis tickFormatter={(value) => `${Number(value).toLocaleString()}`} />
                         <ChartTooltip
                             cursor={false}
                             content={<ChartTooltipContent formatter={(value, name, item) => (
