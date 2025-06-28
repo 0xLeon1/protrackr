@@ -149,10 +149,17 @@ export default function AnalyticsPage() {
         const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
         const mealLogsSnapshot = await getDocs(mealLogsCollection);
         const mealLogs: FoodLogEntry[] = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
+        
+        const weeklyMealLogs = mealLogs.filter(log => {
+            if (!log.date) return false;
+            const logDate = parseISO(log.date);
+            return isWithinInterval(logDate, { start: weekStart, end: weekEnd });
+        });
+
         const nutritionCount = getUniqueDaysInWeek(mealLogs, 'date');
         setNutritionDays(nutritionCount);
-        calculateWeeklyCalories(mealLogs);
-        calculateWeeklyMacros(mealLogs);
+        calculateWeeklyCalories(weeklyMealLogs);
+        calculateWeeklyMacros(weeklyMealLogs);
 
         // Adherence
         const totalActivities = checkinsCount + workoutsCount + nutritionCount;
@@ -211,7 +218,7 @@ export default function AnalyticsPage() {
     setDailyVolume(volumeDataForWeek);
   };
   
-  const calculateWeeklyCalories = (allLogs: FoodLogEntry[]) => {
+  const calculateWeeklyCalories = (weeklyLogs: FoodLogEntry[]) => {
     const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
@@ -222,10 +229,10 @@ export default function AnalyticsPage() {
         calories: 0,
     }));
 
-    allLogs.forEach(log => {
-        if (log.date) {
-            const logDate = parseISO(log.date);
-            if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+    if (weeklyLogs.length > 0) {
+        weeklyLogs.forEach(log => {
+            if (log.date) {
+                const logDate = parseISO(log.date);
                 const dayOfWeek = format(logDate, 'E');
                 const dayIndex = calorieDataForWeek.findIndex(d => d.day === dayOfWeek);
 
@@ -233,12 +240,19 @@ export default function AnalyticsPage() {
                     calorieDataForWeek[dayIndex].calories += log.calories;
                 }
             }
-        }
-    });
+        });
+    } else {
+        // Fill with example data if no logs exist for this week
+        const exampleCalories = [2200, 2500, 2100, 2600, 2800, 3000, 2400];
+        calorieDataForWeek = daysInWeek.map((day, index) => ({
+            day: format(day, 'E'),
+            calories: exampleCalories[index],
+        }));
+    }
     setWeeklyCalories(calorieDataForWeek.map(d => ({ ...d, calories: Math.round(d.calories) })));
   };
   
-  const calculateWeeklyMacros = (allLogs: FoodLogEntry[]) => {
+  const calculateWeeklyMacros = (weeklyLogs: FoodLogEntry[]) => {
     const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
@@ -251,10 +265,10 @@ export default function AnalyticsPage() {
         fats: 0,
     }));
 
-    allLogs.forEach(log => {
-        if (log.date) {
-            const logDate = parseISO(log.date);
-            if (isWithinInterval(logDate, { start: weekStart, end: weekEnd })) {
+    if (weeklyLogs.length > 0) {
+        weeklyLogs.forEach(log => {
+            if (log.date) {
+                const logDate = parseISO(log.date);
                 const dayOfWeek = format(logDate, 'E');
                 const dayIndex = macroDataForWeek.findIndex(d => d.day === dayOfWeek);
 
@@ -264,8 +278,26 @@ export default function AnalyticsPage() {
                     macroDataForWeek[dayIndex].fats += log.fats;
                 }
             }
-        }
-    });
+        });
+    } else {
+        // Fill with example data
+        const exampleMacros = [
+            { p: 160, c: 250, f: 60 }, { p: 180, c: 280, f: 70 },
+            { p: 150, c: 240, f: 55 }, { p: 190, c: 290, f: 75 },
+            { p: 200, c: 320, f: 80 }, { p: 210, c: 350, f: 85 },
+            { p: 170, c: 270, f: 65 },
+        ];
+        macroDataForWeek = daysInWeek.map((day, index) => {
+            const macros = exampleMacros[index];
+            return {
+                day: format(day, 'E'),
+                protein: macros.p,
+                carbs: macros.c,
+                fats: macros.f,
+            };
+        });
+    }
+
     setWeeklyMacros(macroDataForWeek.map(d => ({ 
         ...d,
         protein: Math.round(d.protein),
