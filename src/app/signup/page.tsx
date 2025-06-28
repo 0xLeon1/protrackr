@@ -125,35 +125,35 @@ export default function SignupPage() {
   };
   
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-200px)] py-8">
-        <Card className="w-full max-w-lg">
-            <CardHeader className="text-center">
+    <div className="flex items-center justify-center min-h-[calc(100vh-150px)] py-12">
+        <Card className="w-full max-w-md">
+            <CardHeader className="text-center p-8">
                 {step < 8 ? (
                     <>
-                        <CardTitle className="text-3xl">Welcome to Your Transformation with ProTracker...</CardTitle>
-                        <CardDescription>Let's build your gameplan so you can start getting the best results of your life.</CardDescription>
+                        <CardTitle className="text-3xl font-bold">Welcome to Your Transformation with ProTracker...</CardTitle>
+                        <CardDescription className="pt-2">Let's build your gameplan so you can start getting the best results of your life.</CardDescription>
                     </>
                 ) : (
                     <>
-                        <CardTitle className="text-3xl">Create Your ProTracker Account</CardTitle>
-                        <CardDescription>Almost there! Just a few more details to secure your account.</CardDescription>
+                        <CardTitle className="text-3xl font-bold">Create Your ProTracker Account</CardTitle>
+                        <CardDescription className="pt-2">Almost there! Just a few more details to secure your account.</CardDescription>
                     </>
                 )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-8">
                 <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-8">
+                <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-6">
                     
                     {step === 1 && (
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <FormField control={form.control} name="name" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">First, what should we call you?</FormLabel>
-                                    <FormControl><Input placeholder="Your Name" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('name'); } }} /></FormControl>
+                                    <FormLabel className="text-lg font-semibold">First, what should we call you?</FormLabel>
+                                    <FormControl><Input placeholder="Your Name" {...field} className="h-11 text-base" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('name'); } }} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                            <div className="flex justify-end">
+                            <div className="flex justify-end pt-2">
                                 <Button type="button" onClick={() => handleNextStep('name')}>Next</Button>
                             </div>
                         </div>
@@ -163,12 +163,12 @@ export default function SignupPage() {
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <FormField control={form.control} name="age" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">How old are you?</FormLabel>
-                                    <FormControl><Input type="number" placeholder="25" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('age'); } }} /></FormControl>
+                                    <FormLabel className="text-lg font-semibold">How old are you?</FormLabel>
+                                    <FormControl><Input type="number" placeholder="25" {...field} className="h-11 text-base" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('age'); } }} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                            <div className="flex justify-between">
+                            <div className="flex justify-between pt-2">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="button" onClick={() => handleNextStep('age')}>Next</Button>
                             </div>
@@ -179,9 +179,9 @@ export default function SignupPage() {
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <FormField control={form.control} name="gender" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">What is your gender?</FormLabel>
+                                    <FormLabel className="text-lg font-semibold">What is your gender?</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger className="h-11 text-base"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="male">Male</SelectItem>
                                         <SelectItem value="female">Female</SelectItem>
@@ -190,7 +190,7 @@ export default function SignupPage() {
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                             <div className="flex justify-between">
+                             <div className="flex justify-between pt-2">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="button" onClick={() => handleNextStep('gender')}>Next</Button>
                             </div>
@@ -201,12 +201,12 @@ export default function SignupPage() {
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <FormField control={form.control} name="initialWeight" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">What is your current weight? (lbs)</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g. 180" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('initialWeight'); } }} /></FormControl>
+                                    <FormLabel className="text-lg font-semibold">What is your current weight? (lbs)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g. 180" {...field} className="h-11 text-base" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('initialWeight'); } }} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                            <div className="flex justify-between">
+                            <div className="flex justify-between pt-2">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="button" onClick={() => handleNextStep('initialWeight')}>Next</Button>
                             </div>
@@ -217,12 +217,12 @@ export default function SignupPage() {
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <FormField control={form.control} name="goalWeight" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">What is your goal weight? (lbs)</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g. 170" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('goalWeight'); } }} /></FormControl>
+                                    <FormLabel className="text-lg font-semibold">What is your goal weight? (lbs)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g. 170" {...field} className="h-11 text-base" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('goalWeight'); } }} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                            <div className="flex justify-between">
+                            <div className="flex justify-between pt-2">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="button" onClick={() => handleNextStep('goalWeight')}>Next</Button>
                             </div>
@@ -233,9 +233,9 @@ export default function SignupPage() {
                         <div className="space-y-6 animate-in fade-in duration-500">
                              <FormField control={form.control} name="experience" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">What's your training experience?</FormLabel>
+                                    <FormLabel className="text-lg font-semibold">What's your training experience?</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select level..." /></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger className="h-11 text-base"><SelectValue placeholder="Select level..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="beginner">Beginner (0-2 years)</SelectItem>
                                         <SelectItem value="intermediate">Intermediate (2-4 years)</SelectItem>
@@ -245,7 +245,7 @@ export default function SignupPage() {
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                             <div className="flex justify-between">
+                             <div className="flex justify-between pt-2">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="button" onClick={() => handleNextStep('experience')}>Next</Button>
                             </div>
@@ -256,9 +256,9 @@ export default function SignupPage() {
                         <div className="space-y-6 animate-in fade-in duration-500">
                              <FormField control={form.control} name="transformationTarget" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">Choose your target timeline.</FormLabel>
+                                    <FormLabel className="text-lg font-semibold">Choose your target timeline.</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger className="h-12 text-lg"><SelectValue placeholder="Select duration..." /></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger className="h-11 text-base"><SelectValue placeholder="Select duration..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="8">8 Weeks</SelectItem>
                                         <SelectItem value="12">12 Weeks</SelectItem>
@@ -268,7 +268,7 @@ export default function SignupPage() {
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                             <div className="flex justify-between">
+                             <div className="flex justify-between pt-2">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="button" onClick={() => handleNextStep('transformationTarget')}>Next</Button>
                             </div>
@@ -279,12 +279,12 @@ export default function SignupPage() {
                         <div className="space-y-6 animate-in fade-in duration-500">
                              <FormField control={form.control} name="email" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel className="text-xl">What's your email address?</FormLabel>
-                                    <FormControl><Input type="email" placeholder="m@example.com" {...field} className="h-12 text-lg" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('email'); } }} /></FormControl>
+                                    <FormLabel className="text-lg font-semibold">What's your email address?</FormLabel>
+                                    <FormControl><Input type="email" placeholder="m@example.com" {...field} className="h-11 text-base" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNextStep('email'); } }} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                            <div className="flex justify-between">
+                            <div className="flex justify-between pt-2">
                                 <Button type="button" variant="outline" onClick={handlePreviousStep}>Back</Button>
                                 <Button type="button" onClick={() => handleNextStep('email')}>Next</Button>
                             </div>
@@ -293,18 +293,18 @@ export default function SignupPage() {
                     
                     {step === 9 && (
                         <div className="space-y-6 animate-in fade-in duration-500">
-                            <h3 className="text-xl font-medium">Last step, create your password.</h3>
+                            <h3 className="text-lg font-semibold text-center">Last step, create your password.</h3>
                             <FormField control={form.control} name="password" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Password</FormLabel>
-                                <FormControl><Input type="password" {...field} className="h-12 text-lg" autoFocus /></FormControl>
+                                <FormControl><Input type="password" {...field} className="h-11 text-base" autoFocus /></FormControl>
                                 <FormMessage />
                             </FormItem>
                             )} />
                             <FormField control={form.control} name="confirmPassword" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Confirm Password</FormLabel>
-                                <FormControl><Input type="password" {...field} className="h-12 text-lg" /></FormControl>
+                                <FormControl><Input type="password" {...field} className="h-11 text-base" /></FormControl>
                                 <FormMessage />
                             </FormItem>
                             )} />
@@ -319,7 +319,7 @@ export default function SignupPage() {
                 </form>
                 </Form>
             </CardContent>
-            <CardFooter className="text-center text-sm">
+            <CardFooter className="justify-center text-sm pb-8">
                 <p>Already have an account? <Link href="/login" className="text-primary hover:underline">Log in</Link></p>
             </CardFooter>
         </Card>
