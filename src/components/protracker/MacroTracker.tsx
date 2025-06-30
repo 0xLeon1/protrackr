@@ -6,10 +6,14 @@ import type { WeeklyMacroGoal } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Settings, Forward, Check } from "lucide-react";
+import { Settings, Forward, Check, BookOpen } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { parseISO, endOfWeek, differenceInDays } from 'date-fns';
 import NutritionPlanSetup from "./NutritionPlanSetup";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
 
 interface MacroTrackerProps {
     currentIntake: {
@@ -22,7 +26,8 @@ interface MacroTrackerProps {
 
 export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
   const { profile, macroPlan, currentGoals, refreshData } = useAuth();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPlanSetupOpen, setIsPlanSetupOpen] = useState(false);
+  const [isFullPlanOpen, setIsFullPlanOpen] = useState(false);
 
   if (!profile || !macroPlan || !currentGoals) {
     return null; // Or a loading/skeleton state
@@ -63,10 +68,52 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
                 <CardTitle className="font-headline">Macro Tracker</CardTitle>
                 <CardDescription>Your daily nutrition summary.</CardDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsDialogOpen(true)}>
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Adjust Plan</span>
-            </Button>
+            <div className="flex items-center gap-1">
+                <Dialog open={isFullPlanOpen} onOpenChange={setIsFullPlanOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <BookOpen className="h-5 w-5" />
+                            <span className="sr-only">View Full Plan</span>
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl h-[70vh] flex flex-col">
+                        <DialogHeader>
+                            <DialogTitle>Your Full Transformation Plan</DialogTitle>
+                            <DialogDescription>
+                                Here is your week-by-week macro breakdown.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="flex-1 my-4 pr-6">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[80px]">Week</TableHead>
+                                        <TableHead className="text-right">Calories</TableHead>
+                                        <TableHead className="text-right">Protein (g)</TableHead>
+                                        <TableHead className="text-right">Carbs (g)</TableHead>
+                                        <TableHead className="text-right">Fats (g)</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {macroPlan?.plan.map(week => (
+                                        <TableRow key={week.week}>
+                                            <TableCell className="font-medium">{week.week}</TableCell>
+                                            <TableCell className="text-right">{week.calories.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">{week.protein}</TableCell>
+                                            <TableCell className="text-right">{week.carbs}</TableCell>
+                                            <TableCell className="text-right">{week.fats}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </DialogContent>
+                </Dialog>
+                <Button variant="ghost" size="icon" onClick={() => setIsPlanSetupOpen(true)}>
+                    <Settings className="h-5 w-5" />
+                    <span className="sr-only">Adjust Plan</span>
+                </Button>
+            </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -118,11 +165,11 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
         </div>
       </CardContent>
       <NutritionPlanSetup
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        isOpen={isPlanSetupOpen}
+        onClose={() => setIsPlanSetupOpen(false)}
         onPlanSet={() => {
             refreshData();
-            setIsDialogOpen(false);
+            setIsPlanSetupOpen(false);
         }}
       />
     </Card>

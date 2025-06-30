@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import type { MacroPlan, WeeklyMacroGoal, UserProfile } from '@/types';
 import { add } from 'date-fns';
@@ -18,16 +18,18 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowRight, Check } from 'lucide-react';
+import { Loader2, ArrowRight, Check, Eye, EyeOff } from 'lucide-react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '../ui/progress';
 import { Textarea } from '../ui/textarea';
 import { cn } from '@/lib/utils';
+import { reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 interface NutritionPlanSetupProps {
     isOpen: boolean;
@@ -50,6 +52,11 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     const [step, setStep] = useState(0);
     const [formData, setFormData] = useState<FormSchemaType | null>(null);
     const [otherGoals, setOtherGoals] = useState('');
+    
+    const [requiresReauth, setRequiresReauth] = useState(false);
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [isReauthing, setIsReauthing] = useState(false);
 
     const form = useForm<FormSchemaType>({
       resolver: zodResolver(formSchema),
@@ -62,18 +69,27 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     });
 
     useEffect(() => {
-      if (isOpen && profile) {
-        form.reset({
-          initialWeight: profile.initialWeight || undefined,
-          goalWeight: profile.goalWeight || undefined,
-          transformationTarget: profile.transformationTarget || "12",
-        });
-        setOtherGoals(profile.otherGoals || '');
-        setFormData(null); // Clear previous calculation
-      }
-      if (!isOpen) {
-        setStep(0); // Reset step when dialog closes
-      }
+        if (isOpen && profile) {
+            if (profile.hasCompletedMacroSetup) {
+                setRequiresReauth(true);
+            } else {
+                setRequiresReauth(false);
+            }
+
+            form.reset({
+                initialWeight: profile.initialWeight || undefined,
+                goalWeight: profile.goalWeight || undefined,
+                transformationTarget: profile.transformationTarget || "12",
+            });
+            setOtherGoals(profile.otherGoals || '');
+            setFormData(null);
+            setPassword('');
+            setShowPassword(false);
+        }
+        if (!isOpen) {
+            setStep(0);
+            setRequiresReauth(false);
+        }
     }, [isOpen, profile, form]);
 
 
@@ -209,9 +225,78 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         }
     };
     
+    const handleReauthenticateAndProceed = async () => {
+        if (!user || !user.email || !password || !auth) {
+            toast({ title: "Error", description: "Password is required.", variant: "destructive" });
+            return;
+        }
+
+        setIsReauthing(true);
+        try {
+            const credential = EmailAuthProvider.credential(user.email, password);
+            await reauthenticateWithCredential(user, credential);
+            
+            toast({ title: "Authentication successful!", description: "You can now edit your plan." });
+            setRequiresReauth(false); // Proceed to the setup flow
+        } catch (error: any) {
+            toast({
+                title: "Authentication Failed",
+                description: "Incorrect password. Please try again.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsReauthing(false);
+            setPassword('');
+        }
+    };
+
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
     const renderStepContent = () => {
+        if (requiresReauth) {
+            return (
+                <>
+                    <DialogHeader>
+                        <DialogTitle>Confirm to Edit Plan</DialogTitle>
+                        <DialogDescription>
+                           Changing your plan will reset your start date and all current progress. To continue, please enter your password.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-8 space-y-4">
+                        <div className="space-y-2">
+                           <Label htmlFor="password-confirm">Password</Label>
+                           <div className="relative">
+                               <Input
+                                 id="password-confirm"
+                                 type={showPassword ? 'text' : 'password'}
+                                 value={password}
+                                 onChange={(e) => setPassword(e.target.value)}
+                                 placeholder="Enter your password"
+                                 onKeyDown={(e) => e.key === 'Enter' && password && handleReauthenticateAndProceed()}
+                               />
+                               <Button
+                                 type="button"
+                                 variant="ghost"
+                                 size="icon"
+                                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                                 onClick={() => setShowPassword(!showPassword)}
+                               >
+                                 {showPassword ? <EyeOff /> : <Eye />}
+                               </Button>
+                           </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={onClose} disabled={isReauthing}>Cancel</Button>
+                        <Button onClick={handleReauthenticateAndProceed} disabled={isReauthing || !password}>
+                            {isReauthing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Confirm Password
+                        </Button>
+                    </DialogFooter>
+                </>
+            );
+        }
+
         if (step > 4) {
              return (
                 <>
@@ -279,13 +364,12 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
                 <Form {...form}>
                     <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center py-8">
-                         <div className={cn("w-full h-full flex flex-col items-center justify-center", step !== 0 && 'hidden')}>
+                        <div className={cn("w-full h-full flex flex-col items-center justify-center", step !== 0 && 'hidden')}>
                             <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
                             <DialogDescription className="text-lg text-muted-foreground pt-2">
                             Taking this first step is the most important one. Let's create a plan tailored just for you.
                             </DialogDescription>
                         </div>
-
                         <div className={cn("w-full max-w-sm", step === 1 ? 'block' : 'hidden')}>
                             <FormField control={form.control} name="initialWeight" render={({ field }) => (
                                 <FormItem>
@@ -336,10 +420,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
-            <DialogContent className={cn(
-                "max-w-2xl",
-                step > 4 && "h-[85vh] flex flex-col"
-            )}>
+            <DialogContent className={cn("max-w-2xl", step > 4 && "h-[85vh] flex flex-col")}>
                {renderStepContent()}
             </DialogContent>
         </Dialog>
