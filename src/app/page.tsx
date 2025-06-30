@@ -96,6 +96,21 @@ export default function HomePage() {
     }), { calories: 0, protein: 0, carbs: 0, fats: 0 });
   }, [todaysLogs]);
 
+  const welcomeMessage = useMemo(() => {
+    if (!user || !profile) return "";
+    
+    // Check if it's the user's first session vs a returning session
+    const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
+    const lastSignInTime = user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : 0;
+    
+    // If last sign-in is within 60 seconds of creation time, they are a new user.
+    if (lastSignInTime - creationTime < 60000) {
+        return `Welcome, ${profile.name}!`;
+    } else {
+        return `Welcome back, ${profile.name}!`;
+    }
+  }, [user, profile]);
+
   if (loading || !user || !profile) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
@@ -108,7 +123,7 @@ export default function HomePage() {
     <div className="space-y-6">
        {!profile.hasCompletedMacroSetup && (
         <div>
-          <h1 className="text-3xl font-bold">Welcome, {profile.name}!</h1>
+          <h1 className="text-3xl font-bold">{welcomeMessage}</h1>
           <p className="text-muted-foreground">To get started, let's create your personalized nutrition plan.</p>
         </div>
       )}
