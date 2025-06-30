@@ -6,6 +6,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import type { UserProfile } from '@/types';
 import { doc, getDoc } from 'firebase/firestore';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +26,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
   
+  const router = useRouter();
+  const pathname = usePathname();
+
   const fetchProfile = async (uid: string) => {
     if (!db) return;
     const profileDocRef = doc(db, 'users', uid, 'data', 'profile');
@@ -41,31 +45,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // auth will be undefined if the config is missing.
     const configured = !!auth;
     setIsFirebaseConfigured(configured);
 
-    if (configured) {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        setUser(user);
-        if (user) {
-            await fetchProfile(user.uid);
-        } else {
-            setProfile(null);
-        }
-        setLoading(false);
-      });
-
-      return () => unsubscribe();
-    } else {
-      // If not configured, we're done loading.
+    if (!configured) {
       setLoading(false);
+      return;
     }
+    
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
   
+  // Handles redirection and data fetching based on auth state
+  useEffect(() => {
+    if (loading) return; // Wait for auth listener to resolve
+
+    if (user) {
+        if (user.emailVerified) {
+            fetchProfile(user.uid);
+        } else {
+            setProfile(null);
+            // Redirect if not on an allowed page
+            if (pathname !== '/verify-email' && pathname !== '/login' && pathname !== '/signup') {
+                router.push('/verify-email');
+            }
+        }
+    } else {
+      setProfile(null);
+    }
+  }, [user, loading, pathname, router]);
+
   // Refresh profile data when dataVersion changes
   useEffect(() => {
-    if (user) {
+    if (user && user.emailVerified) {
         fetchProfile(user.uid);
     }
   }, [dataVersion, user]);

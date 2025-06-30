@@ -36,9 +36,18 @@ export default function LoginPage() {
     }
     
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({ title: "Login Successful", description: "Welcome back!" });
-      router.push('/');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      if (userCredential.user.emailVerified) {
+        toast({ title: "Login Successful", description: "Welcome back!" });
+        router.push('/');
+      } else {
+        toast({
+            title: "Email Not Verified",
+            description: "Please check your inbox and verify your email to continue.",
+            variant: "destructive"
+        });
+        router.push('/verify-email');
+      }
     } catch (error: any) {
       toast({
         title: "Login Failed",

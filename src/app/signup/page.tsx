@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,6 +88,8 @@ export default function SignupPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
+      
+      await sendEmailVerification(user);
 
       const targetDate = add(new Date(), { weeks: parseInt(values.transformationTarget) });
       
@@ -111,9 +113,8 @@ export default function SignupPage() {
       const bodyWeightCollectionRef = doc(db, 'users', user.uid, 'bodyweight-logs', `initial_${Date.now()}`);
       await setDoc(bodyWeightCollectionRef, bodyWeightLog);
 
-      toast({ title: "Account Created", description: "Welcome! You have been successfully signed up." });
-      refreshData();
-      router.push('/');
+      toast({ title: "Account Created!", description: "A verification link has been sent to your email. Please verify to continue." });
+      router.push('/verify-email');
     } catch (error: any) {
       toast({
         title: "Signup Failed",
