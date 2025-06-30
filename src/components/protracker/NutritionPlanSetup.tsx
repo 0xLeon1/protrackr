@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import type { MacroPlan, WeeklyMacroGoal } from '@/types';
+import type { MacroPlan, WeeklyMacroGoal, UserProfile } from '@/types';
 import { add } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import {
@@ -21,13 +21,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowRight, Check } from 'lucide-react';
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '../ui/progress';
 import { Textarea } from '../ui/textarea';
+import { cn } from '@/lib/utils';
 
 interface NutritionPlanSetupProps {
     isOpen: boolean;
@@ -43,13 +44,6 @@ const formSchema = z.object({
 
 type FormSchemaType = z.infer<typeof formSchema>;
 
-const setupQuestions = [
-    { field: "initialWeight", title: "What's your current weight?", placeholder: "e.g., 180" },
-    { field: "goalWeight", title: "What's your goal weight?", placeholder: "e.g., 170" },
-    { field: "transformationTarget", title: "How long is your transformation timeline?", options: [{value: "8", label: "8 Weeks"}, {value: "12", label: "12 Weeks"}, {value: "16", label: "16 Weeks"}] },
-    { field: "otherGoals", title: "What other goals do you have?", description: "This is optional, but helps to keep you motivated. (e.g., have more energy, feel more confident)" },
-];
-
 export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: NutritionPlanSetupProps) {
     const { user, profile } = useAuth();
     const { toast } = useToast();
@@ -62,14 +56,25 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
       resolver: zodResolver(formSchema),
       mode: 'onChange',
       defaultValues: {
-        initialWeight: profile?.initialWeight || undefined,
-        goalWeight: profile?.goalWeight || undefined,
+        initialWeight: undefined,
+        goalWeight: undefined,
         transformationTarget: "12",
       },
     });
 
-    const currentStepField = setupQuestions[step-1]?.field as keyof FormSchemaType | 'otherGoals' | undefined;
-    const watchedField = useWatch({ control: form.control, name: currentStepField as any });
+    useEffect(() => {
+      if (isOpen && profile) {
+        form.reset({
+          initialWeight: profile.initialWeight || undefined,
+          goalWeight: profile.goalWeight || undefined,
+          transformationTarget: profile.transformationTarget || "12",
+        });
+        setOtherGoals(profile.otherGoals || '');
+        setFormData(null); // Clear previous calculation
+        setStep(0);
+      }
+    }, [isOpen, profile, form]);
+
 
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
@@ -78,7 +83,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         const totalWeeks = parseInt(transformationTarget, 10);
         const isCutting = goalWeight < initialWeight;
 
-        // Use age and gender from profile for BMR calculation if available, otherwise use defaults.
         const age = profile.age || 25;
         const gender = profile.gender || 'male';
 
@@ -89,7 +93,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             bmr = 447.593 + (9.247 * (initialWeight / 2.20462)) + (3.098 * 165) - (4.330 * age);
         }
 
-        const maintenanceCals = bmr * 1.55; // Assuming moderate activity
+        const maintenanceCals = bmr * 1.55; 
         const startingCalories = isCutting ? maintenanceCals - 500 : maintenanceCals + 300;
         
         const plan: WeeklyMacroGoal[] = [];
@@ -125,12 +129,20 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             return;
         }
 
-        if (currentStepField && currentStepField !== 'otherGoals') {
-            const isValid = await form.trigger(currentStepField);
+        if (step === 1) {
+            const isValid = await form.trigger('initialWeight');
+            if (!isValid) return;
+        }
+        if (step === 2) {
+            const isValid = await form.trigger('goalWeight');
+            if (!isValid) return;
+        }
+        if (step === 3) {
+            const isValid = await form.trigger('transformationTarget');
             if (!isValid) return;
         }
         
-        if (step < setupQuestions.length) {
+        if (step < 4) {
             setStep(step + 1);
         } else {
             form.handleSubmit(onCalculate)();
@@ -163,7 +175,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             const now = new Date();
             const targetDate = add(now, { weeks: parseInt(formData.transformationTarget) });
 
-            const updatedProfileData = {
+            const updatedProfileData: UserProfile = {
                 ...profile,
                 initialWeight: formData.initialWeight,
                 goalWeight: formData.goalWeight,
@@ -206,9 +218,28 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
     const renderStepContent = () => {
-        if (step > setupQuestions.length) {
+        if (step === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center text-center py-12 px-6 h-full">
+                     <DialogHeader>
+                        <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
+                        <DialogDescription className="text-lg text-muted-foreground pt-2">
+                           Taking this first step is the most important one. Let's create a plan tailored just for you.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1" />
+                     <DialogFooter className="w-full">
+                        <Button size="lg" className="w-full" onClick={handleNext}>
+                            Start Setup <ArrowRight className="ml-2 h-5 w-5" />
+                        </Button>
+                     </DialogFooter>
+                </div>
+            )
+        }
+
+        if (step > 4) {
              return (
-                <>
+                <div className="flex flex-col h-full">
                     <DialogHeader>
                         <DialogTitle>Your Personalized Nutrition Plan</DialogTitle>
                         <DialogDescription>
@@ -216,7 +247,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                         </DialogDescription>
                     </DialogHeader>
 
-                    <ScrollArea className="h-72 my-4">
+                    <ScrollArea className="flex-1 my-4">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -248,85 +279,78 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                             Let's Go!
                         </Button>
                     </DialogFooter>
-                </>
+                </div>
             );
         }
         
-        if (step === 0) {
-            return (
-                <div className="text-center py-12 px-6 flex flex-col items-center">
-                     <DialogHeader>
-                        <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
-                        <DialogDescription className="text-lg text-muted-foreground pt-2">
-                           Taking this first step is the most important one. Let's create a plan tailored just for you.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Button size="lg" className="mt-8" onClick={handleNext}>
-                        Start Setup <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                </div>
-            )
-        }
-        
-        const currentQuestion = setupQuestions[step - 1];
-        
         return (
-             <>
+            <div className="flex flex-col h-full">
                 <DialogHeader>
-                    <Progress value={(step / (setupQuestions.length + 1)) * 100} className="w-full mb-4"/>
-                    <DialogTitle className="text-2xl">{currentQuestion.title}</DialogTitle>
-                    {currentQuestion.description && <DialogDescription>{currentQuestion.description}</DialogDescription>}
+                    <Progress value={(step / 4) * 100} className="w-full mb-4"/>
+                    <div className={cn(step !== 1 && 'hidden')}>
+                        <DialogTitle className="text-2xl">What's your current weight?</DialogTitle>
+                    </div>
+                     <div className={cn(step !== 2 && 'hidden')}>
+                        <DialogTitle className="text-2xl">What's your goal weight?</DialogTitle>
+                    </div>
+                     <div className={cn(step !== 3 && 'hidden')}>
+                        <DialogTitle className="text-2xl">How long is your transformation timeline?</DialogTitle>
+                    </div>
+                     <div className={cn(step !== 4 && 'hidden')}>
+                        <DialogTitle className="text-2xl">What other goals do you have?</DialogTitle>
+                        <DialogDescription>This is optional, but helps to keep you motivated.</DialogDescription>
+                    </div>
                 </DialogHeader>
-                <div className="py-8 min-h-[150px] flex items-center justify-center">
-                    <Form {...form}>
-                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="w-full max-w-sm">
-                       {(() => {
-                            switch(step) {
-                                case 1:
-                                    return <FormField control={form.control} name="initialWeight" render={({ field }) => (
-                                        <FormItem>
-                                            <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder={currentQuestion.placeholder} {...field} autoFocus /></FormControl>
-                                            <FormMessage className="text-center pt-2" />
-                                        </FormItem>
-                                    )} />;
-                                case 2:
-                                    return <FormField control={form.control} name="goalWeight" render={({ field }) => (
-                                        <FormItem>
-                                            <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder={currentQuestion.placeholder} {...field} autoFocus /></FormControl>
-                                            <FormMessage className="text-center pt-2" />
-                                        </FormItem>
-                                    )} />;
-                                case 3:
-                                    return <FormField control={form.control} name="transformationTarget" render={({ field }) => (
-                                        <FormItem>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger className="text-lg py-6"><SelectValue placeholder="Select an option..." /></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    {currentQuestion.options?.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )} />;
-                                case 4:
-                                     return <Textarea value={otherGoals} onChange={(e) => setOtherGoals(e.target.value)} placeholder="My goal is to..." className="min-h-[100px]" />;
-                                default:
-                                    return null;
-                            }
-                       })()}
+
+                <Form {...form}>
+                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex-1 flex flex-col items-center justify-center py-8">
+                        <div className={cn("w-full max-w-sm", step !== 1 && 'hidden')}>
+                            <FormField control={form.control} name="initialWeight" render={({ field }) => (
+                                <FormItem>
+                                    <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 180" {...field} autoFocus /></FormControl>
+                                    <FormMessage className="text-center pt-2" />
+                                </FormItem>
+                            )} />
+                        </div>
+                        <div className={cn("w-full max-w-sm", step !== 2 && 'hidden')}>
+                             <FormField control={form.control} name="goalWeight" render={({ field }) => (
+                                <FormItem>
+                                    <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 170" {...field} autoFocus /></FormControl>
+                                    <FormMessage className="text-center pt-2" />
+                                </FormItem>
+                            )} />
+                        </div>
+                        <div className={cn("w-full max-w-sm", step !== 3 && 'hidden')}>
+                            <FormField control={form.control} name="transformationTarget" render={({ field }) => (
+                                <FormItem>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl><SelectTrigger className="text-lg py-6"><SelectValue placeholder="Select an option..." /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="8">8 Weeks</SelectItem>
+                                            <SelectItem value="12">12 Weeks</SelectItem>
+                                            <SelectItem value="16">16 Weeks</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                        <div className={cn("w-full max-w-sm", step !== 4 && 'hidden')}>
+                             <Textarea value={otherGoals} onChange={(e) => setOtherGoals(e.target.value)} placeholder="My goal is to have more energy and feel more confident..." className="min-h-[100px]" />
+                        </div>
                     </form>
-                    </Form>
-                </div>
+                </Form>
+                
                 <DialogFooter>
                     <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                    <Button onClick={handleNext} disabled={isLoading || (currentStepField !== 'otherGoals' && !watchedField)}>Next</Button>
+                    <Button onClick={handleNext} disabled={isLoading}>Next</Button>
                 </DialogFooter>
-            </>
+            </div>
         )
     };
     
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); } }}>
             <DialogContent className="max-w-2xl min-h-[450px]">
                {renderStepContent()}
             </DialogContent>
