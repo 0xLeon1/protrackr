@@ -16,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowRight, Check } from 'lucide-react';
@@ -279,7 +278,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex-1 flex flex-col items-center justify-center py-8">
+                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center py-8">
                          <div className={cn("w-full h-full flex flex-col items-center justify-center", step !== 0 && 'hidden')}>
                             <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
                             <DialogDescription className="text-lg text-muted-foreground pt-2">
@@ -337,7 +336,10 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
-            <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
+            <DialogContent className={cn(
+                "max-w-2xl",
+                step > 4 && "h-[85vh] flex flex-col"
+            )}>
                {renderStepContent()}
             </DialogContent>
         </Dialog>
