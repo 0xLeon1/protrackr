@@ -338,7 +338,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     };
     
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); } }}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
             <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
                {renderStepContent()}
             </DialogContent>
