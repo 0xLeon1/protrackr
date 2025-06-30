@@ -55,34 +55,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      if (user) {
+        fetchProfile(user.uid);
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
   
-  // Handles redirection and data fetching based on auth state
+  // Handles redirection based on auth state
   useEffect(() => {
     if (loading) return; // Wait for auth listener to resolve
 
-    if (user) {
-        if (user.emailVerified) {
-            fetchProfile(user.uid);
-        } else {
-            setProfile(null);
-            // Redirect if not on an allowed page
-            if (pathname !== '/verify-email' && pathname !== '/login' && pathname !== '/signup') {
-                router.push('/verify-email');
-            }
-        }
-    } else {
-      setProfile(null);
+    const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/verify-email';
+
+    if (!user && !isAuthPage) {
+        router.push('/login');
+    } else if (user && !user.emailVerified && !isAuthPage) {
+        router.push('/verify-email');
+    } else if (user && user.emailVerified && isAuthPage) {
+        router.push('/');
     }
   }, [user, loading, pathname, router]);
 
   // Refresh profile data when dataVersion changes
   useEffect(() => {
-    if (user && user.emailVerified) {
+    if (user) {
         fetchProfile(user.uid);
     }
   }, [dataVersion, user]);

@@ -12,17 +12,39 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Loader2, MailCheck } from 'lucide-react';
 
 export default function VerifyEmailPage() {
-    const { user, loading } = useAuth();
+    const { user, loading, refreshData } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const [isSending, setIsSending] = useState(false);
 
+    // This effect sets up polling to check for verification status changes
+    useEffect(() => {
+        if (loading || !user || user.emailVerified) {
+            return;
+        }
+
+        const interval = setInterval(async () => {
+            if (auth.currentUser) {
+                await auth.currentUser.reload();
+                if (auth.currentUser.emailVerified) {
+                    clearInterval(interval);
+                    refreshData(); // Ensure profile data is fresh upon redirect
+                    toast({ title: "Email Verified!", description: "Welcome! Redirecting you now..." });
+                    router.push('/');
+                }
+            }
+        }, 3000); // Check every 3 seconds
+
+        return () => clearInterval(interval); // Cleanup on unmount
+    }, [user, loading, router, toast, refreshData]);
+
+    // This effect handles cases where the user is ALREADY verified when they land here
     useEffect(() => {
         if (!loading && user?.emailVerified) {
-            toast({ title: "Email Verified!", description: "You can now access the app." });
             router.push('/');
         }
-    }, [user, loading, router, toast]);
+    }, [user, loading, router]);
+
 
     const handleResendVerification = async () => {
         if (!user) return;
@@ -64,6 +86,7 @@ export default function VerifyEmailPage() {
         );
     }
 
+    // Render this only if the user is unverified. Verified users are redirected by the effects above.
     return (
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
             <Card className="w-full max-w-md text-center">
@@ -88,7 +111,7 @@ export default function VerifyEmailPage() {
                 </CardContent>
                 <CardFooter className="flex-col gap-4">
                     <p className="text-xs text-muted-foreground">
-                       Once verified, the page will refresh automatically.
+                       This page will refresh automatically once you've verified.
                     </p>
                     <Button variant="link" onClick={handleLogout}>
                         Log out
