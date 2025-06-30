@@ -258,17 +258,6 @@ export default function Header() {
                         <Label htmlFor="goalWeight" className="text-right">Goal Weight</Label>
                         <Input id="goalWeight" type="number" value={editableProfile.goalWeight} onChange={(e) => handleProfileChange('goalWeight', e.target.value)} className="col-span-3" />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="experience" className="text-right">Experience</Label>
-                         <Select value={editableProfile.experience} onValueChange={(value) => handleProfileChange('experience', value)}>
-                            <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="beginner">Beginner</SelectItem>
-                                <SelectItem value="intermediate">Intermediate</SelectItem>
-                                <SelectItem value="advanced">Advanced</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right text-muted-foreground">Target Date</Label>
                         <p className="col-span-3 text-sm font-medium text-muted-foreground">{format(parseISO(editableProfile.targetDate), 'MMM d, yyyy')}</p>

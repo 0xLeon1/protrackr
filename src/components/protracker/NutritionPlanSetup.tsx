@@ -23,7 +23,7 @@ import { Loader2, ArrowRight, Check } from 'lucide-react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '../ui/progress';
@@ -38,7 +38,6 @@ interface NutritionPlanSetupProps {
 const formSchema = z.object({
   initialWeight: z.coerce.number().min(50, { message: "Must be at least 50 lbs." }).max(1000),
   goalWeight: z.coerce.number().min(50, { message: "Must be at least 50 lbs." }).max(1000),
-  experience: z.enum(["beginner", "intermediate", "advanced"], { required_error: "Please select your experience level."}),
   transformationTarget: z.enum(["8", "12", "16"], { required_error: "Please select a timeline."}),
 });
 
@@ -47,7 +46,6 @@ type FormSchemaType = z.infer<typeof formSchema>;
 const setupQuestions = [
     { field: "initialWeight", title: "What's your current weight?", placeholder: "e.g., 180" },
     { field: "goalWeight", title: "What's your goal weight?", placeholder: "e.g., 170" },
-    { field: "experience", title: "How would you describe your training experience?", options: [{value: "beginner", label: "Beginner (0-2 years)"}, {value: "intermediate", label: "Intermediate (2-4 years)"}, {value: "advanced", label: "Advanced (5+ years)"}] },
     { field: "transformationTarget", title: "How long is your transformation timeline?", options: [{value: "8", label: "8 Weeks"}, {value: "12", label: "12 Weeks"}, {value: "16", label: "16 Weeks"}] },
     { field: "otherGoals", title: "What other goals do you have?", description: "This is optional, but helps to keep you motivated. (e.g., have more energy, feel more confident)" },
 ];
@@ -66,12 +64,12 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
       defaultValues: {
         initialWeight: profile?.initialWeight || undefined,
         goalWeight: profile?.goalWeight || undefined,
-        experience: profile?.experience || undefined,
         transformationTarget: "12",
       },
     });
 
-    const watchedField = useWatch({ control: form.control, name: setupQuestions[step-1]?.field as any });
+    const currentStepField = setupQuestions[step-1]?.field as keyof FormSchemaType | 'otherGoals' | undefined;
+    const watchedField = useWatch({ control: form.control, name: currentStepField as any });
 
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
@@ -127,9 +125,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             return;
         }
 
-        const currentQuestion = setupQuestions[step - 1];
-        if (currentQuestion.field !== 'otherGoals') {
-            const isValid = await form.trigger(currentQuestion.field as keyof FormSchemaType);
+        if (currentStepField && currentStepField !== 'otherGoals') {
+            const isValid = await form.trigger(currentStepField);
             if (!isValid) return;
         }
         
@@ -168,7 +165,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
             const updatedProfileData = {
                 ...profile,
-                ...formData,
+                initialWeight: formData.initialWeight,
+                goalWeight: formData.goalWeight,
+                transformationTarget: formData.transformationTarget,
                 targetDate: targetDate.toISOString(),
                 hasCompletedMacroSetup: true,
                 otherGoals: otherGoals,
@@ -206,8 +205,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
-    const renderContent = () => {
-        // Final Plan Review Step
+    const renderStepContent = () => {
         if (step > setupQuestions.length) {
              return (
                 <>
@@ -254,7 +252,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             );
         }
         
-        // Welcome Step
         if (step === 0) {
             return (
                 <div className="text-center py-12 px-6 flex flex-col items-center">
@@ -271,10 +268,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             )
         }
         
-        // Question Steps
         const currentQuestion = setupQuestions[step - 1];
-        const fieldName = currentQuestion.field as keyof FormSchemaType;
-
+        
         return (
              <>
                 <DialogHeader>
@@ -285,54 +280,46 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 <div className="py-8 min-h-[150px] flex items-center justify-center">
                     <Form {...form}>
                     <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="w-full max-w-sm">
-                        {currentQuestion.field === 'otherGoals' ? (
-                             <Textarea 
-                                value={otherGoals}
-                                onChange={(e) => setOtherGoals(e.target.value)}
-                                placeholder="My goal is to..."
-                                className="min-h-[100px]"
-                             />
-                        ) : currentQuestion.options ? (
-                            <FormField control={form.control} name={fieldName} render={({ field }) => (
-                                <FormItem>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="text-lg py-6">
-                                                <SelectValue placeholder="Select an option..." />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {currentQuestion.options.map(opt => (
-                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        ) : (
-                            <FormField control={form.control} name={fieldName} render={({ field }) => (
-                                <FormItem>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            className="text-center text-2xl font-bold h-16"
-                                            placeholder={currentQuestion.placeholder}
-                                            {...field}
-                                            autoFocus
-                                         />
-                                    </FormControl>
-                                    <FormMessage className="text-center pt-2" />
-                                </FormItem>
-                            )} />
-                        )}
-                        </form>
+                       {(() => {
+                            switch(step) {
+                                case 1:
+                                    return <FormField control={form.control} name="initialWeight" render={({ field }) => (
+                                        <FormItem>
+                                            <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder={currentQuestion.placeholder} {...field} autoFocus /></FormControl>
+                                            <FormMessage className="text-center pt-2" />
+                                        </FormItem>
+                                    )} />;
+                                case 2:
+                                    return <FormField control={form.control} name="goalWeight" render={({ field }) => (
+                                        <FormItem>
+                                            <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder={currentQuestion.placeholder} {...field} autoFocus /></FormControl>
+                                            <FormMessage className="text-center pt-2" />
+                                        </FormItem>
+                                    )} />;
+                                case 3:
+                                    return <FormField control={form.control} name="transformationTarget" render={({ field }) => (
+                                        <FormItem>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl><SelectTrigger className="text-lg py-6"><SelectValue placeholder="Select an option..." /></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    {currentQuestion.options?.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />;
+                                case 4:
+                                     return <Textarea value={otherGoals} onChange={(e) => setOtherGoals(e.target.value)} placeholder="My goal is to..." className="min-h-[100px]" />;
+                                default:
+                                    return null;
+                            }
+                       })()}
+                    </form>
                     </Form>
                 </div>
-
                 <DialogFooter>
                     <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                    <Button onClick={handleNext} disabled={isLoading || (currentQuestion.field !== 'otherGoals' && !watchedField)}>Next</Button>
+                    <Button onClick={handleNext} disabled={isLoading || (currentStepField !== 'otherGoals' && !watchedField)}>Next</Button>
                 </DialogFooter>
             </>
         )

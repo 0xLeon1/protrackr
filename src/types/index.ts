@@ -6,6 +6,7 @@
 
 
 
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -77,7 +78,7 @@ export type UserProfile = {
   gender: 'male' | 'female';
   initialWeight: number; // in lbs
   goalWeight: number; // in lbs
-  experience: 'beginner' | 'intermediate' | 'advanced';
+  transformationTarget: string;
   targetDate: string; // ISO string
   signupDate: string; // ISO string
   hasCompletedMacroSetup: boolean;
@@ -170,6 +171,7 @@ export type CustomFoodItem = {
   carbs: number;
   fats: number;
 };
+
 
 
 
