@@ -105,7 +105,13 @@ export default function HomePage() {
   }
 
   return (
-    <>
+    <div className="space-y-6">
+       {!profile.hasCompletedMacroSetup && (
+        <div>
+          <h1 className="text-3xl font-bold">Welcome, {profile.name}!</h1>
+          <p className="text-muted-foreground">To get started, let's create your personalized nutrition plan.</p>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <div className="space-y-6">
           <ConsistencyTracker 
@@ -118,8 +124,8 @@ export default function HomePage() {
           ) : (
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-2xl font-bold">Welcome, {profile.name}!</CardTitle>
-                    <CardDescription className="text-base">Let's create your personalized nutrition plan to kickstart your transformation.</CardDescription>
+                    <CardTitle>Your Nutrition Plan</CardTitle>
+                    <CardDescription>Create your plan to unlock macro tracking and start your transformation.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Button size="lg" className="w-full" onClick={() => setIsSetupOpen(true)}>
@@ -140,6 +146,6 @@ export default function HomePage() {
               setIsSetupOpen(false);
           }}
       />
-    </>
+    </div>
   );
 }
