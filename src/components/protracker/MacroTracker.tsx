@@ -6,9 +6,9 @@ import type { WeeklyMacroGoal } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Settings, Forward } from "lucide-react";
+import { Settings, Forward, Check } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { differenceInWeeks, parseISO, endOfWeek, differenceInDays } from 'date-fns';
+import { parseISO, endOfWeek, differenceInDays } from 'date-fns';
 import NutritionPlanSetup from "./NutritionPlanSetup";
 
 interface MacroTrackerProps {
@@ -33,9 +33,18 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
     return (current / goal) * 100;
   };
   
+  const startDate = parseISO(macroPlan.startDate);
   const totalWeeks = macroPlan.plan.length;
-  const currentWeekNumber = differenceInWeeks(new Date(), parseISO(macroPlan.startDate)) + 1;
-  const overallProgress = (currentWeekNumber / totalWeeks) * 100;
+  const totalDaysInPlan = totalWeeks * 7;
+  const daysElapsed = differenceInDays(new Date(), startDate);
+  const isComplete = daysElapsed >= totalDaysInPlan;
+
+  // Calculate overall progress based on days elapsed
+  const cappedDaysElapsed = Math.min(daysElapsed, totalDaysInPlan);
+  const progressValue = ((cappedDaysElapsed + 1) / totalDaysInPlan) * 100;
+  const overallProgress = Math.min(100, progressValue);
+  
+  const currentWeekNumber = isComplete ? totalWeeks : Math.min(totalWeeks, Math.floor(daysElapsed / 7) + 1);
   
   const endOfCurrentWeek = endOfWeek(new Date(), { weekStartsOn: 1 });
   const daysUntilNextUpdate = differenceInDays(endOfCurrentWeek, new Date());
@@ -67,7 +76,12 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
             <span className="text-sm font-bold">Week {currentWeekNumber} / {totalWeeks}</span>
           </div>
           <Progress value={overallProgress} className="h-2" />
-          {currentWeekNumber < totalWeeks && (
+          {isComplete ? (
+            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                <Check className="h-3 w-3 text-green-500" />
+                Transformation complete!
+            </p>
+          ) : (
             <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
                 <Forward className="h-3 w-3" />
                 {countdownText}
