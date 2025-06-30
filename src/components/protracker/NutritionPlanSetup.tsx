@@ -53,7 +53,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     const [formData, setFormData] = useState<FormSchemaType | null>(null);
     const [otherGoals, setOtherGoals] = useState('');
     
-    const [requiresReauth, setRequiresReauth] = useState(false);
+    const [isEditingExistingPlan, setIsEditingExistingPlan] = useState(false);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isReauthing, setIsReauthing] = useState(false);
@@ -70,12 +70,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
     useEffect(() => {
         if (isOpen && profile) {
-            if (profile.hasCompletedMacroSetup) {
-                setRequiresReauth(true);
-            } else {
-                setRequiresReauth(false);
-            }
-
+            setIsEditingExistingPlan(profile.hasCompletedMacroSetup);
             form.reset({
                 initialWeight: profile.initialWeight || undefined,
                 goalWeight: profile.goalWeight || undefined,
@@ -88,7 +83,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         }
         if (!isOpen) {
             setStep(0);
-            setRequiresReauth(false);
         }
     }, [isOpen, profile, form]);
 
@@ -141,11 +135,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     }, [formData, profile]);
 
     const handleNext = async () => {
-        if (step === 0) {
-            setStep(1);
-            return;
-        }
-
         let isValid = true;
         if (step === 1) isValid = await form.trigger('initialWeight');
         if (step === 2) isValid = await form.trigger('goalWeight');
@@ -167,10 +156,18 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     const onCalculate = (values: FormSchemaType) => {
         setFormData(values);
-        setStep(step + 1);
+        setStep(5);
     };
+
+    const handleProceedToConfirmation = () => {
+        if (isEditingExistingPlan) {
+            setStep(6);
+        } else {
+            savePlanData();
+        }
+    }
     
-    const handleConfirmPlan = async () => {
+    const savePlanData = async () => {
         if (!user || !profile || !calculatedPlan || !formData) {
             toast({
                 title: "Error",
@@ -224,8 +221,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             setStep(0);
         }
     };
-    
-    const handleReauthenticateAndProceed = async () => {
+
+    const handleReauthenticateAndSave = async () => {
         if (!user || !user.email || !password || !auth) {
             toast({ title: "Error", description: "Password is required.", variant: "destructive" });
             return;
@@ -235,9 +232,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         try {
             const credential = EmailAuthProvider.credential(user.email, password);
             await reauthenticateWithCredential(user, credential);
-            
-            toast({ title: "Authentication successful!", description: "You can now edit your plan." });
-            setRequiresReauth(false); // Proceed to the setup flow
+            await savePlanData();
         } catch (error: any) {
             toast({
                 title: "Authentication Failed",
@@ -246,20 +241,19 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             });
         } finally {
             setIsReauthing(false);
-            setPassword('');
         }
     };
 
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
     const renderStepContent = () => {
-        if (requiresReauth) {
-            return (
+        if (step === 6) {
+             return (
                 <>
                     <DialogHeader>
                         <DialogTitle>Confirm to Edit Plan</DialogTitle>
                         <DialogDescription>
-                           Changing your plan will reset your start date and all current progress. To continue, please enter your password.
+                           Changing your plan will reset your start date and all current progress. To confirm, please enter your password.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-8 space-y-4">
@@ -272,7 +266,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                                  value={password}
                                  onChange={(e) => setPassword(e.target.value)}
                                  placeholder="Enter your password"
-                                 onKeyDown={(e) => e.key === 'Enter' && password && handleReauthenticateAndProceed()}
+                                 onKeyDown={(e) => e.key === 'Enter' && password && handleReauthenticateAndSave()}
                                />
                                <Button
                                  type="button"
@@ -287,17 +281,17 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={onClose} disabled={isReauthing}>Cancel</Button>
-                        <Button onClick={handleReauthenticateAndProceed} disabled={isReauthing || !password}>
+                        <Button variant="outline" onClick={handleBack} disabled={isReauthing}>Back</Button>
+                        <Button onClick={handleReauthenticateAndSave} disabled={isReauthing || !password}>
                             {isReauthing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirm Password
+                            Confirm & Save Changes
                         </Button>
                     </DialogFooter>
                 </>
             );
         }
-
-        if (step > 4) {
+        
+        if (step === 5) {
              return (
                 <>
                     <DialogHeader className="shrink-0">
@@ -334,9 +328,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
                     <DialogFooter className="shrink-0">
                         <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                        <Button onClick={handleConfirmPlan} disabled={isLoading} className="bg-green-500 hover:bg-green-600">
+                        <Button onClick={handleProceedToConfirmation} disabled={isLoading} className="bg-green-500 hover:bg-green-600">
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                            Let's Go!
+                            {isEditingExistingPlan ? "Proceed to Confirmation" : "Let's Go!"}
                         </Button>
                     </DialogFooter>
                 </>
@@ -347,7 +341,13 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             <>
                 <DialogHeader>
                     <Progress value={(step / 4) * 100} className="w-full mb-4"/>
-                    <div className={cn(step !== 1 && step !== 0 && 'hidden')}>
+                    <div className={cn(step !== 0 && 'hidden')}>
+                        <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
+                        <DialogDescription className="text-lg text-muted-foreground pt-2">
+                            Taking this first step is the most important one. Let's create a plan tailored just for you.
+                        </DialogDescription>
+                    </div>
+                    <div className={cn(step !== 1 && 'hidden')}>
                         <DialogTitle className="text-2xl">What's your current weight?</DialogTitle>
                     </div>
                      <div className={cn(step !== 2 && 'hidden')}>
@@ -363,13 +363,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center py-8">
-                        <div className={cn("w-full h-full flex flex-col items-center justify-center", step !== 0 && 'hidden')}>
-                            <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
-                            <DialogDescription className="text-lg text-muted-foreground pt-2">
-                            Taking this first step is the most important one. Let's create a plan tailored just for you.
-                            </DialogDescription>
-                        </div>
+                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center flex-1">
+                        <div className={cn("w-full h-full flex flex-col items-center justify-center", step === 0 ? 'block' : 'hidden')}></div>
                         <div className={cn("w-full max-w-sm", step === 1 ? 'block' : 'hidden')}>
                             <FormField control={form.control} name="initialWeight" render={({ field }) => (
                                 <FormItem>
@@ -410,8 +405,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 <DialogFooter>
                     {step > 0 && <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>}
                     <Button onClick={handleNext} disabled={isLoading} className={cn("w-full", step > 0 && "w-auto")}>
-                        {step === 0 ? "Start Setup" : "Next"}
-                        <ArrowRight className={cn("ml-2 h-5 w-5", step === 0 && "hidden")} />
+                        {step === 0 ? "Start Setup" : (step === 4 ? "Calculate Plan" : "Next")}
+                        <ArrowRight className={cn("ml-2 h-5 w-5", step === 4 && "hidden")} />
                     </Button>
                 </DialogFooter>
             </>
@@ -420,7 +415,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
-            <DialogContent className={cn("max-w-2xl", step > 4 && "h-[85vh] flex flex-col")}>
+            <DialogContent className={cn("max-w-2xl flex flex-col", step < 5 ? "h-auto" : "h-[85vh]")}>
                {renderStepContent()}
             </DialogContent>
         </Dialog>
