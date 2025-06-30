@@ -5,6 +5,7 @@
 
 
 
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -80,6 +81,7 @@ export type UserProfile = {
   targetDate: string; // ISO string
   signupDate: string; // ISO string
   hasCompletedMacroSetup: boolean;
+  otherGoals?: string;
 };
 
 export type WeeklyMacroGoal = {
@@ -168,6 +170,7 @@ export type CustomFoodItem = {
   carbs: number;
   fats: number;
 };
+
 
 
 
