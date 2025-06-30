@@ -4,6 +4,7 @@
 
 
 
+
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -77,13 +78,21 @@ export type UserProfile = {
   goalWeight: number; // in lbs
   experience: 'beginner' | 'intermediate' | 'advanced';
   targetDate: string; // ISO string
+  signupDate: string; // ISO string
+  hasCompletedMacroSetup: boolean;
 };
 
-export type MacroGoals = {
+export type WeeklyMacroGoal = {
+  week: number;
   calories: number;
   protein: number;
   carbs: number;
   fats: number;
+};
+
+export type MacroPlan = {
+  startDate: string; // ISO String
+  plan: WeeklyMacroGoal[];
 };
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks' | 'Other';
@@ -159,6 +168,7 @@ export type CustomFoodItem = {
   carbs: number;
   fats: number;
 };
+
 
 
 

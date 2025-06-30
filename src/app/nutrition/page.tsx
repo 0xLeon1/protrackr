@@ -10,17 +10,20 @@ import MealDiary from "@/components/protracker/MealDiary";
 import RecipeBook from "@/components/protracker/RecipeBook";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Zap } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, addDoc, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
-
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import NutritionPlanSetup from '@/components/protracker/NutritionPlanSetup';
 
 export default function NutritionPage() {
   const [allMealLogs, setAllMealLogs] = useState<FoodLogEntry[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [customFoods, setCustomFoods] = useState<CustomFoodItem[]>([]);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
   const { toast } = useToast();
-  const { user, loading, dataVersion } = useAuth();
+  const { user, profile, loading, dataVersion, refreshData } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -30,7 +33,7 @@ export default function NutritionPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (user) {
+    if (user && profile?.hasCompletedMacroSetup) {
         const fetchData = async () => {
             // Fetch Meal Logs
             const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
@@ -52,13 +55,14 @@ export default function NutritionPage() {
         };
         fetchData();
     }
-  }, [user, dataVersion]);
+  }, [user, profile?.hasCompletedMacroSetup, dataVersion]);
 
   const todaysLogs = useMemo(() => {
+    if (!profile?.hasCompletedMacroSetup) return [];
     const todayISO = startOfToday().toISOString();
     const todayDateString = todayISO.split('T')[0];
     return allMealLogs.filter(log => log.date.startsWith(todayDateString));
-  }, [allMealLogs]);
+  }, [allMealLogs, profile?.hasCompletedMacroSetup]);
 
   const handleAddMeal = async (meal: Omit<FoodLogEntry, 'id' | 'date'>) => {
     if (!user) return;
@@ -143,11 +147,40 @@ export default function NutritionPage() {
     }), { calories: 0, protein: 0, carbs: 0, fats: 0 });
   }, [todaysLogs]);
 
-  if (loading || !user) {
+  if (loading || !user || !profile) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (!profile.hasCompletedMacroSetup) {
+    return (
+        <>
+            <div className="flex justify-center items-center h-full min-h-[50vh]">
+                <Card className="w-full max-w-lg text-center">
+                    <CardHeader>
+                        <CardTitle className="text-2xl font-bold">Set Up Your Nutrition Plan</CardTitle>
+                        <CardDescription className="text-base">First, let's create your personalized plan to start tracking your meals.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button size="lg" onClick={() => setIsSetupOpen(true)}>
+                            <Zap className="mr-2 h-5 w-5"/>
+                            Set Up My Plan
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+            <NutritionPlanSetup 
+                isOpen={isSetupOpen} 
+                onClose={() => setIsSetupOpen(false)} 
+                onPlanSet={() => {
+                    refreshData();
+                    setIsSetupOpen(false);
+                }}
+            />
+        </>
     );
   }
 

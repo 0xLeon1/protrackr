@@ -1,26 +1,15 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import type { MacroGoals } from "@/types";
+import { useState } from "react";
+import type { WeeklyMacroGoal } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Settings } from "lucide-react";
+import { Settings, Forward } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { differenceInWeeks, parseISO, endOfWeek, differenceInDays } from 'date-fns';
+import NutritionPlanSetup from "./NutritionPlanSetup";
 
 interface MacroTrackerProps {
     currentIntake: {
@@ -31,94 +20,31 @@ interface MacroTrackerProps {
     }
 }
 
-const defaultGoals: MacroGoals = {
-  calories: 2500,
-  protein: 180,
-  carbs: 250,
-  fats: 70,
-};
-
-// Create a version of the MacroGoals type that allows empty strings for form editing
-type TempMacroGoals = {
-  [K in keyof MacroGoals]: MacroGoals[K] | '';
-};
-
 export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
-  const [goals, setGoals] = useState<MacroGoals>(defaultGoals);
-  const [tempGoals, setTempGoals] = useState<TempMacroGoals>(defaultGoals);
+  const { profile, macroPlan, currentGoals, refreshData } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { user } = useAuth();
 
-  useEffect(() => {
-    if (user) {
-      const fetchGoals = async () => {
-        const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
-        const docSnap = await getDoc(goalsDocRef);
-        if (docSnap.exists()) {
-          const fetchedGoals = docSnap.data() as MacroGoals;
-          setGoals(fetchedGoals);
-          setTempGoals(fetchedGoals);
-        } else {
-          // If no goals are set, use defaults and save them for the new user
-          await setDoc(goalsDocRef, defaultGoals);
-          setGoals(defaultGoals);
-          setTempGoals(defaultGoals);
-        }
-      };
-      fetchGoals();
-    }
-  }, [user]);
+  if (!profile || !macroPlan || !currentGoals) {
+    return null; // Or a loading/skeleton state
+  }
 
-  // When opening the dialog, reset tempGoals to the currently saved goals
-  useEffect(() => {
-    if (isDialogOpen) {
-      setTempGoals(goals);
-    }
-  }, [isDialogOpen, goals]);
-
-  // Automatically calculate calories when macros change
-  useEffect(() => {
-    const p = Number(tempGoals.protein) || 0;
-    const c = Number(tempGoals.carbs) || 0;
-    const f = Number(tempGoals.fats) || 0;
-    const calculatedCalories = (p * 4) + (c * 4) + (f * 9);
-    
-    setTempGoals(prev => ({ ...prev, calories: calculatedCalories }));
-  }, [tempGoals.protein, tempGoals.carbs, tempGoals.fats]);
-
-
-  const handleGoalChange = (field: keyof Omit<MacroGoals, 'calories'>, value: string) => {
-    if (value === "") {
-      setTempGoals(prev => ({ ...prev, [field]: "" }));
-      return;
-    }
-    const numValue = parseInt(value, 10);
-    if (!isNaN(numValue) && numValue >= 0) {
-      setTempGoals(prev => ({ ...prev, [field]: numValue }));
-    }
-  };
-  
-  const handleSaveGoals = async () => {
-    if (!user) return;
-    // If a field is empty, default it to 0 before saving.
-    const finalizedGoals: MacroGoals = {
-        calories: Number(tempGoals.calories) || 0,
-        protein: Number(tempGoals.protein) || 0,
-        carbs: Number(tempGoals.carbs) || 0,
-        fats: Number(tempGoals.fats) || 0,
-    };
-    
-    const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
-    await setDoc(goalsDocRef, finalizedGoals);
-
-    setGoals(finalizedGoals);
-    setIsDialogOpen(false);
-  };
-  
   const getProgressValue = (current: number, goal: number) => {
     if (goal === 0) return 0;
     return (current / goal) * 100;
   };
+  
+  const totalWeeks = macroPlan.plan.length;
+  const currentWeekNumber = differenceInWeeks(new Date(), parseISO(macroPlan.startDate)) + 1;
+  const overallProgress = (currentWeekNumber / totalWeeks) * 100;
+  
+  const endOfCurrentWeek = endOfWeek(new Date(), { weekStartsOn: 1 });
+  const daysUntilNextUpdate = differenceInDays(endOfCurrentWeek, new Date());
+  
+  const countdownText = daysUntilNextUpdate > 1
+    ? `${daysUntilNextUpdate} days until next update`
+    : daysUntilNextUpdate === 1
+    ? '1 day until next update'
+    : 'Macros update tomorrow';
 
   return (
     <Card className="transition-all duration-300 hover:shadow-lg">
@@ -128,74 +54,63 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
                 <CardTitle className="font-headline">Macro Tracker</CardTitle>
                 <CardDescription>Your daily nutrition summary.</CardDescription>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                        <Settings className="h-5 w-5" />
-                        <span className="sr-only">Set Goals</span>
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Set Your Macro Goals</DialogTitle>
-                        <DialogDescription>
-                            Define your daily targets. Calories are calculated automatically.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="protein-goal" className="text-right">Protein</Label>
-                            <Input id="protein-goal" type="number" value={tempGoals.protein} onChange={(e) => handleGoalChange('protein', e.target.value)} className="col-span-3" placeholder="in grams"/>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="carbs-goal" className="text-right">Carbs</Label>
-                            <Input id="carbs-goal" type="number" value={tempGoals.carbs} onChange={(e) => handleGoalChange('carbs', e.target.value)} className="col-span-3" placeholder="in grams"/>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="fats-goal" className="text-right">Fats</Label>
-                            <Input id="fats-goal" type="number" value={tempGoals.fats} onChange={(e) => handleGoalChange('fats', e.target.value)} className="col-span-3" placeholder="in grams"/>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="calories-goal" className="text-right">Calories</Label>
-                            <Input id="calories-goal" type="number" value={tempGoals.calories} className="col-span-3 bg-muted" readOnly />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button type="submit" onClick={handleSaveGoals}>Save Goals</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <Button variant="ghost" size="icon" onClick={() => setIsDialogOpen(true)}>
+                <Settings className="h-5 w-5" />
+                <span className="sr-only">Adjust Plan</span>
+            </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex justify-between items-baseline">
+        <div>
+          <div className="flex justify-between items-baseline mb-1">
+            <span className="text-sm font-medium">Transformation Progress</span>
+            <span className="text-sm font-bold">Week {currentWeekNumber} / {totalWeeks}</span>
+          </div>
+          <Progress value={overallProgress} className="h-2" />
+          {currentWeekNumber < totalWeeks && (
+            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                <Forward className="h-3 w-3" />
+                {countdownText}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-between items-baseline pt-2">
             <h3 className="text-3xl font-bold text-primary">{Math.round(currentIntake.calories).toLocaleString()}</h3>
-            <span className="font-medium text-muted-foreground">/ {goals.calories.toLocaleString()} kCal</span>
+            <span className="font-medium text-muted-foreground">/ {currentGoals.calories.toLocaleString()} kCal</span>
         </div>
         <div className="space-y-3 pt-2">
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Protein</span>
-              <span className="text-muted-foreground">{Math.round(currentIntake.protein)}g / {goals.protein}g</span>
+              <span className="text-muted-foreground">{Math.round(currentIntake.protein)}g / {currentGoals.protein}g</span>
             </div>
-            <Progress value={getProgressValue(currentIntake.protein, goals.protein)} className="h-2 [&>div]:bg-sky-400" />
+            <Progress value={getProgressValue(currentIntake.protein, currentGoals.protein)} className="h-2 [&>div]:bg-sky-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Carbs</span>
-              <span className="text-muted-foreground">{Math.round(currentIntake.carbs)}g / {goals.carbs}g</span>
+              <span className="text-muted-foreground">{Math.round(currentIntake.carbs)}g / {currentGoals.carbs}g</span>
             </div>
-            <Progress value={getProgressValue(currentIntake.carbs, goals.carbs)} className="h-2 [&>div]:bg-orange-400" />
+            <Progress value={getProgressValue(currentIntake.carbs, currentGoals.carbs)} className="h-2 [&>div]:bg-orange-400" />
           </div>
           <div>
             <div className="flex justify-between mb-1 text-sm">
               <span className="font-medium text-foreground">Fats</span>
-              <span className="text-muted-foreground">{Math.round(currentIntake.fats)}g / {goals.fats}g</span>
+              <span className="text-muted-foreground">{Math.round(currentIntake.fats)}g / {currentGoals.fats}g</span>
             </div>
-            <Progress value={getProgressValue(currentIntake.fats, goals.fats)} className="h-2 [&>div]:bg-amber-400" />
+            <Progress value={getProgressValue(currentIntake.fats, currentGoals.fats)} className="h-2 [&>div]:bg-amber-400" />
           </div>
         </div>
       </CardContent>
+      <NutritionPlanSetup
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onPlanSet={() => {
+            refreshData();
+            setIsDialogOpen(false);
+        }}
+      />
     </Card>
   );
 }

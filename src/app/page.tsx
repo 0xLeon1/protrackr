@@ -3,29 +3,25 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FoodLogEntry, MacroGoals, WorkoutLogEntry, CheckinLogEntry } from '@/types';
+import type { FoodLogEntry, WeeklyMacroGoal, WorkoutLogEntry, CheckinLogEntry } from '@/types';
 import { startOfToday, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import DailyCheckin from '@/components/protracker/DailyCheckin';
 import ConsistencyTracker from '@/components/protracker/ConsistencyTracker';
 import MacroRings from '@/components/protracker/MacroRings';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Zap } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-
-
-const defaultGoals: MacroGoals = {
-  calories: 2500,
-  protein: 180,
-  carbs: 250,
-  fats: 70,
-};
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import NutritionPlanSetup from '@/components/protracker/NutritionPlanSetup';
 
 export default function HomePage() {
   const [allMealLogs, setAllMealLogs] = useState<FoodLogEntry[]>([]);
-  const [goals, setGoals] = useState<MacroGoals>(defaultGoals);
   const [consistencyData, setConsistencyData] = useState({ checkinDays: 0, workoutDays: 0, nutritionDays: 0 });
-  const { user, loading, dataVersion } = useAuth();
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  
+  const { user, profile, loading, dataVersion, currentGoals, refreshData } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -35,22 +31,13 @@ export default function HomePage() {
   }, [user, loading, router]);
   
   useEffect(() => {
-    if (user) {
+    if (user && profile?.hasCompletedMacroSetup) {
       const fetchData = async () => {
         // Fetch Meal Logs for Macro Rings
         const mealLogsCollection = collection(db, 'users', user.uid, 'meal-logs');
         const mealLogsSnapshot = await getDocs(mealLogsCollection);
         const mealLogs = mealLogsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FoodLogEntry));
         setAllMealLogs(mealLogs);
-
-        // Fetch Macro Goals for Macro Rings
-        const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
-        const goalsDoc = await getDoc(goalsDocRef);
-        if (goalsDoc.exists()) {
-          setGoals(goalsDoc.data() as MacroGoals);
-        } else {
-          setGoals(defaultGoals);
-        }
 
         // --- Fetch Data for Consistency Tracker ---
         const today = new Date();
@@ -91,13 +78,14 @@ export default function HomePage() {
       
       fetchData();
     }
-  }, [user, dataVersion]);
+  }, [user, profile?.hasCompletedMacroSetup, dataVersion]);
 
   const todaysLogs = useMemo(() => {
+    if (!profile?.hasCompletedMacroSetup) return [];
     const todayISO = startOfToday().toISOString();
     const todayDateString = todayISO.split('T')[0];
     return allMealLogs.filter(log => log.date.startsWith(todayDateString));
-  }, [allMealLogs]);
+  }, [allMealLogs, profile?.hasCompletedMacroSetup]);
   
   const currentIntake = useMemo(() => {
     return todaysLogs.reduce((acc, log) => ({
@@ -108,11 +96,40 @@ export default function HomePage() {
     }), { calories: 0, protein: 0, carbs: 0, fats: 0 });
   }, [todaysLogs]);
 
-  if (loading || !user) {
+  if (loading || !user || !profile) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (!profile.hasCompletedMacroSetup) {
+    return (
+        <>
+            <div className="flex justify-center items-center h-full min-h-[50vh]">
+                <Card className="w-full max-w-lg text-center">
+                    <CardHeader>
+                        <CardTitle className="text-2xl font-bold">Welcome, {profile.name}!</CardTitle>
+                        <CardDescription className="text-base">Let's create your personalized nutrition plan to kickstart your transformation.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button size="lg" onClick={() => setIsSetupOpen(true)}>
+                            <Zap className="mr-2 h-5 w-5"/>
+                            Set Up My Plan
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+            <NutritionPlanSetup 
+                isOpen={isSetupOpen} 
+                onClose={() => setIsSetupOpen(false)} 
+                onPlanSet={() => {
+                    refreshData();
+                    setIsSetupOpen(false);
+                }}
+            />
+        </>
     );
   }
 
@@ -124,7 +141,7 @@ export default function HomePage() {
           workoutDays={consistencyData.workoutDays}
           nutritionDays={consistencyData.nutritionDays}
         />
-        <MacroRings currentIntake={currentIntake} goals={goals} />
+        {currentGoals && <MacroRings currentIntake={currentIntake} goals={currentGoals} />}
       </div>
       <DailyCheckin />
     </div>

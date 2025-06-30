@@ -1,6 +1,7 @@
+
 "use client";
 
-import type { MacroGoals } from "@/types";
+import type { WeeklyMacroGoal } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 
@@ -10,7 +11,7 @@ interface MacroRingsProps {
         carbs: number;
         fats: number;
     };
-    goals: MacroGoals;
+    goals: WeeklyMacroGoal;
 }
 
 const Ring = ({ name, value, goal, color }: { name: string; value: number; goal: number; color: string }) => {

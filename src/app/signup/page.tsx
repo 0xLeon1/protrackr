@@ -91,7 +91,8 @@ export default function SignupPage() {
       
       await sendEmailVerification(user);
 
-      const targetDate = add(new Date(), { weeks: parseInt(values.transformationTarget) });
+      const now = new Date();
+      const targetDate = add(now, { weeks: parseInt(values.transformationTarget) });
       
       const userProfile = {
         name: values.name,
@@ -101,6 +102,8 @@ export default function SignupPage() {
         goalWeight: values.goalWeight,
         experience: values.experience,
         targetDate: targetDate.toISOString(),
+        signupDate: now.toISOString(),
+        hasCompletedMacroSetup: false,
       };
       
       const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
@@ -108,7 +111,7 @@ export default function SignupPage() {
 
       const bodyWeightLog = {
           weight: values.initialWeight,
-          date: new Date().toISOString(),
+          date: now.toISOString(),
       };
       const bodyWeightCollectionRef = doc(db, 'users', user.uid, 'bodyweight-logs', `initial_${Date.now()}`);
       await setDoc(bodyWeightCollectionRef, bodyWeightLog);
@@ -131,7 +134,7 @@ export default function SignupPage() {
             <CardHeader className="text-center p-8">
                 {step < 8 ? (
                     <>
-                        <CardTitle className="text-3xl font-bold">Welcome to Your Transformation with ProTracker...</CardTitle>
+                        <CardTitle className="text-3xl font-bold">Welcome to Your Transformation with ProTracker</CardTitle>
                         <CardDescription className="pt-2">Let's build your gameplan to getting the best results of your life.</CardDescription>
                     </>
                 ) : (

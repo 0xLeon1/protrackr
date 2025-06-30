@@ -4,9 +4,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import type { UserProfile } from '@/types';
+import type { UserProfile, MacroPlan, WeeklyMacroGoal } from '@/types';
 import { doc, getDoc } from 'firebase/firestore';
 import { usePathname, useRouter } from 'next/navigation';
+import { differenceInWeeks, parseISO } from 'date-fns';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +16,8 @@ interface AuthContextType {
   isFirebaseConfigured: boolean;
   dataVersion: number;
   refreshData: () => void;
+  macroPlan: MacroPlan | null;
+  currentGoals: WeeklyMacroGoal | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +25,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [macroPlan, setMacroPlan] = useState<MacroPlan | null>(null);
+  const [currentGoals, setCurrentGoals] = useState<WeeklyMacroGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
@@ -29,14 +34,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  const fetchProfile = async (uid: string) => {
+  const fetchUserData = async (uid: string) => {
     if (!db) return;
+    
+    // Fetch Profile
     const profileDocRef = doc(db, 'users', uid, 'data', 'profile');
     const profileDoc = await getDoc(profileDocRef);
-    if (profileDoc.exists()) {
-        setProfile(profileDoc.data() as UserProfile);
+    const userProfile = profileDoc.exists() ? profileDoc.data() as UserProfile : null;
+    setProfile(userProfile);
+
+    // Fetch Macro Plan
+    const goalsDocRef = doc(db, 'users', uid, 'data', 'goals');
+    const goalsDoc = await getDoc(goalsDocRef);
+    const userMacroPlan = goalsDoc.exists() ? goalsDoc.data() as MacroPlan : null;
+    setMacroPlan(userMacroPlan);
+    
+    // Determine current goals from the plan
+    if (userMacroPlan && userMacroPlan.plan && userMacroPlan.plan.length > 0) {
+        const weeksSinceStart = differenceInWeeks(new Date(), parseISO(userMacroPlan.startDate));
+        const currentWeekIndex = Math.max(0, Math.min(weeksSinceStart, userMacroPlan.plan.length - 1));
+        setCurrentGoals(userMacroPlan.plan[currentWeekIndex]);
     } else {
-        setProfile(null);
+        setCurrentGoals(null);
     }
   };
 
@@ -53,12 +72,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        fetchProfile(user.uid);
+        await fetchUserData(user.uid);
       } else {
         setProfile(null);
+        setMacroPlan(null);
+        setCurrentGoals(null);
       }
       setLoading(false);
     });
@@ -84,12 +105,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Refresh profile data when dataVersion changes
   useEffect(() => {
     if (user) {
-        fetchProfile(user.uid);
+        fetchUserData(user.uid);
     }
   }, [dataVersion, user]);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, dataVersion, refreshData }}>
+    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, dataVersion, refreshData, macroPlan, currentGoals }}>
       {children}
     </AuthContext.Provider>
   );
