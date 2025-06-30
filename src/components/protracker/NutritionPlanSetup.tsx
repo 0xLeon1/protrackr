@@ -71,7 +71,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         });
         setOtherGoals(profile.otherGoals || '');
         setFormData(null); // Clear previous calculation
-        setStep(0);
+      }
+      if (!isOpen) {
+        setStep(0); // Reset step when dialog closes
       }
     }, [isOpen, profile, form]);
 
@@ -129,19 +131,12 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             return;
         }
 
-        if (step === 1) {
-            const isValid = await form.trigger('initialWeight');
-            if (!isValid) return;
-        }
-        if (step === 2) {
-            const isValid = await form.trigger('goalWeight');
-            if (!isValid) return;
-        }
-        if (step === 3) {
-            const isValid = await form.trigger('transformationTarget');
-            if (!isValid) return;
-        }
-        
+        let isValid = true;
+        if (step === 1) isValid = await form.trigger('initialWeight');
+        if (step === 2) isValid = await form.trigger('goalWeight');
+        if (step === 3) isValid = await form.trigger('transformationTarget');
+        if (!isValid) return;
+
         if (step < 4) {
             setStep(step + 1);
         } else {
@@ -218,28 +213,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
     const renderStepContent = () => {
-        if (step === 0) {
-            return (
-                <div className="flex flex-col items-center justify-center text-center py-12 px-6 h-full">
-                     <DialogHeader>
-                        <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
-                        <DialogDescription className="text-lg text-muted-foreground pt-2">
-                           Taking this first step is the most important one. Let's create a plan tailored just for you.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex-1" />
-                     <DialogFooter className="w-full">
-                        <Button size="lg" className="w-full" onClick={handleNext}>
-                            Start Setup <ArrowRight className="ml-2 h-5 w-5" />
-                        </Button>
-                     </DialogFooter>
-                </div>
-            )
-        }
-
         if (step > 4) {
              return (
-                <div className="flex flex-col h-full">
+                <>
                     <DialogHeader>
                         <DialogTitle>Your Personalized Nutrition Plan</DialogTitle>
                         <DialogDescription>
@@ -247,30 +223,32 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                         </DialogDescription>
                     </DialogHeader>
 
-                    <ScrollArea className="flex-1 my-4">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[80px]">Week</TableHead>
-                                    <TableHead className="text-right">Calories</TableHead>
-                                    <TableHead className="text-right">Protein (g)</TableHead>
-                                    <TableHead className="text-right">Carbs (g)</TableHead>
-                                    <TableHead className="text-right">Fats (g)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {calculatedPlan?.map(week => (
-                                    <TableRow key={week.week}>
-                                        <TableCell className="font-medium">{week.week}</TableCell>
-                                        <TableCell className="text-right">{week.calories.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right">{week.protein}</TableCell>
-                                        <TableCell className="text-right">{week.carbs}</TableCell>
-                                        <TableCell className="text-right">{week.fats}</TableCell>
+                    <div className="flex-1 relative my-4">
+                        <ScrollArea className="absolute inset-0 pr-6">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[80px]">Week</TableHead>
+                                        <TableHead className="text-right">Calories</TableHead>
+                                        <TableHead className="text-right">Protein (g)</TableHead>
+                                        <TableHead className="text-right">Carbs (g)</TableHead>
+                                        <TableHead className="text-right">Fats (g)</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
+                                </TableHeader>
+                                <TableBody>
+                                    {calculatedPlan?.map(week => (
+                                        <TableRow key={week.week}>
+                                            <TableCell className="font-medium">{week.week}</TableCell>
+                                            <TableCell className="text-right">{week.calories.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">{week.protein}</TableCell>
+                                            <TableCell className="text-right">{week.carbs}</TableCell>
+                                            <TableCell className="text-right">{week.fats}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </div>
 
                     <DialogFooter>
                         <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
@@ -279,15 +257,15 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                             Let's Go!
                         </Button>
                     </DialogFooter>
-                </div>
+                </>
             );
         }
         
         return (
-            <div className="flex flex-col h-full">
+            <>
                 <DialogHeader>
                     <Progress value={(step / 4) * 100} className="w-full mb-4"/>
-                    <div className={cn(step !== 1 && 'hidden')}>
+                    <div className={cn(step !== 1 && step !== 0 && 'hidden')}>
                         <DialogTitle className="text-2xl">What's your current weight?</DialogTitle>
                     </div>
                      <div className={cn(step !== 2 && 'hidden')}>
@@ -304,6 +282,13 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
                 <Form {...form}>
                     <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex-1 flex flex-col items-center justify-center py-8">
+                         <div className={cn("w-full h-full flex flex-col items-center justify-center", step !== 0 && 'hidden')}>
+                            <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
+                            <DialogDescription className="text-lg text-muted-foreground pt-2">
+                            Taking this first step is the most important one. Let's create a plan tailored just for you.
+                            </DialogDescription>
+                        </div>
+
                         <div className={cn("w-full max-w-sm", step !== 1 && 'hidden')}>
                             <FormField control={form.control} name="initialWeight" render={({ field }) => (
                                 <FormItem>
@@ -342,16 +327,19 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 </Form>
                 
                 <DialogFooter>
-                    <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                    <Button onClick={handleNext} disabled={isLoading}>Next</Button>
+                    {step > 0 && <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>}
+                    <Button onClick={handleNext} disabled={isLoading} className={cn("w-full", step > 0 && "w-auto")}>
+                        {step === 0 ? "Start Setup" : "Next"}
+                        <ArrowRight className={cn("ml-2 h-5 w-5", step === 0 && "hidden")} />
+                    </Button>
                 </DialogFooter>
-            </div>
+            </>
         )
     };
     
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); } }}>
-            <DialogContent className="max-w-2xl min-h-[450px]">
+            <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
                {renderStepContent()}
             </DialogContent>
         </Dialog>
