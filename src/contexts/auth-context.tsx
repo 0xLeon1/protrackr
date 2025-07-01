@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import type { UserProfile, MacroPlan, WeeklyMacroGoal } from '@/types';
@@ -15,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   isFirebaseConfigured: boolean;
   dataVersion: number;
-  refreshData: () => Promise<void>;
+  refreshData: () => void;
   resetUserData: (password: string) => Promise<void>;
   macroPlan: MacroPlan | null;
   currentGoals: WeeklyMacroGoal | null;
@@ -35,40 +35,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  const fetchUserData = async (uid: string) => {
+  const fetchUserData = useCallback(async (uid: string) => {
     if (!db) return;
     
-    // Fetch Profile
-    const profileDocRef = doc(db, 'users', uid, 'data', 'profile');
-    const profileDoc = await getDoc(profileDocRef);
-    const userProfile = profileDoc.exists() ? profileDoc.data() as UserProfile : null;
-    setProfile(userProfile);
+    try {
+        const profileDocRef = doc(db, 'users', uid, 'data', 'profile');
+        const goalsDocRef = doc(db, 'users', uid, 'data', 'goals');
 
-    // Fetch Macro Plan
-    const goalsDocRef = doc(db, 'users', uid, 'data', 'goals');
-    const goalsDoc = await getDoc(goalsDocRef);
-    const userMacroPlan = goalsDoc.exists() ? goalsDoc.data() as MacroPlan : null;
-    setMacroPlan(userMacroPlan);
-    
-    // Determine current goals from the plan
-    if (userMacroPlan && userMacroPlan.plan && userMacroPlan.plan.length > 0) {
-        const weeksSinceStart = differenceInWeeks(new Date(), parseISO(userMacroPlan.startDate));
-        const currentWeekIndex = Math.max(0, Math.min(weeksSinceStart, userMacroPlan.plan.length - 1));
-        setCurrentGoals(userMacroPlan.plan[currentWeekIndex]);
-    } else {
+        const [profileDoc, goalsDoc] = await Promise.all([
+            getDoc(profileDocRef),
+            getDoc(goalsDocRef)
+        ]);
+        
+        const userProfile = profileDoc.exists() ? profileDoc.data() as UserProfile : null;
+        setProfile(userProfile);
+
+        const userMacroPlan = goalsDoc.exists() ? goalsDoc.data() as MacroPlan : null;
+        setMacroPlan(userMacroPlan);
+        
+        if (userMacroPlan?.plan?.length) {
+            const weeksSinceStart = differenceInWeeks(new Date(), parseISO(userMacroPlan.startDate));
+            const currentWeekIndex = Math.max(0, Math.min(weeksSinceStart, userMacroPlan.plan.length - 1));
+            setCurrentGoals(userMacroPlan.plan[currentWeekIndex]);
+        } else {
+            setCurrentGoals(null);
+        }
+    } catch (error) {
+        console.error("Error fetching user data:", error);
+        setProfile(null);
+        setMacroPlan(null);
         setCurrentGoals(null);
     }
-  };
+  }, []);
 
-  const refreshData = async () => {
-    if (user) {
-      setDataVersion(v => v + 1);
-    }
+  const refreshData = () => {
+    setDataVersion(v => v + 1);
   };
   
   const resetUserData = async (password: string) => {
-    if (!user || !user.email || !password || !auth || !db) {
-      throw new Error("User, email, or DB not available.");
+    if (!user || !user.email) {
+      throw new Error("User not authenticated.");
     }
     
     const currentUserName = profile?.name || 'User';
@@ -89,6 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
      for (const docId of dataDocsToDelete) {
+      if (!db) continue;
       const docRef = doc(db, 'users', user.uid, 'data', docId);
       await deleteDoc(docRef).catch((e) => console.log(`Could not delete ${docId}`, e));
     }
@@ -105,13 +112,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       targetDate: '',
       otherGoals: '',
     };
-    const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-    await setDoc(profileDocRef, minimalProfile);
+    if (db) {
+      const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+      await setDoc(profileDocRef, minimalProfile);
+    }
     
-    setDataVersion(v => v + 1);
+    refreshData();
   };
 
-
+  // Effect to subscribe to auth state changes
   useEffect(() => {
     const configured = !!auth;
     setIsFirebaseConfigured(configured);
@@ -120,37 +129,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
-    
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
-      setUser(user);
-      if (user) {
-        await fetchUserData(user.uid);
-      } else {
-        setProfile(null);
-        setMacroPlan(null);
-        setCurrentGoals(null);
-      }
-      setLoading(false);
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
     });
 
     return () => unsubscribe();
-  }, [dataVersion]);
-  
-  // Handles redirection based on auth state
+  }, []);
+
+  // Effect to fetch user data when user changes or a refresh is triggered
   useEffect(() => {
-    if (loading) return; // Wait for auth listener to resolve
+    if (user) {
+      setLoading(true);
+      fetchUserData(user.uid).finally(() => {
+        setLoading(false);
+      });
+    } else {
+      setProfile(null);
+      setMacroPlan(null);
+      setCurrentGoals(null);
+      setLoading(false);
+    }
+  }, [user, dataVersion, fetchUserData]);
+  
+  // Effect to handle routing based on auth state
+  useEffect(() => {
+    if (loading) return;
 
     const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/verify-email';
 
     if (!user && !isAuthPage) {
         router.push('/login');
-    } else if (user && !user.emailVerified && !isAuthPage) {
+    } else if (user && !user.emailVerified && pathname !== '/verify-email') {
         router.push('/verify-email');
     } else if (user && user.emailVerified && isAuthPage) {
         router.push('/');
     }
   }, [user, loading, pathname, router]);
+
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, dataVersion, refreshData, resetUserData, macroPlan, currentGoals }}>
