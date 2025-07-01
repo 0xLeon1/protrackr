@@ -30,6 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -46,7 +47,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 
 export default function Header() {
-  const { user, profile, isFirebaseConfigured, refreshData, resetUserData } = useAuth();
+  const { user, profile, isFirebaseConfigured, resetUserData, refreshData } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
