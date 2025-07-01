@@ -63,9 +63,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = async () => {
     if (user) {
       setLoading(true);
-      await fetchUserData(user.uid);
-      setDataVersion(v => v + 1);
-      setLoading(false);
+      try {
+        await fetchUserData(user.uid);
+      } finally {
+        setLoading(false);
+        setDataVersion(v => v + 1);
+      }
     }
   };
   
@@ -74,54 +77,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("User profile not available or password not provided.");
     }
     
-    setLoading(true);
-    try {
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
 
-      const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
-      for (const coll of collectionsToDelete) {
-        const collRef = collection(db, 'users', user.uid, coll);
-        const snapshot = await getDocs(collRef);
-        if (!snapshot.empty) {
-          const batch = writeBatch(db);
-          snapshot.docs.forEach(doc => batch.delete(doc.ref));
-          await batch.commit();
-        }
+    const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
+    for (const coll of collectionsToDelete) {
+      const collRef = collection(db, 'users', user.uid, coll);
+      const snapshot = await getDocs(collRef);
+      if (!snapshot.empty) {
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
       }
-      
-      const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
-      for (const docId of dataDocsToDelete) {
-        const docRef = doc(db, 'users', user.uid, 'data', docId);
-        await deleteDoc(docRef).catch(() => {});
-      }
-
-      const minimalProfile: UserProfile = {
-        name: profile.name,
-        signupDate: user.metadata.creationTime || new Date().toISOString(),
-        hasCompletedMacroSetup: false,
-        age: 0,
-        gender: 'male',
-        initialWeight: 0,
-        goalWeight: 0,
-        transformationTarget: '',
-        targetDate: '',
-        otherGoals: '',
-      };
-      const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-      await setDoc(profileDocRef, minimalProfile);
-      
-      // Directly update the state to prevent race conditions
-      setProfile(minimalProfile);
-      setMacroPlan(null);
-      setCurrentGoals(null);
-      setDataVersion(v => v + 1);
-
-    } catch (error) {
-      throw error;
-    } finally {
-      setLoading(false);
     }
+    
+    const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
+    for (const docId of dataDocsToDelete) {
+      const docRef = doc(db, 'users', user.uid, 'data', docId);
+      await deleteDoc(docRef).catch(() => {});
+    }
+
+    const minimalProfile: UserProfile = {
+      name: profile.name,
+      signupDate: user.metadata.creationTime || new Date().toISOString(),
+      hasCompletedMacroSetup: false,
+      age: 0,
+      gender: 'male',
+      initialWeight: 0,
+      goalWeight: 0,
+      transformationTarget: '',
+      targetDate: '',
+      otherGoals: '',
+    };
+    const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+    await setDoc(profileDocRef, minimalProfile);
+    
+    // Directly update the state to prevent race conditions
+    setProfile(minimalProfile);
+    setMacroPlan(null);
+    setCurrentGoals(null);
+    setDataVersion(v => v + 1);
   };
 
 

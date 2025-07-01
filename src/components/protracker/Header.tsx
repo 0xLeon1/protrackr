@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/contexts/auth-context';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { UserProfile } from '@/types';
+import { doc, setDoc } from 'firebase/firestore';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
@@ -106,10 +107,10 @@ export default function Header() {
   };
   
   const handleSaveChanges = async () => {
-    if (!user || !auth.currentUser || !editableProfile) return;
+    if (!user || !editableProfile) return;
 
     try {
-        const profileDocRef = doc(auth.currentUser.firestore, 'users', user.uid, 'data', 'profile');
+        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
         await setDoc(profileDocRef, editableProfile, { merge: true });
         
         await refreshData();
