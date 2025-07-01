@@ -13,25 +13,13 @@ import { doc, setDoc } from 'firebase/firestore';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { Dumbbell, LogOut, Trash2, Loader2, User as UserIcon, Edit } from "lucide-react";
+import { Dumbbell, LogOut, User as UserIcon, Edit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -47,13 +35,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 
 export default function Header() {
-  const { user, profile, isFirebaseConfigured, resetUserData, refreshData } = useAuth();
+  const { user, profile, isFirebaseConfigured, refreshData } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
-  const [password, setPassword] = useState('');
-  const [isResetting, setIsResetting] = useState(false);
-  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [editableProfile, setEditableProfile] = useState<Partial<UserProfile> | null>(null);
 
@@ -74,29 +59,6 @@ export default function Header() {
     }
     await signOut(auth);
     router.push('/login');
-  };
-  
-  const handleResetData = async () => {
-    if (!password) return;
-    setIsResetting(true);
-    try {
-      await resetUserData(password);
-      toast({ title: "Success!", description: "All your account data has been reset." });
-      setIsResetDialogOpen(false);
-      setPassword('');
-    } catch (error: any) {
-      let errorMessage = "Failed to reset data. Please check your password and try again.";
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        errorMessage = "Incorrect password. Please try again.";
-      }
-      toast({
-        title: "Error Resetting Data",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsResetting(false);
-    }
   };
 
   const handleProfileChange = (field: keyof UserProfile, value: string | number) => {
@@ -160,46 +122,6 @@ export default function Header() {
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Logout</span>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Reset Data</span>
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action is irreversible. It will permanently delete all your programs, logs, and tracking data. To confirm, please enter your password.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <div className="space-y-2 py-2">
-                        <Label htmlFor="password-confirm" className="sr-only">Password</Label>
-                        <Input
-                          id="password-confirm"
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Enter your password"
-                          onKeyDown={(e) => {
-                              if (e.key === 'Enter' && password) {
-                                  e.preventDefault();
-                                  handleResetData();
-                              }
-                          }}
-                        />
-                      </div>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setPassword('')}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleResetData} disabled={isResetting || !password} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                          {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          Confirm & Reset
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -216,7 +138,7 @@ export default function Header() {
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="age" className="text-right">Age</Label>
-                        <Input id="age" type="number" value={editableProfile.age || ''} onChange={(e) => handleProfileChange('age', e.target.value ? Number(e.target.value) : '')} className="col-span-3" />
+                        <Input id="age" type="number" value={editableProfile.age || ''} onChange={(e) => handleProfileChange('age', Number(e.target.value))} className="col-span-3" />
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="gender" className="text-right">Gender</Label>
@@ -230,11 +152,11 @@ export default function Header() {
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="initialWeight" className="text-right">Start Weight</Label>
-                        <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} onChange={(e) => handleProfileChange('initialWeight', e.target.value ? Number(e.target.value) : '')} className="col-span-3" />
+                        <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} onChange={(e) => handleProfileChange('initialWeight', Number(e.target.value))} className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="goalWeight" className="text-right">Goal Weight</Label>
-                        <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} onChange={(e) => handleProfileChange('goalWeight', e.target.value ? Number(e.target.value) : '')} className="col-span-3" />
+                        <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} onChange={(e) => handleProfileChange('goalWeight', Number(e.target.value))} className="col-span-3" />
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right text-muted-foreground">Target Date</Label>

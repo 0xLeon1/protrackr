@@ -2,10 +2,10 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { onAuthStateChanged, User, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import type { UserProfile, MacroPlan, WeeklyMacroGoal } from '@/types';
-import { doc, getDoc, writeBatch, collection, getDocs, deleteDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { usePathname, useRouter } from 'next/navigation';
 import { differenceInWeeks, parseISO } from 'date-fns';
 
@@ -15,7 +15,6 @@ interface AuthContextType {
   loading: boolean;
   isFirebaseConfigured: boolean;
   refreshData: () => Promise<void>;
-  resetUserData: (password: string) => Promise<void>;
   macroPlan: MacroPlan | null;
   currentGoals: WeeklyMacroGoal | null;
 }
@@ -68,65 +67,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshData = useCallback(async () => {
     if (user) {
+        setLoading(true);
         await fetchUserData(user.uid);
+        setLoading(false);
     }
   }, [user, fetchUserData]);
-  
-  const resetUserData = async (password: string) => {
-    if (!user || !user.email) {
-      throw new Error("User not authenticated.");
-    }
-    
-    const currentUserName = profile?.name || 'User';
 
-    // 1. Reauthenticate user
-    const credential = EmailAuthProvider.credential(user.email, password);
-    await reauthenticateWithCredential(user, credential);
-
-    if (db) {
-        // 2. Delete all user subcollections
-        const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
-        for (const coll of collectionsToDelete) {
-          const collRef = collection(db, 'users', user.uid, coll);
-          const snapshot = await getDocs(collRef);
-          if (!snapshot.empty) {
-            const batch = writeBatch(db);
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-          }
-        }
-        
-        // 3. Delete all user data documents
-        const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
-         for (const docId of dataDocsToDelete) {
-          const docRef = doc(db, 'users', user.uid, 'data', docId);
-          await deleteDoc(docRef).catch((e) => console.log(`Could not delete ${docId}`, e));
-        }
-
-        // 4. Create a new minimal profile in the database
-        const minimalProfile: UserProfile = {
-          name: currentUserName,
-          signupDate: user.metadata.creationTime || new Date().toISOString(),
-          hasCompletedMacroSetup: false,
-          age: 0,
-          gender: 'male',
-          initialWeight: 0,
-          goalWeight: 0,
-          transformationTarget: '',
-          targetDate: '',
-          otherGoals: '',
-        };
-        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-        await setDoc(profileDocRef, minimalProfile);
-
-        // 5. Manually update the context state to reflect the reset, fixing the race condition.
-        setProfile(minimalProfile);
-        setMacroPlan(null);
-        setCurrentGoals(null);
-    }
-  };
-
-  // Effect to subscribe to auth state changes and perform initial data load
   useEffect(() => {
     const configured = !!auth;
     setIsFirebaseConfigured(configured);
@@ -152,7 +98,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [fetchUserData]);
 
-  // Effect to handle routing based on auth state
   useEffect(() => {
     if (loading) return;
 
@@ -168,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, refreshData, resetUserData, macroPlan, currentGoals }}>
+    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, refreshData, macroPlan, currentGoals }}>
       {children}
     </AuthContext.Provider>
   );
