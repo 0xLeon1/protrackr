@@ -62,8 +62,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = async () => {
     if (user) {
         setLoading(true);
-        await fetchUserData(user.uid);
-        setLoading(false);
+        try {
+            await fetchUserData(user.uid);
+        } catch (error) {
+            console.error("Error during data refresh:", error);
+        } finally {
+            setLoading(false);
+        }
     }
     setDataVersion(v => v + 1);
   };
@@ -107,13 +112,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         router.push('/');
     }
   }, [user, loading, pathname, router]);
-
-  // This effect is now a fallback, direct refreshData calls are preferred
-  useEffect(() => {
-    if (user) {
-        fetchUserData(user.uid);
-    }
-  }, [dataVersion, user]);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, dataVersion, refreshData, macroPlan, currentGoals }}>
