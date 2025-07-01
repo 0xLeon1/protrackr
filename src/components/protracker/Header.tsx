@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function Header() {
   const { user, profile, isFirebaseConfigured, refreshData } = useAuth();
@@ -260,7 +261,17 @@ export default function Header() {
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right text-muted-foreground">Target Date</Label>
-                        <p className="col-span-3 text-sm font-medium text-muted-foreground">{format(parseISO(editableProfile.targetDate), 'MMM d, yyyy')}</p>
+                        <p className="col-span-3 text-sm font-medium text-muted-foreground">{editableProfile.targetDate ? format(parseISO(editableProfile.targetDate), 'MMM d, yyyy') : 'Not Set'}</p>
+                    </div>
+                    <div className="grid grid-cols-4 items-start gap-4">
+                        <Label htmlFor="otherGoals" className="text-right pt-2">Your 'Why'</Label>
+                        <Textarea 
+                            id="otherGoals" 
+                            value={editableProfile.otherGoals || ''} 
+                            onChange={(e) => handleProfileChange('otherGoals', e.target.value)} 
+                            className="col-span-3 min-h-[80px]" 
+                            placeholder="e.g. To have more energy for my family..."
+                        />
                     </div>
                   </div>
                 )}
