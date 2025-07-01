@@ -15,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   isFirebaseConfigured: boolean;
   dataVersion: number;
-  refreshData: () => void;
+  refreshData: () => Promise<void>;
   resetUserData: (password: string) => Promise<void>;
   macroPlan: MacroPlan | null;
   currentGoals: WeeklyMacroGoal | null;
@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserData = useCallback(async (uid: string) => {
     if (!db) return;
     
+    setLoading(true);
     try {
         const profileDocRef = doc(db, 'users', uid, 'data', 'profile');
         const goalsDocRef = doc(db, 'users', uid, 'data', 'goals');
@@ -65,12 +66,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile(null);
         setMacroPlan(null);
         setCurrentGoals(null);
+    } finally {
+        setLoading(false);
     }
   }, []);
 
-  const refreshData = () => {
-    setDataVersion(v => v + 1);
-  };
+  const refreshData = useCallback(async () => {
+    if (user) {
+        await fetchUserData(user.uid);
+    }
+  }, [user, fetchUserData]);
   
   const resetUserData = async (password: string) => {
     if (!user || !user.email) {
@@ -79,9 +84,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const currentUserName = profile?.name || 'User';
 
+    // 1. Reauthenticate user
     const credential = EmailAuthProvider.credential(user.email, password);
     await reauthenticateWithCredential(user, credential);
 
+    // 2. Delete all user subcollections
     const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
     for (const coll of collectionsToDelete) {
       const collRef = collection(db, 'users', user.uid, coll);
@@ -93,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
+    // 3. Delete all user data documents
     const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
      for (const docId of dataDocsToDelete) {
       if (!db) continue;
@@ -100,6 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await deleteDoc(docRef).catch((e) => console.log(`Could not delete ${docId}`, e));
     }
 
+    // 4. Create a new minimal profile in the database
     const minimalProfile: UserProfile = {
       name: currentUserName,
       signupDate: user.metadata.creationTime || new Date().toISOString(),
@@ -112,12 +121,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       targetDate: '',
       otherGoals: '',
     };
-    if (db) {
-      const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-      await setDoc(profileDocRef, minimalProfile);
-    }
-    
-    refreshData();
+    const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+    await setDoc(profileDocRef, minimalProfile);
+
+    // 5. Manually update the context state to reflect the reset
+    setProfile(minimalProfile);
+    setMacroPlan(null);
+    setCurrentGoals(null);
   };
 
   // Effect to subscribe to auth state changes
@@ -137,20 +147,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  // Effect to fetch user data when user changes or a refresh is triggered
+  // Effect to fetch user data when user changes
   useEffect(() => {
     if (user) {
-      setLoading(true);
-      fetchUserData(user.uid).finally(() => {
-        setLoading(false);
-      });
+      fetchUserData(user.uid);
     } else {
+      setLoading(false);
       setProfile(null);
       setMacroPlan(null);
       setCurrentGoals(null);
-      setLoading(false);
     }
-  }, [user, dataVersion, fetchUserData]);
+  }, [user, fetchUserData]);
   
   // Effect to handle routing based on auth state
   useEffect(() => {

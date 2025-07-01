@@ -30,7 +30,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -55,7 +54,7 @@ export default function Header() {
   const [isResetting, setIsResetting] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
-  const [editableProfile, setEditableProfile] = useState<UserProfile | null>(null);
+  const [editableProfile, setEditableProfile] = useState<Partial<UserProfile> | null>(null);
 
   useEffect(() => {
     if (isProfileDialogOpen && profile) {
@@ -108,6 +107,7 @@ export default function Header() {
   const handleSaveChanges = async () => {
     if (!user || !editableProfile) return;
     
+    // Validate required fields
     if (!editableProfile.name || !editableProfile.age || editableProfile.age <= 0 || !editableProfile.initialWeight || editableProfile.initialWeight <= 0 || !editableProfile.goalWeight || editableProfile.goalWeight <= 0) {
       toast({
         title: "Invalid Profile Data",
@@ -211,11 +211,11 @@ export default function Header() {
                   <div className="pt-4 grid gap-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="name" className="text-right">Name</Label>
-                        <Input id="name" value={editableProfile.name} onChange={(e) => handleProfileChange('name', e.target.value)} className="col-span-3" />
+                        <Input id="name" value={editableProfile.name || ''} onChange={(e) => handleProfileChange('name', e.target.value)} className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="age" className="text-right">Age</Label>
-                        <Input id="age" type="number" value={editableProfile.age || ''} onChange={(e) => handleProfileChange('age', Number(e.target.value))} className="col-span-3" />
+                        <Input id="age" type="number" value={editableProfile.age || ''} onChange={(e) => handleProfileChange('age', e.target.value ? Number(e.target.value) : '')} className="col-span-3" />
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="gender" className="text-right">Gender</Label>
@@ -229,11 +229,11 @@ export default function Header() {
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="initialWeight" className="text-right">Start Weight</Label>
-                        <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} onChange={(e) => handleProfileChange('initialWeight', Number(e.target.value))} className="col-span-3" />
+                        <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} onChange={(e) => handleProfileChange('initialWeight', e.target.value ? Number(e.target.value) : '')} className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="goalWeight" className="text-right">Goal Weight</Label>
-                        <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} onChange={(e) => handleProfileChange('goalWeight', Number(e.target.value))} className="col-span-3" />
+                        <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} onChange={(e) => handleProfileChange('goalWeight', e.target.value ? Number(e.target.value) : '')} className="col-span-3" />
                     </div>
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right text-muted-foreground">Target Date</Label>
