@@ -62,21 +62,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshData = async () => {
     if (user) {
-      setLoading(true);
-      try {
-        await fetchUserData(user.uid);
-      } finally {
-        setLoading(false);
-        setDataVersion(v => v + 1);
-      }
+      setDataVersion(v => v + 1);
     }
   };
   
   const resetUserData = async (password: string) => {
-    if (!user || !user.email || !password || !auth || !db || !profile) {
-      throw new Error("User profile not available or password not provided.");
+    if (!user || !user.email || !password || !auth || !db) {
+      throw new Error("User, email, or DB not available.");
     }
     
+    const currentUserName = profile?.name || 'User';
+
     const credential = EmailAuthProvider.credential(user.email, password);
     await reauthenticateWithCredential(user, credential);
 
@@ -92,13 +88,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
-    for (const docId of dataDocsToDelete) {
+     for (const docId of dataDocsToDelete) {
       const docRef = doc(db, 'users', user.uid, 'data', docId);
-      await deleteDoc(docRef).catch(() => {});
+      await deleteDoc(docRef).catch((e) => console.log(`Could not delete ${docId}`, e));
     }
 
     const minimalProfile: UserProfile = {
-      name: profile.name,
+      name: currentUserName,
       signupDate: user.metadata.creationTime || new Date().toISOString(),
       hasCompletedMacroSetup: false,
       age: 0,
@@ -112,10 +108,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
     await setDoc(profileDocRef, minimalProfile);
     
-    // Directly update the state to prevent race conditions
-    setProfile(minimalProfile);
-    setMacroPlan(null);
-    setCurrentGoals(null);
     setDataVersion(v => v + 1);
   };
 
@@ -143,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [dataVersion]);
   
   // Handles redirection based on auth state
   useEffect(() => {
