@@ -256,7 +256,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                            Changing your plan will reset your start date and all current progress. To confirm, please enter your password.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-8 space-y-4">
+                    <div className="flex-1 flex flex-col justify-center">
                         <div className="space-y-2">
                            <Label htmlFor="password-confirm">Password</Label>
                            <div className="relative">
@@ -275,7 +275,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
                                  onClick={() => setShowPassword(!showPassword)}
                                >
-                                 {showPassword ? <EyeOff /> : <Eye />}
+                                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                </Button>
                            </div>
                         </div>
@@ -365,6 +365,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 <Form {...form}>
                     <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center flex-1">
                         <div className={cn("w-full h-full flex flex-col items-center justify-center", step === 0 ? 'block' : 'hidden')}></div>
+                        
                         <div className={cn("w-full max-w-sm", step === 1 ? 'block' : 'hidden')}>
                             <FormField control={form.control} name="initialWeight" render={({ field }) => (
                                 <FormItem>
@@ -415,7 +416,10 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
-            <DialogContent className={cn("max-w-2xl flex flex-col", step < 5 ? "h-auto" : "h-[85vh]")}>
+            <DialogContent className={cn(
+                "max-w-2xl flex flex-col",
+                step === 5 ? "h-[85vh]" : (step === 6 ? "min-h-[380px]" : "h-auto")
+            )}>
                {renderStepContent()}
             </DialogContent>
         </Dialog>
