@@ -62,13 +62,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = async () => {
     if (user) {
         setLoading(true);
-        try {
-            await fetchUserData(user.uid);
-        } catch (error) {
-            console.error("Error during data refresh:", error);
-        } finally {
-            setLoading(false);
-        }
+        await fetchUserData(user.uid);
+        setLoading(false);
     }
     setDataVersion(v => v + 1);
   };
