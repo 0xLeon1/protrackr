@@ -103,25 +103,25 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         const totalWeeks = parseInt(transformationTarget, 10);
         const isCutting = goalWeight < initialWeight;
 
-        const age = profile.age || 25;
-        const gender = profile.gender || 'male';
-
-        let bmr;
-        if (gender === 'male') {
-            bmr = 88.362 + (13.397 * (initialWeight / 2.20462)) + (4.799 * 178) - (5.677 * age);
-        } else {
-            bmr = 447.593 + (9.247 * (initialWeight / 2.20462)) + (3.098 * 165) - (4.330 * age);
-        }
-
-        const maintenanceCals = bmr * 1.55; 
-        const startingCalories = isCutting ? maintenanceCals - 500 : maintenanceCals + 300;
+        const startingCalories = goalWeight * 15;
         
         const plan: WeeklyMacroGoal[] = [];
 
         for (let i = 0; i < totalWeeks; i++) {
             const week = i + 1;
-            const calorieAdjustment = Math.floor(i / 4) * (isCutting ? -75 : 75);
-            const weeklyCalories = Math.round((startingCalories + calorieAdjustment) / 10) * 10;
+            const periods = Math.floor((week - 1) / 2); // How many 2-week periods have passed
+
+            let weeklyCalories;
+
+            if (isCutting) {
+                const minCalories = goalWeight * 10;
+                const currentCals = startingCalories - (periods * 200);
+                weeklyCalories = Math.max(minCalories, currentCals);
+            } else { // Bulking
+                const maxCalories = goalWeight * 18; // Sensible ceiling
+                const currentCals = startingCalories + (periods * 200);
+                weeklyCalories = Math.min(maxCalories, currentCals);
+            }
             
             const proteinGrams = Math.round(goalWeight * 1);
             const proteinCals = proteinGrams * 4;
@@ -134,7 +134,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
             plan.push({
                 week,
-                calories: weeklyCalories,
+                calories: Math.round(weeklyCalories),
                 protein: proteinGrams,
                 carbs: carbGrams,
                 fats: fatGrams,
