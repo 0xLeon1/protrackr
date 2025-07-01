@@ -79,7 +79,7 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
       toast({ title: "Plan Reset", description: "You can now set up a new nutrition plan."});
 
       // 3. Refresh global state
-      refreshData();
+      await refreshData();
       
       // 4. Close the confirmation dialog
       setResetStep('closed');
@@ -234,8 +234,8 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
       <NutritionPlanSetup
         isOpen={isPlanSetupOpen}
         onClose={() => setIsPlanSetupOpen(false)}
-        onPlanSet={() => {
-            refreshData();
+        onPlanSet={async () => {
+            await refreshData();
             setIsPlanSetupOpen(false);
         }}
       />

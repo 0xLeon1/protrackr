@@ -15,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   isFirebaseConfigured: boolean;
   dataVersion: number;
-  refreshData: () => void;
+  refreshData: () => Promise<void>;
   macroPlan: MacroPlan | null;
   currentGoals: WeeklyMacroGoal | null;
 }
@@ -59,7 +59,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const refreshData = () => {
+  const refreshData = async () => {
+    if (user) {
+        setLoading(true);
+        await fetchUserData(user.uid);
+        setLoading(false);
+    }
     setDataVersion(v => v + 1);
   };
 
@@ -73,6 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       setUser(user);
       if (user) {
         await fetchUserData(user.uid);
@@ -102,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, pathname, router]);
 
-  // Refresh profile data when dataVersion changes
+  // This effect is now a fallback, direct refreshData calls are preferred
   useEffect(() => {
     if (user) {
         fetchUserData(user.uid);

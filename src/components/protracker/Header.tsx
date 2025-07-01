@@ -122,7 +122,7 @@ export default function Header() {
         
         toast({ title: "Success!", description: "All your account data has been reset." });
         
-        refreshData();
+        await refreshData();
         
         setIsResetDialogOpen(false);
         setPassword('');
@@ -155,7 +155,7 @@ export default function Header() {
         const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
         await setDoc(profileDocRef, editableProfile, { merge: true });
         
-        refreshData();
+        await refreshData();
         toast({ title: "Profile Updated", description: "Your changes have been saved." });
         setIsProfileDialogOpen(false);
     } catch (error) {

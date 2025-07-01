@@ -156,8 +156,8 @@ export default function HomePage() {
       <NutritionPlanSetup 
           isOpen={isSetupOpen && !profile.hasCompletedMacroSetup} 
           onClose={() => setIsSetupOpen(false)} 
-          onPlanSet={() => {
-              refreshData();
+          onPlanSet={async () => {
+              await refreshData();
               setIsSetupOpen(false);
           }}
       />

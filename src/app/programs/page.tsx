@@ -165,7 +165,7 @@ export default function ProgramsPage() {
             title: "Cardio Logged!",
             description: `${log.modality} for ${log.duration} minutes has been saved.`
         });
-        refreshData(); // Triggers re-fetch on other pages
+        await refreshData(); // Triggers re-fetch on other pages
     } catch (error) {
         console.error("Error logging cardio:", error);
         toast({ title: "Logging Failed", description: "Could not save your cardio session.", variant: "destructive" });

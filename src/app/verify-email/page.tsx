@@ -28,7 +28,7 @@ export default function VerifyEmailPage() {
                 await auth.currentUser.reload();
                 if (auth.currentUser.emailVerified) {
                     clearInterval(interval);
-                    refreshData(); // Ensure profile data is fresh upon redirect
+                    await refreshData(); // Ensure profile data is fresh upon redirect
                     toast({ title: "Email Verified!", description: "Welcome! Redirecting you now..." });
                     router.push('/');
                 }

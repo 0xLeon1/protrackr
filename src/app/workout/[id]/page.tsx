@@ -118,7 +118,7 @@ export default function ActiveWorkoutPage() {
 
     await addDoc(collection(db, 'users', user.uid, 'logs'), newLog);
 
-    refreshData(); // To update analytics page, etc.
+    await refreshData(); // To update analytics page, etc.
 
     toast({
         title: "Workout Complete!",
