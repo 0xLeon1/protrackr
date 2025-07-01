@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowRight, Check, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ArrowRight, Check, Eye, EyeOff, TrendingUp, Target, Calendar } from 'lucide-react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -30,6 +30,7 @@ import { Progress } from '../ui/progress';
 import { Textarea } from '../ui/textarea';
 import { cn } from '@/lib/utils';
 import { reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { Card, CardContent, CardHeader } from '../ui/card';
 
 interface NutritionPlanSetupProps {
     isOpen: boolean;
@@ -86,6 +87,14 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         }
     }, [isOpen, profile, form]);
 
+    const averageWeeklyChange = useMemo(() => {
+        if (!formData) return 0;
+        const { initialWeight, goalWeight, transformationTarget } = formData;
+        const totalChange = goalWeight - initialWeight;
+        const weeks = parseInt(transformationTarget, 10);
+        if (weeks === 0) return 0;
+        return totalChange / weeks;
+    }, [formData]);
 
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
@@ -161,7 +170,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
     const handleProceedToConfirmation = () => {
         if (isEditingExistingPlan) {
-            setStep(6);
+            setStep(7);
         } else {
             savePlanData();
         }
@@ -247,7 +256,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
     const renderStepContent = () => {
-        if (step === 6) {
+        if (step === 7) {
              return (
                 <>
                     <DialogHeader>
@@ -291,7 +300,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             );
         }
         
-        if (step === 5) {
+        if (step === 6) {
              return (
                 <>
                     <DialogHeader className="shrink-0">
@@ -337,10 +346,65 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             );
         }
         
+        if (step === 5) {
+            return (
+                <>
+                    <DialogHeader>
+                        <DialogTitle>Your Transformation At a Glance</DialogTitle>
+                        <DialogDescription>
+                            Here's a summary of your goal. Your personalized plan is designed for safe and sustainable progress.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 flex flex-col items-center justify-center space-y-8">
+                        <div className="grid grid-cols-3 gap-4 text-center w-full max-w-md">
+                             <Card>
+                                <CardHeader className="p-3 pb-0">
+                                    <CardDescription className="flex items-center justify-center gap-2"><TrendingUp className="h-4 w-4" /> Start Weight</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-3">
+                                    <p className="text-3xl font-bold">{formData?.initialWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p>
+                                </CardContent>
+                            </Card>
+                             <Card>
+                                <CardHeader className="p-3 pb-0">
+                                    <CardDescription className="flex items-center justify-center gap-2"><Target className="h-4 w-4" /> Goal Weight</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-3">
+                                    <p className="text-3xl font-bold">{formData?.goalWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p>
+                                </CardContent>
+                            </Card>
+                             <Card>
+                                <CardHeader className="p-3 pb-0">
+                                    <CardDescription className="flex items-center justify-center gap-2"><Calendar className="h-4 w-4" /> Timeline</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-3">
+                                     <p className="text-3xl font-bold">{formData?.transformationTarget}<span className="text-base font-medium text-muted-foreground"> wks</span></p>
+                                </CardContent>
+                            </Card>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-lg">Your journey will involve an average change of</p>
+                            <p className="text-2xl font-bold text-primary">{Math.abs(averageWeeklyChange).toFixed(1)} lbs per week</p>
+                        </div>
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 text-green-700 dark:text-green-400 max-w-md text-sm text-center">
+                           <Check className="h-5 w-5 shrink-0" />
+                           <p>This plan is designed for a healthy rate of {goalType}, which is under our recommended maximum of 2.5 lbs per week.</p>
+                        </div>
+                    </div>
+                     <DialogFooter>
+                        <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
+                        <Button onClick={() => setStep(6)} disabled={isLoading}>
+                            View My Plan <ArrowRight className="ml-2 h-5 w-5" />
+                        </Button>
+                    </DialogFooter>
+                </>
+            )
+        }
+        
         return (
             <>
                 <DialogHeader>
-                    <Progress value={(step / 4) * 100} className="w-full mb-4"/>
+                    <Progress value={(step / 5) * 100} className="w-full mb-4"/>
                     <div className={cn(step !== 0 && 'hidden')}>
                         <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
                         <DialogDescription className="text-lg text-muted-foreground pt-2">
@@ -418,7 +482,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
             <DialogContent className={cn(
                 "max-w-2xl flex flex-col",
-                step === 5 ? "h-[85vh]" : (step === 6 ? "min-h-[380px]" : "h-auto")
+                step === 6 ? "h-[85vh]" : (step === 5 || step === 7 ? "min-h-[500px]" : "h-auto")
             )}>
                {renderStepContent()}
             </DialogContent>
