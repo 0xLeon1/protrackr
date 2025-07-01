@@ -77,8 +77,8 @@ export default function Header() {
   };
   
   const handleResetData = async () => {
-    if (!user || !user.email || !password || !db) {
-        toast({ title: "Error", description: "Password is required.", variant: "destructive" });
+    if (!user || !user.email || !password || !db || !profile) {
+        toast({ title: "Error", description: "User profile not available. Please wait and try again.", variant: "destructive" });
         return;
     }
     setIsResetting(true);
@@ -90,7 +90,7 @@ export default function Header() {
         // 2. Delete all user data from Firestore
         toast({ title: "Deleting data...", description: "This may take a moment."});
 
-        const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes'];
+        const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
         
         for (const coll of collectionsToDelete) {
             const collRef = collection(db, 'users', user.uid, coll);
@@ -109,6 +109,16 @@ export default function Header() {
             const docRef = doc(db, 'users', user.uid, 'data', docId);
             await deleteDoc(docRef).catch(() => {});
         }
+
+        // 3. Recreate the minimal user profile to prevent app lock
+        const minimalProfile = {
+            name: profile.name,
+            signupDate: user.metadata.creationTime || new Date().toISOString(),
+            hasCompletedMacroSetup: false,
+        };
+        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+        await setDoc(profileDocRef, minimalProfile);
+
         
         toast({ title: "Success!", description: "All your account data has been reset." });
         
