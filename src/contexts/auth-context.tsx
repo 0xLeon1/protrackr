@@ -2,10 +2,10 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import type { UserProfile, MacroPlan, WeeklyMacroGoal } from '@/types';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, getDocs, deleteDoc, setDoc } from 'firebase/firestore';
 import { usePathname, useRouter } from 'next/navigation';
 import { differenceInWeeks, parseISO } from 'date-fns';
 
@@ -16,6 +16,7 @@ interface AuthContextType {
   isFirebaseConfigured: boolean;
   dataVersion: number;
   refreshData: () => Promise<void>;
+  resetUserData: (password: string) => Promise<void>;
   macroPlan: MacroPlan | null;
   currentGoals: WeeklyMacroGoal | null;
 }
@@ -61,12 +62,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshData = async () => {
     if (user) {
-        setLoading(true);
-        await fetchUserData(user.uid);
-        setLoading(false);
+      setLoading(true);
+      await fetchUserData(user.uid);
+      setDataVersion(v => v + 1);
+      setLoading(false);
     }
-    setDataVersion(v => v + 1);
   };
+  
+  const resetUserData = async (password: string) => {
+    if (!user || !user.email || !password || !auth || !db || !profile) {
+      throw new Error("User profile not available or password not provided.");
+    }
+    
+    setLoading(true);
+    try {
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+
+      const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
+      for (const coll of collectionsToDelete) {
+        const collRef = collection(db, 'users', user.uid, coll);
+        const snapshot = await getDocs(collRef);
+        if (!snapshot.empty) {
+          const batch = writeBatch(db);
+          snapshot.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+        }
+      }
+      
+      const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
+      for (const docId of dataDocsToDelete) {
+        const docRef = doc(db, 'users', user.uid, 'data', docId);
+        await deleteDoc(docRef).catch(() => {});
+      }
+
+      const minimalProfile: UserProfile = {
+        name: profile.name,
+        signupDate: user.metadata.creationTime || new Date().toISOString(),
+        hasCompletedMacroSetup: false,
+        age: 0,
+        gender: 'male',
+        initialWeight: 0,
+        goalWeight: 0,
+        transformationTarget: '',
+        targetDate: '',
+        otherGoals: '',
+      };
+      const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+      await setDoc(profileDocRef, minimalProfile);
+      
+      // Directly update the state to prevent race conditions
+      setProfile(minimalProfile);
+      setMacroPlan(null);
+      setCurrentGoals(null);
+      setDataVersion(v => v + 1);
+
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     const configured = !!auth;
@@ -109,7 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, dataVersion, refreshData, macroPlan, currentGoals }}>
+    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, dataVersion, refreshData, resetUserData, macroPlan, currentGoals }}>
       {children}
     </AuthContext.Provider>
   );

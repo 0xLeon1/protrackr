@@ -3,10 +3,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signOut, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { useAuth } from '@/contexts/auth-context';
-import { auth, db } from '@/lib/firebase';
-import { collection, getDocs, writeBatch, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { UserProfile } from '@/types';
@@ -47,7 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 
 export default function Header() {
-  const { user, profile, isFirebaseConfigured, refreshData } = useAuth();
+  const { user, profile, isFirebaseConfigured, refreshData, resetUserData } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -77,68 +76,26 @@ export default function Header() {
   };
   
   const handleResetData = async () => {
-    if (!user || !user.email || !password || !db || !profile) {
-        toast({ title: "Error", description: "User profile not available. Please wait and try again.", variant: "destructive" });
-        return;
-    }
+    if (!password) return;
     setIsResetting(true);
+
     try {
-        // 1. Re-authenticate user
-        const credential = EmailAuthProvider.credential(user.email, password);
-        await reauthenticateWithCredential(user, credential);
-        
-        // 2. Delete all user data from Firestore
-        toast({ title: "Deleting data...", description: "This may take a moment."});
-
-        const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
-        
-        for (const coll of collectionsToDelete) {
-            const collRef = collection(db, 'users', user.uid, coll);
-            const snapshot = await getDocs(collRef);
-            if (!snapshot.empty) {
-                const batch = writeBatch(db);
-                snapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
-            }
-        }
-        
-        const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
-        for (const docId of dataDocsToDelete) {
-            const docRef = doc(db, 'users', user.uid, 'data', docId);
-            await deleteDoc(docRef).catch(() => {});
-        }
-
-        // 3. Recreate the minimal user profile to prevent app lock
-        const minimalProfile = {
-            name: profile.name,
-            signupDate: user.metadata.creationTime || new Date().toISOString(),
-            hasCompletedMacroSetup: false,
-        };
-        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-        await setDoc(profileDocRef, minimalProfile);
-
-        
-        toast({ title: "Success!", description: "All your account data has been reset." });
-        
-        await refreshData();
-        
-        setIsResetDialogOpen(false);
-        setPassword('');
-
+      await resetUserData(password);
+      toast({ title: "Success!", description: "All your account data has been reset." });
+      setIsResetDialogOpen(false);
+      setPassword('');
     } catch (error: any) {
-        let errorMessage = "Failed to reset data. Please check your password and try again.";
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            errorMessage = "Incorrect password. Please try again.";
-        }
-        toast({
-            title: "Error",
-            description: errorMessage,
-            variant: "destructive"
-        });
+      let errorMessage = "Failed to reset data. Please check your password and try again.";
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMessage = "Incorrect password. Please try again.";
+      }
+      toast({
+        title: "Error Resetting Data",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
-        setIsResetting(false);
+      setIsResetting(false);
     }
   };
 
@@ -149,10 +106,10 @@ export default function Header() {
   };
   
   const handleSaveChanges = async () => {
-    if (!user || !db || !editableProfile) return;
+    if (!user || !auth.currentUser || !editableProfile) return;
 
     try {
-        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+        const profileDocRef = doc(auth.currentUser.firestore, 'users', user.uid, 'data', 'profile');
         await setDoc(profileDocRef, editableProfile, { merge: true });
         
         await refreshData();

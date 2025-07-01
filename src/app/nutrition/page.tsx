@@ -175,8 +175,8 @@ export default function NutritionPage() {
             <NutritionPlanSetup 
                 isOpen={isSetupOpen} 
                 onClose={() => setIsSetupOpen(false)} 
-                onPlanSet={async () => {
-                    await refreshData();
+                onPlanSet={() => {
+                    refreshData();
                     setIsSetupOpen(false);
                 }}
             />
