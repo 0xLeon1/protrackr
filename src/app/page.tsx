@@ -25,12 +25,6 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
-  
-  useEffect(() => {
     if (user) {
       const fetchData = async () => {
         // Fetch Meal Logs for Macro Rings & Consistency
@@ -97,13 +91,12 @@ export default function HomePage() {
   }, [todaysLogs]);
 
   const welcomeMessage = useMemo(() => {
-    if (!user || !profile) return "";
-    
-    // Check if it's the user's first session vs a returning session
+    if (!user) return "";
+    if (!profile) return "Welcome!";
+
     const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
     const lastSignInTime = user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : 0;
     
-    // If last sign-in is within 60 seconds of creation time, they are a new user.
     if (lastSignInTime - creationTime < 60000) {
         return `Welcome, ${profile.name}!`;
     } else {
@@ -111,7 +104,7 @@ export default function HomePage() {
     }
   }, [user, profile]);
 
-  if (loading || !user || !profile) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -119,14 +112,27 @@ export default function HomePage() {
     );
   }
 
+  if (!user) {
+    // This case is handled by the redirect in AuthContext, but as a fallback
+    return null;
+  }
+  
+  const needsSetup = !profile || !profile.hasCompletedMacroSetup;
+
   return (
     <div className="space-y-6">
-       {!profile.hasCompletedMacroSetup && (
+       {needsSetup ? (
         <div>
           <h1 className="text-3xl font-bold">{welcomeMessage}</h1>
           <p className="text-muted-foreground">To get started, let's create your personalized nutrition plan.</p>
         </div>
+      ) : (
+        <div>
+          <h1 className="text-3xl font-bold">{welcomeMessage}</h1>
+          <p className="text-muted-foreground">Here's your dashboard for today.</p>
+        </div>
       )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <div className="space-y-6">
           <ConsistencyTracker 
@@ -134,9 +140,7 @@ export default function HomePage() {
             workoutDays={consistencyData.workoutDays}
             nutritionDays={consistencyData.nutritionDays}
           />
-          {profile.hasCompletedMacroSetup ? (
-            currentGoals && <MacroRings currentIntake={currentIntake} goals={currentGoals} />
-          ) : (
+          {needsSetup ? (
             <Card>
                 <CardHeader>
                     <CardTitle>Your Nutrition Plan</CardTitle>
@@ -149,15 +153,17 @@ export default function HomePage() {
                     </Button>
                 </CardContent>
             </Card>
+          ) : (
+            currentGoals && <MacroRings currentIntake={currentIntake} goals={currentGoals} />
           )}
         </div>
         <DailyCheckin />
       </div>
       <NutritionPlanSetup 
-          isOpen={isSetupOpen && !profile.hasCompletedMacroSetup} 
+          isOpen={isSetupOpen && needsSetup} 
           onClose={() => setIsSetupOpen(false)} 
           onPlanSet={() => {
-              refreshData(); // No need to await, context handles loading state
+              refreshData();
               setIsSetupOpen(false);
           }}
       />

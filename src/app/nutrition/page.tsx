@@ -27,12 +27,6 @@ export default function NutritionPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
-
-  useEffect(() => {
     if (user && profile?.hasCompletedMacroSetup) {
         const fetchData = async () => {
             // Fetch Meal Logs
@@ -147,15 +141,19 @@ export default function NutritionPage() {
     }), { calories: 0, protein: 0, carbs: 0, fats: 0 });
   }, [todaysLogs]);
 
-  if (loading || !user || !profile) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-full min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
+  
+  if (!user) {
+    return null;
+  }
 
-  if (!profile.hasCompletedMacroSetup) {
+  if (!profile || !profile.hasCompletedMacroSetup) {
     return (
         <>
             <div className="flex justify-center items-center h-full min-h-[50vh]">
