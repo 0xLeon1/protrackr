@@ -30,7 +30,7 @@ import { Progress } from '../ui/progress';
 import { Textarea } from '../ui/textarea';
 import { cn } from '@/lib/utils';
 import { reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { Card, CardContent, CardHeader } from '../ui/card';
+import { Card, CardContent, CardHeader, CardDescription } from '../ui/card';
 
 interface NutritionPlanSetupProps {
     isOpen: boolean;
@@ -489,3 +489,4 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         </Dialog>
     );
 }
+
