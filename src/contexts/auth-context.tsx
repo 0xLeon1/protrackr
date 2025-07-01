@@ -14,7 +14,6 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   isFirebaseConfigured: boolean;
-  dataVersion: number;
   refreshData: () => Promise<void>;
   resetUserData: (password: string) => Promise<void>;
   macroPlan: MacroPlan | null;
@@ -30,7 +29,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentGoals, setCurrentGoals] = useState<WeeklyMacroGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState(false);
-  const [dataVersion, setDataVersion] = useState(0);
   
   const router = useRouter();
   const pathname = usePathname();
@@ -38,7 +36,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserData = useCallback(async (uid: string) => {
     if (!db) return;
     
-    setLoading(true);
     try {
         const profileDocRef = doc(db, 'users', uid, 'data', 'profile');
         const goalsDocRef = doc(db, 'users', uid, 'data', 'goals');
@@ -66,8 +63,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile(null);
         setMacroPlan(null);
         setCurrentGoals(null);
-    } finally {
-        setLoading(false);
     }
   }, []);
 
@@ -88,77 +83,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const credential = EmailAuthProvider.credential(user.email, password);
     await reauthenticateWithCredential(user, credential);
 
-    // 2. Delete all user subcollections
-    const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
-    for (const coll of collectionsToDelete) {
-      const collRef = collection(db, 'users', user.uid, coll);
-      const snapshot = await getDocs(collRef);
-      if (!snapshot.empty) {
-        const batch = writeBatch(db);
-        snapshot.docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-      }
-    }
-    
-    // 3. Delete all user data documents
-    const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
-     for (const docId of dataDocsToDelete) {
-      if (!db) continue;
-      const docRef = doc(db, 'users', user.uid, 'data', docId);
-      await deleteDoc(docRef).catch((e) => console.log(`Could not delete ${docId}`, e));
-    }
+    if (db) {
+        // 2. Delete all user subcollections
+        const collectionsToDelete = ['programs', 'logs', 'meal-logs', 'bodyweight-logs', 'checkins', 'sleep-logs', 'custom-foods', 'recipes', 'cardio-logs'];
+        for (const coll of collectionsToDelete) {
+          const collRef = collection(db, 'users', user.uid, coll);
+          const snapshot = await getDocs(collRef);
+          if (!snapshot.empty) {
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+          }
+        }
+        
+        // 3. Delete all user data documents
+        const dataDocsToDelete = ['goals', 'profile', 'recent-foods'];
+         for (const docId of dataDocsToDelete) {
+          const docRef = doc(db, 'users', user.uid, 'data', docId);
+          await deleteDoc(docRef).catch((e) => console.log(`Could not delete ${docId}`, e));
+        }
 
-    // 4. Create a new minimal profile in the database
-    const minimalProfile: UserProfile = {
-      name: currentUserName,
-      signupDate: user.metadata.creationTime || new Date().toISOString(),
-      hasCompletedMacroSetup: false,
-      age: 0,
-      gender: 'male',
-      initialWeight: 0,
-      goalWeight: 0,
-      transformationTarget: '',
-      targetDate: '',
-      otherGoals: '',
-    };
-    const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-    await setDoc(profileDocRef, minimalProfile);
+        // 4. Create a new minimal profile in the database
+        const minimalProfile: UserProfile = {
+          name: currentUserName,
+          signupDate: user.metadata.creationTime || new Date().toISOString(),
+          hasCompletedMacroSetup: false,
+          age: 0,
+          gender: 'male',
+          initialWeight: 0,
+          goalWeight: 0,
+          transformationTarget: '',
+          targetDate: '',
+          otherGoals: '',
+        };
+        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+        await setDoc(profileDocRef, minimalProfile);
 
-    // 5. Manually update the context state to reflect the reset
-    setProfile(minimalProfile);
-    setMacroPlan(null);
-    setCurrentGoals(null);
+        // 5. Manually update the context state to reflect the reset, fixing the race condition.
+        setProfile(minimalProfile);
+        setMacroPlan(null);
+        setCurrentGoals(null);
+    }
   };
 
-  // Effect to subscribe to auth state changes
+  // Effect to subscribe to auth state changes and perform initial data load
   useEffect(() => {
     const configured = !!auth;
     setIsFirebaseConfigured(configured);
-
     if (!configured) {
-      setLoading(false);
-      return;
+        setLoading(false);
+        return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        setLoading(true);
+        if (firebaseUser) {
+            setUser(firebaseUser);
+            await fetchUserData(firebaseUser.uid);
+        } else {
+            setUser(null);
+            setProfile(null);
+            setMacroPlan(null);
+            setCurrentGoals(null);
+        }
+        setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [fetchUserData]);
 
-  // Effect to fetch user data when user changes
-  useEffect(() => {
-    if (user) {
-      fetchUserData(user.uid);
-    } else {
-      setLoading(false);
-      setProfile(null);
-      setMacroPlan(null);
-      setCurrentGoals(null);
-    }
-  }, [user, fetchUserData]);
-  
   // Effect to handle routing based on auth state
   useEffect(() => {
     if (loading) return;
@@ -174,9 +167,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, pathname, router]);
 
-
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, dataVersion, refreshData, resetUserData, macroPlan, currentGoals }}>
+    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, refreshData, resetUserData, macroPlan, currentGoals }}>
       {children}
     </AuthContext.Provider>
   );
