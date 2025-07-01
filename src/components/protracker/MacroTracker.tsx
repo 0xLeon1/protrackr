@@ -23,8 +23,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 
@@ -57,7 +58,7 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
   };
 
   const handleResetConfirm = async () => {
-    if (!user || !user.email || !password || !auth) {
+    if (!user || !user.email || !password || !auth || !db) {
         toast({ title: "Error", description: "Password is required.", variant: "destructive" });
         return;
     }
@@ -67,9 +68,21 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
 
-      // On success, close the dialog and open the plan setup
+      // 1. Delete the existing macro plan
+      const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
+      await deleteDoc(goalsDocRef);
+      
+      // 2. Update profile to indicate setup is needed
+      const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+      await updateDoc(profileDocRef, { hasCompletedMacroSetup: false });
+      
+      toast({ title: "Plan Reset", description: "You can now set up a new nutrition plan."});
+
+      // 3. Refresh global state
+      refreshData();
+      
+      // 4. Close the confirmation dialog
       setResetStep('closed');
-      setIsPlanSetupOpen(true);
 
     } catch (error: any) {
         toast({
