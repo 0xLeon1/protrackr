@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -10,7 +9,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -130,11 +129,9 @@ export default function SettingsPage() {
                         placeholder="e.g. To have more energy for my family..."
                     />
                 </div>
+                <Button onClick={handleSaveChanges}>Save Changes</Button>
             </div>
         </CardContent>
-        <CardFooter className="border-t px-6 py-4">
-            <Button onClick={handleSaveChanges}>Save Changes</Button>
-        </CardFooter>
       </Card>
     </div>
   );
