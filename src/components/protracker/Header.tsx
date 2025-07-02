@@ -13,7 +13,7 @@ import { doc, setDoc } from 'firebase/firestore';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { Dumbbell, LogOut, User as UserIcon, Edit } from "lucide-react";
+import { Dumbbell, LogOut, User as UserIcon, Edit, Settings } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,6 +117,10 @@ export default function Header() {
                   <DropdownMenuItem onSelect={() => setIsProfileDialogOpen(true)}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => router.push('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
