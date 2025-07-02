@@ -43,6 +43,17 @@ const schema = z.object({
                 path: ['benchPress1RM'],
             });
         }
+    }
+    if (data.experience === 'intermediate') {
+         if (!data.squat1RM) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Squat max is required for intermediates.",
+                path: ['squat1RM'],
+            });
+        }
+    }
+    if (data.experience === 'advanced') {
         if (!data.squat1RM) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -50,8 +61,6 @@ const schema = z.object({
                 path: ['squat1RM'],
             });
         }
-    }
-    if (data.experience === 'advanced') {
         if (!data.deadlift1RM) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -68,7 +77,7 @@ type FormData = z.infer<typeof schema>;
 const STEPS = [
     { id: 1, field: 'experience', title: "What's your experience level?", options: [{value: 'beginner', label: 'Beginner (<1yr)'}, {value: 'intermediate', label: 'Intermediate (1-3yrs)'}, {value: 'advanced', label: 'Advanced (3+yrs)'}] },
     { id: 2, field: 'frequency', title: "How many days a week can you train?", options: [{value: '3', label: '3 Days'}, {value: '4', label: '4 Days'}, {value: '5', label: '5 Days'}, {value: '6', label: '6 Days'}] },
-    { id: 3, field: 'goal', title: "What's your primary goal?", options: [{value: 'Build Muscle', label: 'Build Muscle'}, {value: 'Lose Body Fat', label: 'Get Toned & Defined'}] },
+    { id: 3, field: 'goal', title: "What's your primary goal?", options: [{value: 'Build Muscle', label: 'Build Muscle'}, {value: 'Lose Body Fat', label: 'Lose Body Fat'}, {value: 'Get Toned & Defined', label: 'Get Toned & Defined'}] },
 ];
 
 export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: ProgramGeneratorProps) {
@@ -334,7 +343,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                 <RadioGroup
                                     onValueChange={field.onChange}
                                     value={field.value}
-                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full"
+                                    className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full"
                                 >
                                     {currentStepInfo.options.map(option => (
                                         <Label key={option.value} htmlFor={option.value} className={cn("relative flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer",
