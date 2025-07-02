@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, orderBy, limit } from 'firebase/firestore';
 
 export default function ActiveWorkoutPage() {
   const params = useParams();
@@ -24,6 +24,7 @@ export default function ActiveWorkoutPage() {
   const [programName, setProgramName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [lastWorkout, setLastWorkout] = useState<Workout | null>(null);
+  const [currentWeek, setCurrentWeek] = useState(1);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -36,7 +37,6 @@ export default function ActiveWorkoutPage() {
       const fetchWorkoutData = async () => {
         setIsLoading(true);
         try {
-            // Load Programs to find the workout
             const programsCollection = collection(db, 'users', user.uid, 'programs');
             const programsSnapshot = await getDocs(programsCollection);
             const programs: Program[] = programsSnapshot.docs.map(doc => doc.data() as Program);
@@ -54,26 +54,42 @@ export default function ActiveWorkoutPage() {
             }
             
             if (foundWorkout) {
+              setProgramName(foundProgramName);
+
+              const logsCollection = collection(db, 'users', user.uid, 'logs');
+              const q = query(
+                logsCollection, 
+                where("workoutId", "==", workoutId),
+                orderBy("completedAt", "desc"),
+                limit(1)
+              );
+              const logSnapshot = await getDocs(q);
+              
+              let nextWeek = 1;
+              if (!logSnapshot.empty) {
+                const lastLog = logSnapshot.docs[0].data() as WorkoutLogEntry;
+                setLastWorkout(lastLog.workoutSnapshot);
+                const lastWeekCompleted = lastLog.weekCompleted || 0;
+                nextWeek = lastWeekCompleted < 12 ? lastWeekCompleted + 1 : 1;
+              }
+              setCurrentWeek(nextWeek);
+
               const workoutWithPerformance = {
                 ...foundWorkout,
                 exercises: foundWorkout.exercises.map(ex => {
                   
-                  // Default to the base exercise values
-                  let weekSets = ex.sets as number;
-                  let weekReps = ex.reps;
-                  let weekWeight = ex.weight;
+                  const progressionForThisWeek = ex.progression?.find(p => p.week === nextWeek);
 
-                  // TODO: Implement week tracking. For now, assume it's always Week 1.
-                  if (ex.progression && ex.progression.length > 0) {
-                    const week1Progression = ex.progression.find(p => p.week === 1);
-                    if (week1Progression) {
-                        weekSets = week1Progression.sets;
-                        weekReps = week1Progression.reps;
-                        weekWeight = week1Progression.weight;
-                    }
-                  }
+                  let weekSets = progressionForThisWeek?.sets || (ex.sets as number);
+                  let weekReps = progressionForThisWeek?.reps || ex.reps;
+                  let weekWeight = progressionForThisWeek?.weight || ex.weight;
                   
-                  const repValue = weekReps ? parseInt(String(weekReps).split('-')[0], 10) : '';
+                  if (typeof weekSets !== 'number' || isNaN(weekSets)) {
+                      weekSets = 1;
+                  }
+
+                  const repValue = String(weekReps).split('-')[0];
+                  const parsedRep = parseInt(repValue, 10);
 
                   return {
                     ...ex,
@@ -82,7 +98,7 @@ export default function ActiveWorkoutPage() {
                     weight: weekWeight,
                     performance: Array.from({ length: weekSets }, (_, i) => ({
                       id: `set-${ex.id}-${i}`,
-                      reps: isNaN(repValue) ? '' : repValue,
+                      reps: isNaN(parsedRep) ? '' : parsedRep,
                       weight: weekWeight || '',
                       completed: false,
                     })),
@@ -91,22 +107,7 @@ export default function ActiveWorkoutPage() {
               };
 
               setWorkout(workoutWithPerformance);
-              setProgramName(foundProgramName);
-
-              // Load History to find the last completed session for this workout
-              const logsCollection = collection(db, 'users', user.uid, 'logs');
-              const q = query(
-                logsCollection, 
-                where("workoutId", "==", workoutId)
-              );
-              const logSnapshot = await getDocs(q);
-
-              if (!logSnapshot.empty) {
-                const allLogsForThisWorkout = logSnapshot.docs.map(doc => doc.data() as WorkoutLogEntry);
-                allLogsForThisWorkout.sort((a,b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
-                const lastLog = allLogsForThisWorkout[0];
-                setLastWorkout(lastLog.workoutSnapshot);
-              }
+              
             }
         } catch(error) {
             console.error("Error fetching workout data: ", error);
@@ -131,17 +132,17 @@ export default function ActiveWorkoutPage() {
   const handleFinishWorkout = async () => {
     if (!workout || !user) return;
     
-    // Create a new log entry
     const newLog: Omit<WorkoutLogEntry, 'logId'> = {
       workoutId,
       programName,
       completedAt: new Date().toISOString(),
       workoutSnapshot: workout,
+      weekCompleted: currentWeek,
     };
 
     await addDoc(collection(db, 'users', user.uid, 'logs'), newLog);
 
-    await refreshData(); // To update analytics page, etc.
+    await refreshData();
 
     toast({
         title: "Workout Complete!",
@@ -186,7 +187,7 @@ export default function ActiveWorkoutPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Button>
             <h1 className="text-3xl font-bold">{workout.name}</h1>
-            <p className="text-muted-foreground">{programName}</p>
+            <p className="text-muted-foreground">{programName} - Week {currentWeek}</p>
         </div>
         <Button onClick={handleFinishWorkout} className="mt-2 bg-green-500 hover:bg-green-600 text-white">Finish Workout</Button>
       </div>

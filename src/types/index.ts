@@ -42,6 +42,7 @@ export type WorkoutLogEntry = {
     programName: string;
     completedAt: string;
     workoutSnapshot: Workout;
+    weekCompleted?: number;
 };
 
 export type BodyWeightLogEntry = {
