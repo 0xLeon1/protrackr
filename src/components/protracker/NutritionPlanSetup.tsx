@@ -3,8 +3,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { db, auth } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import type { MacroPlan, WeeklyMacroGoal, UserProfile } from '@/types';
 import { add } from 'date-fns';
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '../ui/progress';
 import { Textarea } from '../ui/textarea';
 import { cn } from '@/lib/utils';
-import { reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardDescription } from '../ui/card';
 
 interface NutritionPlanSetupProps {
@@ -47,17 +46,12 @@ const formSchema = z.object({
 type FormSchemaType = z.infer<typeof formSchema>;
 
 export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: NutritionPlanSetupProps) {
-    const { user, profile } = useAuth();
+    const { user, profile, macroPlan } = useAuth();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const [step, setStep] = useState(0);
     const [formData, setFormData] = useState<FormSchemaType | null>(null);
     const [otherGoals, setOtherGoals] = useState('');
-    
-    const [isEditingExistingPlan, setIsEditingExistingPlan] = useState(false);
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [isReauthing, setIsReauthing] = useState(false);
 
     const form = useForm<FormSchemaType>({
       resolver: zodResolver(formSchema),
@@ -71,7 +65,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
     useEffect(() => {
         if (isOpen && profile) {
-            setIsEditingExistingPlan(profile.hasCompletedMacroSetup);
             form.reset({
                 initialWeight: profile.initialWeight || undefined,
                 goalWeight: profile.goalWeight || undefined,
@@ -79,22 +72,27 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             });
             setOtherGoals(profile.otherGoals || '');
             setFormData(null);
-            setPassword('');
-            setShowPassword(false);
         }
         if (!isOpen) {
             setStep(0);
         }
     }, [isOpen, profile, form]);
 
-    const averageWeeklyChange = useMemo(() => {
-        if (!formData) return 0;
-        const { initialWeight, goalWeight, transformationTarget } = formData;
-        const totalChange = goalWeight - initialWeight;
-        const weeks = parseInt(transformationTarget, 10);
-        if (weeks === 0) return 0;
-        return totalChange / weeks;
-    }, [formData]);
+    const handleConfirmPlan = async () => {
+        if (!user) return;
+        setIsLoading(true);
+        try {
+            const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+            await updateDoc(profileDocRef, { hasCompletedMacroSetup: true });
+            toast({ title: "Plan Confirmed!", description: "You're all set to start tracking." });
+            onPlanSet();
+        } catch (error) {
+            console.error("Error confirming plan:", error);
+            toast({ title: "Error", description: "Could not confirm your plan.", variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
@@ -165,17 +163,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     const onCalculate = (values: FormSchemaType) => {
         setFormData(values);
-        setStep(5);
+        setStep(5); // Go to plan summary
     };
 
-    const handleProceedToConfirmation = () => {
-        if (isEditingExistingPlan) {
-            setStep(7);
-        } else {
-            savePlanData();
-        }
-    }
-    
     const savePlanData = async () => {
         if (!user || !profile || !calculatedPlan || !formData) {
             toast({
@@ -191,8 +181,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             const now = new Date();
             const targetDate = add(now, { weeks: parseInt(formData.transformationTarget) });
 
-            const updatedProfileData: UserProfile = {
-                ...profile,
+            const updatedProfileData: Partial<UserProfile> = {
                 initialWeight: formData.initialWeight,
                 goalWeight: formData.goalWeight,
                 transformationTarget: formData.transformationTarget,
@@ -201,16 +190,16 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 otherGoals: otherGoals,
             };
 
-            const macroPlan: MacroPlan = {
+            const macroPlanData: MacroPlan = {
                 startDate: now.toISOString(),
                 plan: calculatedPlan,
             };
 
             const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
-            await setDoc(goalsDocRef, macroPlan);
+            await setDoc(goalsDocRef, macroPlanData);
 
             const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-            await setDoc(profileDocRef, updatedProfileData);
+            await updateDoc(profileDocRef, updatedProfileData);
             
             toast({
                 title: "Nutrition Plan Set!",
@@ -231,76 +220,56 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         }
     };
 
-    const handleReauthenticateAndSave = async () => {
-        if (!user || !user.email || !password || !auth) {
-            toast({ title: "Error", description: "Password is required.", variant: "destructive" });
-            return;
-        }
+    // If a plan exists but isn't confirmed, show the confirmation view
+    if (isOpen && profile && !profile.hasCompletedMacroSetup && macroPlan && macroPlan.plan.length > 0) {
+        const firstWeek = macroPlan.plan[0];
+        const goalType = profile.goalWeight < profile.initialWeight ? 'Fat Loss' : 'Muscle Gain';
 
-        setIsReauthing(true);
-        try {
-            const credential = EmailAuthProvider.credential(user.email, password);
-            await reauthenticateWithCredential(user, credential);
-            await savePlanData();
-        } catch (error: any) {
-            toast({
-                title: "Authentication Failed",
-                description: "Incorrect password. Please try again.",
-                variant: "destructive"
-            });
-        } finally {
-            setIsReauthing(false);
-        }
-    };
+        return (
+            <Dialog open={isOpen} onOpenChange={onClose}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl">Your Transformation Plan is Ready!</DialogTitle>
+                        <DialogDescription>
+                          Here is the {macroPlan.plan.length}-week {goalType} plan we've generated for you. Review and confirm to start your journey.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="text-center p-4 rounded-lg bg-muted">
+                            <p className="text-sm text-muted-foreground">Your plan will adjust over time. It starts with:</p>
+                            <p className="font-bold text-lg">{firstWeek.calories.toLocaleString()} kcal / day</p>
+                            <p className="text-sm text-muted-foreground">
+                                P: {firstWeek.protein}g, C: {firstWeek.carbs}g, F: {firstWeek.fats}g
+                            </p>
+                        </div>
+                        <p className="text-xs text-center text-muted-foreground">You can view the full week-by-week breakdown in the Macro Tracker on the Nutrition page.</p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={onClose} disabled={isLoading}>Maybe Later</Button>
+                        <Button onClick={handleConfirmPlan} disabled={isLoading} className="bg-green-500 hover:bg-green-600 text-white">
+                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                            Confirm & Start Tracking
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
 
+    // --- Fallback to Plan Creation Form ---
+    const averageWeeklyChange = useMemo(() => {
+        if (!formData) return 0;
+        const { initialWeight, goalWeight, transformationTarget } = formData;
+        const totalChange = goalWeight - initialWeight;
+        const weeks = parseInt(transformationTarget, 10);
+        if (weeks === 0) return 0;
+        return totalChange / weeks;
+    }, [formData]);
+    
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
     const renderStepContent = () => {
-        if (step === 7) {
-             return (
-                <>
-                    <DialogHeader>
-                        <DialogTitle>Confirm to Edit Plan</DialogTitle>
-                        <DialogDescription>
-                           Changing your plan will reset your start date and all current progress. To confirm, please enter your password.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex-1 flex flex-col justify-center">
-                        <div className="space-y-2">
-                           <Label htmlFor="password-confirm">Password</Label>
-                           <div className="relative">
-                               <Input
-                                 id="password-confirm"
-                                 type={showPassword ? 'text' : 'password'}
-                                 value={password}
-                                 onChange={(e) => setPassword(e.target.value)}
-                                 placeholder="Enter your password"
-                                 onKeyDown={(e) => e.key === 'Enter' && password && handleReauthenticateAndSave()}
-                               />
-                               <Button
-                                 type="button"
-                                 variant="ghost"
-                                 size="icon"
-                                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                                 onClick={() => setShowPassword(!showPassword)}
-                               >
-                                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                               </Button>
-                           </div>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={handleBack} disabled={isReauthing}>Back</Button>
-                        <Button onClick={handleReauthenticateAndSave} disabled={isReauthing || !password}>
-                            {isReauthing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirm & Save Changes
-                        </Button>
-                    </DialogFooter>
-                </>
-            );
-        }
-        
-        if (step === 6) {
+        if (step === 6) { // Final confirmation step of creation
              return (
                 <>
                     <DialogHeader className="shrink-0">
@@ -309,7 +278,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                             Based on your info, here's a recommended plan for your {goalType} goal over {formData?.transformationTarget} weeks.
                         </DialogDescription>
                     </DialogHeader>
-
                     <div className="flex-1 overflow-auto my-4 pr-4">
                         <Table>
                             <TableHeader>
@@ -334,12 +302,11 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                             </TableBody>
                         </Table>
                     </div>
-
                     <DialogFooter className="shrink-0">
                         <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                        <Button onClick={handleProceedToConfirmation} disabled={isLoading} className="bg-green-500 hover:bg-green-600">
+                        <Button onClick={savePlanData} disabled={isLoading} className="bg-green-500 hover:bg-green-600">
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                            {isEditingExistingPlan ? "Proceed to Confirmation" : "Let's Go!"}
+                            Let's Go!
                         </Button>
                     </DialogFooter>
                 </>
@@ -357,30 +324,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                     </DialogHeader>
                     <div className="flex-1 flex flex-col items-center justify-center space-y-8">
                         <div className="grid grid-cols-3 gap-4 text-center w-full max-w-md">
-                             <Card>
-                                <CardHeader className="p-3 pb-0">
-                                    <CardDescription className="flex items-center justify-center gap-2"><TrendingUp className="h-4 w-4" /> Start Weight</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-3">
-                                    <p className="text-3xl font-bold">{formData?.initialWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p>
-                                </CardContent>
-                            </Card>
-                             <Card>
-                                <CardHeader className="p-3 pb-0">
-                                    <CardDescription className="flex items-center justify-center gap-2"><Target className="h-4 w-4" /> Goal Weight</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-3">
-                                    <p className="text-3xl font-bold">{formData?.goalWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p>
-                                </CardContent>
-                            </Card>
-                             <Card>
-                                <CardHeader className="p-3 pb-0">
-                                    <CardDescription className="flex items-center justify-center gap-2"><Calendar className="h-4 w-4" /> Timeline</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-3">
-                                     <p className="text-3xl font-bold">{formData?.transformationTarget}<span className="text-base font-medium text-muted-foreground"> wks</span></p>
-                                </CardContent>
-                            </Card>
+                             <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><TrendingUp className="h-4 w-4" /> Start Weight</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.initialWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p></CardContent></Card>
+                             <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><Target className="h-4 w-4" /> Goal Weight</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.goalWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p></CardContent></Card>
+                             <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><Calendar className="h-4 w-4" /> Timeline</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.transformationTarget}<span className="text-base font-medium text-muted-foreground"> wks</span></p></CardContent></Card>
                         </div>
                         <div className="text-center">
                             <p className="text-lg">Your journey will involve an average change of</p>
@@ -393,9 +339,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                     </div>
                      <DialogFooter>
                         <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                        <Button onClick={() => setStep(6)} disabled={isLoading}>
-                            View My Plan <ArrowRight className="ml-2 h-5 w-5" />
-                        </Button>
+                        <Button onClick={() => setStep(6)} disabled={isLoading}>View My Plan <ArrowRight className="ml-2 h-5 w-5" /></Button>
                     </DialogFooter>
                 </>
             )
@@ -405,68 +349,21 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             <>
                 <DialogHeader>
                     <Progress value={(step / 5) * 100} className="w-full mb-4"/>
-                    <div className={cn(step !== 0 && 'hidden')}>
-                        <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
-                        <DialogDescription className="text-lg text-muted-foreground pt-2">
-                            Taking this first step is the most important one. Let's create a plan tailored just for you.
-                        </DialogDescription>
-                    </div>
-                    <div className={cn(step !== 1 && 'hidden')}>
-                        <DialogTitle className="text-2xl">What's your current weight?</DialogTitle>
-                    </div>
-                     <div className={cn(step !== 2 && 'hidden')}>
-                        <DialogTitle className="text-2xl">What's your goal weight?</DialogTitle>
-                    </div>
-                     <div className={cn(step !== 3 && 'hidden')}>
-                        <DialogTitle className="text-2xl">How long is your transformation timeline?</DialogTitle>
-                    </div>
-                     <div className={cn(step !== 4 && 'hidden')}>
-                        <DialogTitle className="text-2xl">What other goals do you have?</DialogTitle>
-                        <DialogDescription>This is optional, but helps to keep you motivated.</DialogDescription>
-                    </div>
+                    <div className={cn(step !== 0 && 'hidden')}><DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle><DialogDescription className="text-lg text-muted-foreground pt-2">Taking this first step is the most important one.</DialogDescription></div>
+                    <div className={cn(step !== 1 && 'hidden')}><DialogTitle className="text-2xl">What's your current weight?</DialogTitle></div>
+                    <div className={cn(step !== 2 && 'hidden')}><DialogTitle className="text-2xl">What's your goal weight?</DialogTitle></div>
+                    <div className={cn(step !== 3 && 'hidden')}><DialogTitle className="text-2xl">How long is your transformation timeline?</DialogTitle></div>
+                    <div className={cn(step !== 4 && 'hidden')}><DialogTitle className="text-2xl">What's your 'Why'?</DialogTitle><DialogDescription>This is optional, but helps to keep you motivated.</DialogDescription></div>
                 </DialogHeader>
-
                 <Form {...form}>
                     <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center flex-1">
                         <div className={cn("w-full h-full flex flex-col items-center justify-center", step === 0 ? 'block' : 'hidden')}></div>
-                        
-                        <div className={cn("w-full max-w-sm", step === 1 ? 'block' : 'hidden')}>
-                            <FormField control={form.control} name="initialWeight" render={({ field }) => (
-                                <FormItem>
-                                    <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 180" {...field} autoFocus /></FormControl>
-                                    <FormMessage className="text-center pt-2" />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <div className={cn("w-full max-w-sm", step === 2 ? 'block' : 'hidden')}>
-                             <FormField control={form.control} name="goalWeight" render={({ field }) => (
-                                <FormItem>
-                                    <FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 170" {...field} autoFocus /></FormControl>
-                                    <FormMessage className="text-center pt-2" />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <div className={cn("w-full max-w-sm", step === 3 ? 'block' : 'hidden')}>
-                            <FormField control={form.control} name="transformationTarget" render={({ field }) => (
-                                <FormItem>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger className="text-lg py-6"><SelectValue placeholder="Select an option..." /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="8">8 Weeks</SelectItem>
-                                            <SelectItem value="12">12 Weeks</SelectItem>
-                                            <SelectItem value="16">16 Weeks</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <div className={cn("w-full max-w-sm", step === 4 ? 'block' : 'hidden')}>
-                             <Textarea value={otherGoals} onChange={(e) => setOtherGoals(e.target.value)} placeholder="My goal is to have more energy and feel more confident..." className="min-h-[100px]" />
-                        </div>
+                        <div className={cn("w-full max-w-sm", step === 1 ? 'block' : 'hidden')}><FormField control={form.control} name="initialWeight" render={({ field }) => (<FormItem><FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 180" {...field} autoFocus /></FormControl><FormMessage className="text-center pt-2" /></FormItem>)} /></div>
+                        <div className={cn("w-full max-w-sm", step === 2 ? 'block' : 'hidden')}><FormField control={form.control} name="goalWeight" render={({ field }) => (<FormItem><FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 170" {...field} autoFocus /></FormControl><FormMessage className="text-center pt-2" /></FormItem>)} /></div>
+                        <div className={cn("w-full max-w-sm", step === 3 ? 'block' : 'hidden')}><FormField control={form.control} name="transformationTarget" render={({ field }) => (<FormItem><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="text-lg py-6"><SelectValue placeholder="Select an option..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="8">8 Weeks</SelectItem><SelectItem value="12">12 Weeks</SelectItem><SelectItem value="16">16 Weeks</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} /></div>
+                        <div className={cn("w-full max-w-sm", step === 4 ? 'block' : 'hidden')}><Textarea value={otherGoals} onChange={(e) => setOtherGoals(e.target.value)} placeholder="My goal is to have more energy and feel more confident..." className="min-h-[100px]" /></div>
                     </form>
                 </Form>
-                
                 <DialogFooter>
                     {step > 0 && <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>}
                     <Button onClick={handleNext} disabled={isLoading} className={cn("w-full", step > 0 && "w-auto")}>
@@ -480,13 +377,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
-            <DialogContent className={cn(
-                "max-w-2xl flex flex-col",
-                step === 6 ? "h-[85vh]" : (step === 5 || step === 7 ? "min-h-[500px]" : "h-auto")
-            )}>
+            <DialogContent className={cn("max-w-2xl flex flex-col", step === 6 ? "h-[85vh]" : (step === 5 ? "min-h-[500px]" : "h-auto"))}>
                {renderStepContent()}
             </DialogContent>
         </Dialog>
     );
 }
-

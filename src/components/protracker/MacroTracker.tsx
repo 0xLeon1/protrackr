@@ -6,28 +6,13 @@ import type { WeeklyMacroGoal } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Settings, Forward, Check, BookOpen, Loader2 } from "lucide-react";
+import { Forward, Check, BookOpen } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { parseISO, endOfWeek, differenceInDays } from 'date-fns';
 import NutritionPlanSetup from "./NutritionPlanSetup";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import { auth, db } from "@/lib/firebase";
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
 
 
 interface MacroTrackerProps {
@@ -40,61 +25,10 @@ interface MacroTrackerProps {
 }
 
 export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
-  const { user, profile, macroPlan, currentGoals, refreshData } = useAuth();
-  const { toast } = useToast();
-
+  const { profile, macroPlan, currentGoals, refreshData } = useAuth();
+  
   const [isPlanSetupOpen, setIsPlanSetupOpen] = useState(false);
   const [isFullPlanOpen, setIsFullPlanOpen] = useState(false);
-  
-  const [resetStep, setResetStep] = useState<'closed' | 'warning' | 'password'>('closed');
-  const [password, setPassword] = useState('');
-  const [isResetting, setIsResetting] = useState(false);
-
-
-  const handleOpenResetDialog = () => {
-    setResetStep('warning');
-    setPassword('');
-    setIsResetting(false);
-  };
-
-  const handleResetConfirm = async () => {
-    if (!user || !user.email || !password || !auth || !db) {
-        toast({ title: "Error", description: "Password is required.", variant: "destructive" });
-        return;
-    }
-    
-    setIsResetting(true);
-    try {
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
-
-      // 1. Delete the existing macro plan
-      const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
-      await deleteDoc(goalsDocRef);
-      
-      // 2. Update profile to indicate setup is needed
-      const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-      await updateDoc(profileDocRef, { hasCompletedMacroSetup: false });
-      
-      toast({ title: "Plan Reset", description: "You can now set up a new nutrition plan."});
-
-      // 3. Refresh global state
-      await refreshData();
-      
-      // 4. Close the confirmation dialog
-      setResetStep('closed');
-
-    } catch (error: any) {
-        toast({
-            title: "Authentication Failed",
-            description: "Incorrect password. Please try again.",
-            variant: "destructive"
-        });
-    } finally {
-        setIsResetting(false);
-    }
-  };
-
 
   if (!profile || !macroPlan || !currentGoals) {
     return null; // Or a loading/skeleton state
@@ -176,10 +110,6 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
                         </ScrollArea>
                     </DialogContent>
                 </Dialog>
-                <Button variant="ghost" size="icon" onClick={handleOpenResetDialog}>
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">Adjust Plan</span>
-                </Button>
             </div>
         </div>
       </CardHeader>
@@ -239,56 +169,6 @@ export default function MacroTracker({ currentIntake }: MacroTrackerProps) {
             setIsPlanSetupOpen(false);
         }}
       />
-      
-      <Dialog open={resetStep !== 'closed'} onOpenChange={(open) => !open && setResetStep('closed')}>
-        <DialogContent>
-          {resetStep === 'warning' && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Are you sure you want to change your plan?</DialogTitle>
-                <DialogDescription>
-                  Building a great physique takes time and consistency. Changing your plan should only be done if necessary.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setResetStep('closed')}>Cancel</Button>
-                <Button onClick={() => setResetStep('password')}>Yes, I understand</Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {resetStep === 'password' && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Confirm Password to Reset Plan</DialogTitle>
-                <DialogDescription>
-                  For your security, please enter your password to proceed. This will allow you to create a new nutrition plan.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-2 py-2">
-                <Label htmlFor="password-confirm" className="sr-only">Password</Label>
-                <Input
-                  id="password-confirm"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && password && handleResetConfirm()}
-                />
-              </div>
-              <DialogFooter>
-                 <Button variant="outline" onClick={() => setResetStep('warning')} disabled={isResetting}>Back</Button>
-                <Button onClick={handleResetConfirm} disabled={isResetting || !password}>
-                  {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Confirm
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
     </Card>
   );
 }

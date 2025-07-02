@@ -149,7 +149,7 @@ export default function SignupPage() {
         transformationTarget: values.transformationTarget,
         targetDate: targetDate.toISOString(),
         signupDate: now.toISOString(),
-        hasCompletedMacroSetup: true, // Setup is completed during signup
+        hasCompletedMacroSetup: false, // User must confirm plan after login
         otherGoals: '', 
       };
       
