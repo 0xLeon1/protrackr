@@ -17,7 +17,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function SettingsPage() {
   const { user, profile, loading, refreshData } = useAuth();
@@ -89,7 +88,7 @@ export default function SettingsPage() {
             Make changes to your profile. Click save when you're done.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className="p-6 max-h-[60vh] overflow-y-auto">
             <div className="grid gap-6 max-w-lg">
                 <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="name" className="text-right">Name</Label>
