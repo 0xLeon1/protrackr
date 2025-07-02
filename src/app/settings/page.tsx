@@ -77,19 +77,19 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
+    <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage your account and preferences.</p>
       </header>
-      <Card className="flex-1 flex flex-col min-h-0">
+      <Card>
         <CardHeader>
           <CardTitle>Edit Your Profile</CardTitle>
           <CardDescription>
             Make changes to your profile. Click save when you're done.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto p-6">
+        <CardContent className="p-6">
             <div className="grid gap-6 max-w-lg">
                 <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="name" className="text-right">Name</Label>
