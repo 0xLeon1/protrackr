@@ -45,6 +45,7 @@ const prompt = ai.definePrompt({
   name: 'generateProgramPrompt',
   input: {schema: GenerateProgramInputSchema},
   output: {schema: GenerateProgramOutputSchema},
+  model: 'googleai/gemini-1.5-flash',
   prompt: `You are an expert personal trainer and fitness coach. Your task is to generate a structured workout program based on the user's details.
 
 The user's details are:
@@ -59,6 +60,26 @@ Instructions:
 4.  For each exercise, provide a reasonable number of sets (typically 3-4) and a target repetition range (e.g., "8-12", "10-15", "5").
 5.  Set an initial placeholder weight for each exercise. For bodyweight exercises, set this to 0. For weighted exercises, set it to a very conservative starting weight in lbs (e.g., Barbell Bench Press: 45, Dumbbell Curl: 10).
 6.  The output must be a JSON object that strictly adheres to the provided schema. Do not include any extra text or explanations outside of the JSON structure.`,
+  config: {
+    safetySettings: [
+      {
+        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+        threshold: 'BLOCK_NONE',
+      },
+       {
+        category: 'HARM_CATEGORY_HATE_SPEECH',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      },
+      {
+        category: 'HARM_CATEGORY_HARASSMENT',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      },
+      {
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      },
+    ]
+  }
 });
 
 const generateProgramFlow = ai.defineFlow(
