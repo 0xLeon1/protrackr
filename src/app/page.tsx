@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -151,7 +150,7 @@ export default function HomePage() {
 
                 {/* The overlay with the button */}
                 <div className="absolute inset-0 flex items-center justify-center bg-background/30">
-                    <Button size="lg" className="w-auto" onClick={() => setIsSetupOpen(true)}>
+                    <Button size="lg" className="h-24 w-3/4 text-xl" onClick={() => setIsSetupOpen(true)}>
                         <Unlock className="mr-2 h-5 w-5"/>
                         Build Your Meal Plan
                     </Button>
