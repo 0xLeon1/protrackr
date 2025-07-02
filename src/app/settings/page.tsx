@@ -5,17 +5,28 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function SettingsPage() {
   const { user, profile, loading, refreshData } = useAuth();
@@ -23,6 +34,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
 
   const [editableProfile, setEditableProfile] = useState<Partial<UserProfile> | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -45,10 +57,10 @@ export default function SettingsPage() {
   const handleSaveChanges = async () => {
     if (!user || !editableProfile) return;
     
-    if (!editableProfile.name || !editableProfile.age || editableProfile.age <= 0 || !editableProfile.initialWeight || editableProfile.initialWeight <= 0 || !editableProfile.goalWeight || editableProfile.goalWeight <= 0) {
+    if (!editableProfile.name || !editableProfile.age || editableProfile.age <= 0) {
       toast({
         title: "Invalid Profile Data",
-        description: "Please ensure all fields are filled out correctly and have valid values.",
+        description: "Please ensure your name and age have valid values.",
         variant: "destructive",
       });
       return;
@@ -56,7 +68,13 @@ export default function SettingsPage() {
 
     try {
         const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-        await setDoc(profileDocRef, editableProfile, { merge: true });
+        const dataToSave: Partial<UserProfile> = {
+            name: editableProfile.name,
+            age: editableProfile.age,
+            gender: editableProfile.gender,
+            otherGoals: editableProfile.otherGoals,
+        };
+        await setDoc(profileDocRef, dataToSave, { merge: true });
         
         await refreshData();
         toast({ title: "Profile Updated", description: "Your changes have been saved." });
@@ -65,6 +83,36 @@ export default function SettingsPage() {
         toast({ title: "Error", description: "Could not save your changes.", variant: "destructive" });
     }
   };
+  
+  const handleResetPlan = async () => {
+    if (!user || !profile) return;
+    setIsResetting(true);
+
+    try {
+        const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
+        await deleteDoc(goalsDocRef);
+        
+        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+        await updateDoc(profileDocRef, { hasCompletedMacroSetup: false });
+        
+        await refreshData();
+        
+        toast({
+            title: "Nutrition Plan Reset",
+            description: "Your plan has been cleared. You can now set up a new one.",
+        });
+
+    } catch (error) {
+        console.error("Error resetting nutrition plan: ", error);
+        toast({
+            title: "Error",
+            description: "Could not reset your nutrition plan. Please try again.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsResetting(false);
+    }
+  }
 
   if (loading || !user || !editableProfile) {
     return (
@@ -74,20 +122,26 @@ export default function SettingsPage() {
     );
   }
 
+  const hasActivePlan = profile?.hasCompletedMacroSetup;
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage your account and preferences.</p>
       </header>
+      
       <Card>
         <CardHeader>
           <CardTitle>Edit Your Profile</CardTitle>
           <CardDescription>
-            Make changes to your profile. Click save when you're done.
+            {hasActivePlan 
+              ? "Your core plan details are locked. To change them, you must reset your plan."
+              : "Make changes to your profile. Click save when you're done."
+            }
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 max-h-[60vh] overflow-y-auto">
+        <CardContent>
             <div className="grid gap-6 max-w-lg">
                 <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="name" className="text-right">Name</Label>
@@ -109,15 +163,15 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="initialWeight" className="text-right">Start Weight</Label>
-                    <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} onChange={(e) => handleProfileChange('initialWeight', Number(e.target.value))} className="col-span-2" />
+                    <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} disabled={hasActivePlan} className="col-span-2" />
                 </div>
                 <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="goalWeight" className="text-right">Goal Weight</Label>
-                    <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} onChange={(e) => handleProfileChange('goalWeight', Number(e.target.value))} className="col-span-2" />
+                    <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} disabled={hasActivePlan} className="col-span-2" />
                 </div>
                  <div className="grid grid-cols-3 items-center gap-4">
-                    <Label className="text-right text-muted-foreground">Target Date</Label>
-                    <p className="col-span-2 text-sm font-medium text-muted-foreground">{editableProfile.targetDate ? format(parseISO(editableProfile.targetDate), 'MMM d, yyyy') : 'Not Set'}</p>
+                    <Label className="text-right">Target Date</Label>
+                    <Input value={editableProfile.targetDate ? format(parseISO(editableProfile.targetDate), 'MMM d, yyyy') : 'Not Set'} disabled className="col-span-2 text-muted-foreground" />
                 </div>
                 <div className="grid grid-cols-3 items-start gap-4">
                     <Label htmlFor="otherGoals" className="text-right pt-2">Your 'Why'</Label>
@@ -133,6 +187,46 @@ export default function SettingsPage() {
             </div>
         </CardContent>
       </Card>
+      
+      {hasActivePlan && (
+        <Card className="border-destructive">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="text-destructive"/>
+                    Danger Zone
+                </CardTitle>
+                <CardDescription>
+                    Resetting your plan is a permanent action and cannot be undone.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" disabled={isResetting}>
+                            {isResetting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            Reset My Nutrition Plan
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will permanently delete your current nutrition plan. You will need to
+                                go through the setup process again to create a new one. This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleResetPlan} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Yes, Reset My Plan
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </CardContent>
+        </Card>
+      )}
+
     </div>
   );
 }
