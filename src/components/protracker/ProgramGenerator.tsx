@@ -86,6 +86,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                 description: 'The AI could not generate a program. Please try again.',
                 variant: 'destructive',
             });
+            setStep(3); // Reset to last step
         } finally {
             setIsLoading(false);
         }
@@ -120,10 +121,73 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
         setTimeout(() => {
             setStep(1);
             setGeneratedProgram(null);
+            setIsLoading(false);
         }, 300);
     }
     
     const renderContent = () => {
+        // Priority 1: Loading state
+        if (isLoading) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+                    <h2 className="text-2xl font-bold">Building Your Plan...</h2>
+                    <p className="text-muted-foreground">The AI coach is crafting your personalized program.</p>
+                </div>
+            );
+        }
+
+        // Priority 2: Result state
+        if (step === 4 && generatedProgram) {
+            return (
+                <div className="flex flex-col h-full">
+                    <CardHeader>
+                        <Progress value={100} className="w-full mb-4"/>
+                        <CardTitle className="text-2xl">{generatedProgram.name}</CardTitle>
+                        <CardDescription>Review your new program. You can edit it later from the Programs page.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto pr-2">
+                        <Accordion type="multiple" className="w-full" defaultValue={['work-0']}>
+                            {generatedProgram.workouts.map((workout, idx) => (
+                                <AccordionItem value={`work-${idx}`} key={idx}>
+                                    <AccordionTrigger className="text-lg font-semibold"><Dumbbell className="mr-3 text-primary"/> {workout.name}</AccordionTrigger>
+                                    <AccordionContent>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Exercise</TableHead>
+                                                    <TableHead className="text-center">Sets</TableHead>
+                                                    <TableHead className="text-center">Reps</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {workout.exercises.map((ex, exIdx) => (
+                                                    <TableRow key={exIdx}>
+                                                        <TableCell className="font-medium">{ex.name}</TableCell>
+                                                        <TableCell className="text-center">{ex.sets}</TableCell>
+                                                        <TableCell className="text-center">{ex.reps}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </CardContent>
+                     <CardFooter className="flex justify-between">
+                        <Button variant="outline" onClick={handleGenerateProgram} disabled={isLoading}>
+                           <RefreshCcw className="mr-2"/> Regenerate
+                        </Button>
+                        <Button onClick={handleSave} className="bg-green-500 hover:bg-green-600">
+                            <Check className="mr-2"/> Save Program
+                        </Button>
+                    </CardFooter>
+                </div>
+            );
+        }
+        
+        // Priority 3: Form steps
         if (step <= STEPS.length) {
             const fieldName = currentStepInfo.field as keyof FormData;
             return (
@@ -132,7 +196,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                         <Progress value={(step / (STEPS.length + 1)) * 100} className="w-full mb-4"/>
                         <CardTitle className="text-2xl">{currentStepInfo.title}</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex-1 flex items-center justify-center">
+                    <CardContent className="flex-1 flex flex-col items-center justify-center">
                         <Controller
                             name={fieldName}
                             control={control}
@@ -151,7 +215,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                 </RadioGroup>
                             )}
                         />
-                        {errors[fieldName] && <p className="text-destructive text-sm mt-2">{errors[fieldName]?.message}</p>}
+                        {errors[fieldName] && <p className="text-destructive text-sm mt-4 text-center">{errors[fieldName]?.message}</p>}
                     </CardContent>
                     <CardFooter className="flex justify-between">
                         <Button variant="outline" onClick={handleBack} disabled={step === 1}><ArrowLeft className="mr-2" /> Back</Button>
@@ -163,63 +227,8 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                 </div>
             );
         }
-        
-        if (isLoading || !generatedProgram) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-                    <h2 className="text-2xl font-bold">Building Your Plan...</h2>
-                    <p className="text-muted-foreground">The AI coach is crafting your personalized program.</p>
-                </div>
-            );
-        }
-        
-        return (
-            <div className="flex flex-col h-full">
-                <CardHeader>
-                    <Progress value={100} className="w-full mb-4"/>
-                    <CardTitle className="text-2xl">{generatedProgram.name}</CardTitle>
-                    <CardDescription>Review your new program. You can edit it later from the Programs page.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto pr-2">
-                    <Accordion type="multiple" className="w-full" defaultValue={['work-0']}>
-                        {generatedProgram.workouts.map((workout, idx) => (
-                            <AccordionItem value={`work-${idx}`} key={idx}>
-                                <AccordionTrigger className="text-lg font-semibold"><Dumbbell className="mr-3 text-primary"/> {workout.name}</AccordionTrigger>
-                                <AccordionContent>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Exercise</TableHead>
-                                                <TableHead className="text-center">Sets</TableHead>
-                                                <TableHead className="text-center">Reps</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {workout.exercises.map((ex, exIdx) => (
-                                                <TableRow key={exIdx}>
-                                                    <TableCell className="font-medium">{ex.name}</TableCell>
-                                                    <TableCell className="text-center">{ex.sets}</TableCell>
-                                                    <TableCell className="text-center">{ex.reps}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                </CardContent>
-                 <CardFooter className="flex justify-between">
-                    <Button variant="outline" onClick={handleGenerateProgram} disabled={isLoading}>
-                       <RefreshCcw className="mr-2"/> Regenerate
-                    </Button>
-                    <Button onClick={handleSave} className="bg-green-500 hover:bg-green-600">
-                        <Check className="mr-2"/> Save Program
-                    </Button>
-                </CardFooter>
-            </div>
-        );
+
+        return null; // Fallback
     }
     
     return (
