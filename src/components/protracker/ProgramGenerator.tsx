@@ -101,7 +101,13 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                 description: 'The AI could not generate a program. Please try again.',
                 variant: 'destructive',
             });
-            setStep(4); // Reset to 1RM step if applicable
+            // Go back to the appropriate step if generation fails
+            const experience = getValues('experience');
+             if (experience === 'beginner') {
+                setStep(3);
+            } else {
+                setStep(4);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -124,7 +130,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                     reps: e.reps,
                     weight: e.weight,
                     notes: e.notes || '',
-                    progression: e.progression,
+                    progression: e.progression || [],
                 }))
             }))
         };
@@ -301,7 +307,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                     <CardFooter className="flex justify-between">
                         <Button variant="outline" onClick={handleBack} disabled={step === 1}><ArrowLeft className="mr-2" /> Back</Button>
                         <Button onClick={handleNext}>
-                            {step === STEPS.length ? 'Next' : 'Next'}
+                            Next
                             <ArrowRight className="ml-2" />
                         </Button>
                     </CardFooter>
