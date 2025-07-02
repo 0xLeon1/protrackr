@@ -99,6 +99,7 @@ const prompt = ai.definePrompt({
         *   Populate the 'progression' field for the **Barbell Bench Press, Barbell Squat, and Barbell Deadlift**, using their respective user-provided 1RMs for the calculations.
 
 3.  **12-Week Percentage Progression (Use for all 'progression' calculations):**
+    *   **Parsing Rule:** For formats like \`AxB\` (e.g., \`2x10\`), \`A\` is the value for the \`sets\` field and \`B\` is the value for the \`reps\` field (as a string). For Rep Max weeks (e.g., \`5 Rep Max\`), \`sets\` is \`1\` and \`reps\` is \`"5"\`.
     *   W1: 2x10 @ 70%
     *   W2: 2x10 @ 77%
     *   W3: 5x5 @ 80%
