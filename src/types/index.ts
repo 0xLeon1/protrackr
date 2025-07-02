@@ -1,12 +1,4 @@
 
-
-
-
-
-
-
-
-
 export type SetPerformance = {
   id: string;
   reps: number | '';
@@ -18,7 +10,7 @@ export type Exercise = {
   id:string;
   name: string;
   sets: number | '';
-  reps: number | '';
+  reps: string;
   weight: number | '';
   notes: string;
   performance?: SetPerformance[];
@@ -171,13 +163,3 @@ export type CustomFoodItem = {
   carbs: number;
   fats: number;
 };
-
-
-
-
-
-
-
-
-
-

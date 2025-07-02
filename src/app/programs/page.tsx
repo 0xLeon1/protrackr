@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import WorkoutTracker from "@/components/protracker/WorkoutTracker";
 import CardioLogger from "@/components/protracker/CardioLogger";
-import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit, Zap, Dumbbell } from 'lucide-react';
+import ProgramGenerator from "@/components/protracker/ProgramGenerator";
+import { PlusCircle, Trash2, Play, MoreVertical, Loader2, Edit, Zap, Dumbbell, Sparkles, FilePlus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +59,7 @@ export default function ProgramsPage() {
   const [currentEditedWorkout, setCurrentEditedWorkout] = useState<Workout | null>(null);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
 
 
   useEffect(() => {
@@ -107,6 +109,20 @@ export default function ProgramsPage() {
     setPrograms([...programs, newProgram]);
     setNewProgramName('');
     setIsCreateDialogOpen(false);
+  };
+  
+  const handleSaveGeneratedProgram = async (program: Program) => {
+    if (!user) return;
+    
+    const programRef = doc(db, 'users', user.uid, 'programs', program.id);
+    await setDoc(programRef, program);
+    
+    setPrograms([...programs, program]);
+    setIsGeneratorOpen(false);
+    toast({
+        title: "Program Saved!",
+        description: `Your new program "${program.name}" is ready to go.`
+    });
   };
 
   const handleDeleteProgram = async (programId: string) => {
@@ -227,173 +243,167 @@ export default function ProgramsPage() {
     <div className="space-y-8">
       <div className="space-y-6">
         <div className="flex justify-between items-center gap-4">
-            <h2 className="text-2xl font-bold">Your Programs</h2>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Create Program
-                    </Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create a New Program</DialogTitle>
-                        <DialogDescription>
-                            Give your new program a name to get started.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Input 
-                        value={newProgramName} 
-                        onChange={(e) => setNewProgramName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
-                        placeholder="e.g., Push Pull Legs"
-                        autoFocus
-                    />
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleAddProgram}>Create</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <h1 className="text-3xl font-bold">Training Programs</h1>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Program
+            </Button>
         </div>
 
-        {programs.length === 0 && !pageIsLoading && (
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-center text-muted-foreground">You haven't created any programs yet. Use the button above to get started.</p>
+        {programs.length === 0 && !pageIsLoading ? (
+          <Card className="text-center">
+            <CardHeader>
+                <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit">
+                    <Sparkles className="w-10 h-10 text-primary" />
+                </div>
+                <CardTitle className="mt-4 text-2xl">Create Your First Workout Program</CardTitle>
+                <CardDescription className="max-w-md mx-auto">
+                    Let our AI coach build a personalized plan for you, or create one from scratch.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4">
+                <Button size="lg" className="w-full max-w-xs" onClick={() => setIsGeneratorOpen(true)}>
+                    <Sparkles className="mr-2 h-5 w-5"/>
+                    Generate Program with AI
+                </Button>
+                <Button variant="ghost" onClick={() => setIsCreateDialogOpen(true)}>
+                    <FilePlus className="mr-2 h-4 w-4"/>
+                    Or, create my own manually
+                </Button>
             </CardContent>
           </Card>
-        )}
-        <div className="space-y-6">
-          {programs.map((program) => (
-            <Card key={program.id} className="overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between p-4 bg-muted/50">
-                    <CardTitle className="text-2xl flex items-center gap-3">
-                        <Dumbbell className="h-6 w-6 text-primary" />
-                        {program.name}
-                    </CardTitle>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="shrink-0 ml-auto">
-                            <MoreVertical className="h-5 w-5" />
-                        </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => handleAddWorkout(program.id)}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                <span>Add Day</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => { setProgramToRename(program); setNewProgramRename(program.name); }}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                <span>Rename</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Delete Program</span>
+        ) : (
+            <div className="space-y-6">
+            {programs.map((program) => (
+                <Card key={program.id} className="overflow-hidden">
+                    <CardHeader className="flex flex-row items-center justify-between p-4 bg-muted/50">
+                        <CardTitle className="text-2xl flex items-center gap-3">
+                            <Dumbbell className="h-6 w-6 text-primary" />
+                            {program.name}
+                        </CardTitle>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="shrink-0 ml-auto">
+                                <MoreVertical className="h-5 w-5" />
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => handleAddWorkout(program.id)}>
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    <span>Add Day</span>
                                 </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the "{program.name}" program and all of its workouts.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteProgram(program.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                    Delete
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                            </AlertDialog>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </CardHeader>
+                                <DropdownMenuItem onSelect={() => { setProgramToRename(program); setNewProgramRename(program.name); }}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    <span>Rename</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Delete Program</span>
+                                    </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the "{program.name}" program and all of its workouts.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteProgram(program.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                        Delete
+                                    </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                                </AlertDialog>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </CardHeader>
 
-                <CardContent className="p-4">
-                  <div className="space-y-4">
-                    {program.workouts.length > 0 ? (
-                      <div className="space-y-3">
-                        {program.workouts.map(workout => (
-                            <div key={workout.id} className="border p-4 rounded-lg bg-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                <div className="flex-1">
-                                    <h4 className="font-semibold">{workout.name}</h4>
-                                    <p className="text-sm text-muted-foreground mt-2 space-x-2">
-                                    {workout.exercises.map(ex => (
-                                        <span key={ex.id} className="inline-block after:content-['•'] after:ml-2 last:after:content-[]">{ex.name}</span>
-                                    ))}
-                                    {workout.exercises.length === 0 && <span>No exercises yet.</span>}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                                    <Button 
-                                        size="sm"
-                                        onClick={() => handleStartWorkout(workout.id)}
-                                        className="bg-green-500 hover:bg-green-600 text-white"
-                                    >
-                                        <Play className="mr-2 h-4 w-4" />
-                                        Start
-                                    </Button>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="shrink-0">
-                                            <MoreVertical className="h-4 w-4" />
+                    <CardContent className="p-4">
+                    <div className="space-y-4">
+                        {program.workouts.length > 0 ? (
+                        <div className="space-y-3">
+                            {program.workouts.map(workout => (
+                                <div key={workout.id} className="border p-4 rounded-lg bg-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold">{workout.name}</h4>
+                                        <p className="text-sm text-muted-foreground mt-2 space-x-2">
+                                        {workout.exercises.map(ex => (
+                                            <span key={ex.id} className="inline-block after:content-['•'] after:ml-2 last:after:content-[]">{ex.name}</span>
+                                        ))}
+                                        {workout.exercises.length === 0 && <span>No exercises yet.</span>}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                        <Button 
+                                            size="sm"
+                                            onClick={() => handleStartWorkout(workout.id)}
+                                            className="bg-green-500 hover:bg-green-600 text-white"
+                                        >
+                                            <Play className="mr-2 h-4 w-4" />
+                                            Start
                                         </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onSelect={() => openEditWorkoutDialog(program.id, workout)}>
-                                                <Edit className="mr-2 h-4 w-4" />
-                                                <span>Edit</span>
-                                            </DropdownMenuItem>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem
-                                                    onSelect={(e) => e.preventDefault()}
-                                                    className="text-destructive focus:text-destructive"
-                                                >
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    <span>Delete Workout</span>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="shrink-0">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onSelect={() => openEditWorkoutDialog(program.id, workout)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    <span>Edit</span>
                                                 </DropdownMenuItem>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                    This action cannot be undone. This will permanently delete the "{workout.name}" workout.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction
-                                                    onClick={() => handleDeleteWorkout(program.id, workout.id)}
-                                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                    <DropdownMenuItem
+                                                        onSelect={(e) => e.preventDefault()}
+                                                        className="text-destructive focus:text-destructive"
                                                     >
-                                                    Delete
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        <span>Delete Workout</span>
+                                                    </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                        This action cannot be undone. This will permanently delete the "{workout.name}" workout.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                        onClick={() => handleDeleteWorkout(program.id, workout.id)}
+                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                        >
+                                                        Delete
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-center text-muted-foreground py-4 border rounded-lg border-dashed">
-                        <p>This program has no workouts yet.</p>
-                        <p>Use the menu to add a day to get started.</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-            </Card>
-          ))}
-        </div>
+                            ))}
+                        </div>
+                        ) : (
+                        <div className="text-sm text-center text-muted-foreground py-4 border rounded-lg border-dashed">
+                            <p>This program has no workouts yet.</p>
+                            <p>Use the menu to add a day to get started.</p>
+                        </div>
+                        )}
+                    </div>
+                    </CardContent>
+                </Card>
+            ))}
+            </div>
+        )}
       </div>
 
       <Card>
@@ -408,6 +418,29 @@ export default function ProgramsPage() {
             <CardioLogger onLogCardio={handleLogCardio} />
         </CardContent>
       </Card>
+      
+      {/* Manual Program Create Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Create a New Program</DialogTitle>
+                  <DialogDescription>
+                      Give your new program a name to get started. You can add workouts and exercises next.
+                  </DialogDescription>
+              </DialogHeader>
+              <Input 
+                  value={newProgramName} 
+                  onChange={(e) => setNewProgramName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddProgram()}
+                  placeholder="e.g., Push Pull Legs"
+                  autoFocus
+              />
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleAddProgram}>Create</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
       
       {/* Program Rename Dialog */}
       <Dialog open={!!programToRename} onOpenChange={(isOpen) => !isOpen && setProgramToRename(null)}>
@@ -465,6 +498,14 @@ export default function ProgramsPage() {
               </DialogFooter>
           </DialogContent>
       </Dialog>
+      
+      {/* AI Program Generator Dialog */}
+      <ProgramGenerator 
+        isOpen={isGeneratorOpen}
+        onClose={() => setIsGeneratorOpen(false)}
+        onSaveProgram={handleSaveGeneratedProgram}
+      />
+
     </div>
   );
 }
