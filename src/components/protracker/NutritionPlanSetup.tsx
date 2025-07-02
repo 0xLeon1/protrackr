@@ -76,35 +76,43 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             setTimeout(() => {
                 setStep(0);
                 setFormData(null);
-                form.reset();
+                form.reset({ initialWeight: undefined, goalWeight: undefined, transformationTarget: "12" });
             }, 300);
         }
     }, [isOpen, profile, form]);
 
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
-        
+
         const { goalWeight, transformationTarget, initialWeight } = formData;
         const totalWeeks = parseInt(transformationTarget, 10);
         const isCutting = goalWeight < initialWeight;
 
-        // Use a more moderate calorie multiplier
-        const startingCalories = isCutting ? initialWeight * 12 : initialWeight * 13;
+        const startingCalories = goalWeight * 15;
+        const minCalories = goalWeight * 10;
         
         const plan: WeeklyMacroGoal[] = [];
 
         for (let i = 0; i < totalWeeks; i++) {
             const week = i + 1;
-            // Adjustments happen every week for a smoother progression
-            const weeklyAdjustment = (startingCalories - (goalWeight * (isCutting ? 10 : 15))) / totalWeeks;
-            
-            const weeklyCalories = startingCalories - (i * weeklyAdjustment);
+            const periods = Math.floor((week - 1) / 2); // Adjustments happen every 2 weeks
 
+            let weeklyCalories;
+            if (isCutting) {
+                // Drop calories by 200 every 2 weeks, but don't go below the floor.
+                const currentCals = startingCalories - (periods * 200);
+                weeklyCalories = Math.max(minCalories, currentCals);
+            } else { // Bulking
+                const maxCalories = goalWeight * 18;
+                const currentCals = startingCalories + (periods * 200);
+                weeklyCalories = Math.min(maxCalories, currentCals);
+            }
+            
             const proteinGrams = Math.round(goalWeight * 1);
             const proteinCals = proteinGrams * 4;
             const fatCals = weeklyCalories * 0.25;
             const fatGrams = Math.round(fatCals / 9);
-            const carbCals = weeklyCalories - proteinCals - fatCals;
+            const carbCals = weeklyCalories - proteinCals - fatGrams;
             const carbGrams = Math.round(carbCals / 4);
 
             plan.push({
