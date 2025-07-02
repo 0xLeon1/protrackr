@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import type { MacroPlan, WeeklyMacroGoal, UserProfile } from '@/types';
-import { add } from 'date-fns';
+import { add, format, differenceInDays } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,13 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowRight, Check, Eye, EyeOff, TrendingUp, Target, Calendar } from 'lucide-react';
+import { Loader2, ArrowRight, Check, TrendingUp, Target, Calendar } from 'lucide-react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '../ui/progress';
 import { Textarea } from '../ui/textarea';
@@ -71,10 +70,11 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                 transformationTarget: profile.transformationTarget || "12",
             });
             setOtherGoals(profile.otherGoals || '');
-            setFormData(null);
         }
         if (!isOpen) {
+            // Reset state when dialog closes
             setStep(0);
+            setFormData(null);
         }
     }, [isOpen, profile, form]);
 
@@ -97,9 +97,9 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
         
-        const { initialWeight, goalWeight, transformationTarget } = formData;
+        const { goalWeight, transformationTarget } = formData;
         const totalWeeks = parseInt(transformationTarget, 10);
-        const isCutting = goalWeight < initialWeight;
+        const isCutting = goalWeight < formData.initialWeight;
 
         const startingCalories = goalWeight * 15;
         
@@ -107,26 +107,23 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
         for (let i = 0; i < totalWeeks; i++) {
             const week = i + 1;
-            const periods = Math.floor((week - 1) / 2); // How many 2-week periods have passed
+            const periods = Math.floor((week - 1) / 2);
 
             let weeklyCalories;
-
             if (isCutting) {
                 const minCalories = goalWeight * 10;
                 const currentCals = startingCalories - (periods * 200);
                 weeklyCalories = Math.max(minCalories, currentCals);
-            } else { // Bulking
-                const maxCalories = goalWeight * 18; // Sensible ceiling
+            } else {
+                const maxCalories = goalWeight * 18;
                 const currentCals = startingCalories + (periods * 200);
                 weeklyCalories = Math.min(maxCalories, currentCals);
             }
             
             const proteinGrams = Math.round(goalWeight * 1);
             const proteinCals = proteinGrams * 4;
-            
             const fatCals = weeklyCalories * 0.25;
             const fatGrams = Math.round(fatCals / 9);
-
             const carbCals = weeklyCalories - proteinCals - fatCals;
             const carbGrams = Math.round(carbCals / 4);
 
@@ -163,7 +160,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     const onCalculate = (values: FormSchemaType) => {
         setFormData(values);
-        setStep(5); // Go to plan summary
+        setStep(5);
     };
 
     const savePlanData = async () => {
@@ -231,7 +228,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
 
-    // If a plan exists but isn't confirmed, show the confirmation view
     if (isOpen && profile && !profile.hasCompletedMacroSetup && macroPlan && macroPlan.plan.length > 0) {
         const firstWeek = macroPlan.plan[0];
         const currentGoalType = profile.goalWeight < profile.initialWeight ? 'Fat Loss' : 'Muscle Gain';
@@ -266,121 +262,142 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             </Dialog>
         );
     }
-
-    // --- Fallback to Plan Creation Form ---
     
     const renderStepContent = () => {
-        if (step === 6) { // Final confirmation step of creation
-             return (
-                <>
-                    <DialogHeader className="shrink-0">
-                        <DialogTitle>Your Personalized Nutrition Plan</DialogTitle>
-                        <DialogDescription>
-                            Based on your info, here's a recommended plan for your {goalType} goal over {formData?.transformationTarget} weeks.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex-1 overflow-auto my-4 pr-4">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[80px]">Week</TableHead>
-                                    <TableHead className="text-right">Calories</TableHead>
-                                    <TableHead className="text-right">Protein (g)</TableHead>
-                                    <TableHead className="text-right">Carbs (g)</TableHead>
-                                    <TableHead className="text-right">Fats (g)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {calculatedPlan?.map(week => (
-                                    <TableRow key={week.week}>
-                                        <TableCell className="font-medium">{week.week}</TableCell>
-                                        <TableCell className="text-right">{week.calories.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right">{week.protein}</TableCell>
-                                        <TableCell className="text-right">{week.carbs}</TableCell>
-                                        <TableCell className="text-right">{week.fats}</TableCell>
+        switch (step) {
+            case 0:
+                return (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle>
+                            <DialogDescription className="text-lg text-muted-foreground pt-2">Taking this first step is the most important one.</DialogDescription>
+                        </DialogHeader>
+                        <div className="flex-1" />
+                        <DialogFooter>
+                            <Button onClick={handleNext} className="w-full">Start Setup <ArrowRight className="ml-2 h-5 w-5" /></Button>
+                        </DialogFooter>
+                    </>
+                );
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+                return (
+                    <>
+                        <DialogHeader>
+                            <Progress value={(step / 6) * 100} className="w-full mb-4"/>
+                            <div className={cn(step !== 1 && 'hidden')}><DialogTitle className="text-2xl">What's your current weight?</DialogTitle></div>
+                            <div className={cn(step !== 2 && 'hidden')}><DialogTitle className="text-2xl">What's your goal weight?</DialogTitle></div>
+                            <div className={cn(step !== 3 && 'hidden')}><DialogTitle className="text-2xl">What's your transformation timeline?</DialogTitle></div>
+                            <div className={cn(step !== 4 && 'hidden')}><DialogTitle className="text-2xl">What's your 'Why'?</DialogTitle><DialogDescription>This is optional, but helps to keep you motivated.</DialogDescription></div>
+                        </DialogHeader>
+                        <Form {...form}>
+                            <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center flex-1">
+                                <div className={cn("w-full max-w-sm", step === 1 ? 'block' : 'hidden')}><FormField control={form.control} name="initialWeight" render={({ field }) => (<FormItem><FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 180" {...field} autoFocus /></FormControl><FormMessage className="text-center pt-2" /></FormItem>)} /></div>
+                                <div className={cn("w-full max-w-sm", step === 2 ? 'block' : 'hidden')}><FormField control={form.control} name="goalWeight" render={({ field }) => (<FormItem><FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 170" {...field} autoFocus /></FormControl><FormMessage className="text-center pt-2" /></FormItem>)} /></div>
+                                <div className={cn("w-full max-w-sm", step === 3 ? 'block' : 'hidden')}><FormField control={form.control} name="transformationTarget" render={({ field }) => (<FormItem><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="text-lg py-6"><SelectValue placeholder="Select an option..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="8">8 Weeks</SelectItem><SelectItem value="12">12 Weeks</SelectItem><SelectItem value="16">16 Weeks</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} /></div>
+                                <div className={cn("w-full max-w-sm", step === 4 ? 'block' : 'hidden')}><Textarea value={otherGoals} onChange={(e) => setOtherGoals(e.target.value)} placeholder="My goal is to have more energy and feel more confident..." className="min-h-[100px]" /></div>
+                            </form>
+                        </Form>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
+                            <Button onClick={handleNext} disabled={isLoading}>
+                                {step === 4 ? "Calculate Plan" : "Next"}
+                                {step < 4 && <ArrowRight className="ml-2 h-5 w-5" />}
+                            </Button>
+                        </DialogFooter>
+                    </>
+                );
+            case 5:
+                const targetDate = formData ? format(add(new Date(), { weeks: parseInt(formData.transformationTarget) }), 'MMMM d, yyyy') : '';
+                return (
+                    <>
+                        <DialogHeader>
+                             <Progress value={(step / 6) * 100} className="w-full mb-4"/>
+                            <DialogTitle>Your Transformation At a Glance</DialogTitle>
+                            <DialogDescription>
+                                Here's a summary of your goal. Your personalized plan is designed for safe and sustainable progress.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+                            <div className="grid grid-cols-3 gap-4 text-center w-full max-w-md">
+                                 <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><TrendingUp className="h-4 w-4" /> Start Weight</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.initialWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p></CardContent></Card>
+                                 <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><Target className="h-4 w-4" /> Goal Weight</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.goalWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p></CardContent></Card>
+                                 <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><Calendar className="h-4 w-4" /> End Date</CardDescription></CardHeader><CardContent className="p-3"><p className="text-lg font-bold">{targetDate}</p></CardContent></Card>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-lg">Your journey will involve an average change of</p>
+                                <p className="text-2xl font-bold text-primary">{Math.abs(averageWeeklyChange).toFixed(1)} lbs per week</p>
+                            </div>
+                             <div className={cn("flex items-center gap-2 p-3 rounded-lg max-w-md text-sm text-center", Math.abs(averageWeeklyChange) > 2.5 ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : "bg-green-500/10 text-green-700 dark:text-green-400")}>
+                                <Check className={cn("h-5 w-5 shrink-0", Math.abs(averageWeeklyChange) > 2.5 && "hidden")} />
+                               <p>{Math.abs(averageWeeklyChange) > 2.5 
+                                    ? "This is an aggressive goal. Healthy weight loss is typically 1-2 lbs per week. Your plan will be adjusted for a safer rate."
+                                    : `This is a healthy rate of ${goalType}, which is under our recommended maximum of 2.5 lbs per week.`
+                               }</p>
+                            </div>
+                        </div>
+                         <DialogFooter>
+                            <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
+                            <Button onClick={() => setStep(6)} disabled={isLoading}>View My Plan <ArrowRight className="ml-2 h-5 w-5" /></Button>
+                        </DialogFooter>
+                    </>
+                );
+            case 6:
+                return (
+                    <>
+                        <DialogHeader className="shrink-0">
+                            <Progress value={100} className="w-full mb-4"/>
+                            <DialogTitle>Your Personalized Nutrition Plan</DialogTitle>
+                            <DialogDescription>
+                                Based on your info, here's a recommended plan for your {goalType} goal over {formData?.transformationTarget} weeks.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex-1 overflow-auto my-4 pr-4">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[80px]">Week</TableHead>
+                                        <TableHead className="text-right">Calories</TableHead>
+                                        <TableHead className="text-right">Protein (g)</TableHead>
+                                        <TableHead className="text-right">Carbs (g)</TableHead>
+                                        <TableHead className="text-right">Fats (g)</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                    <DialogFooter className="shrink-0">
-                        <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                        <Button onClick={savePlanData} disabled={isLoading} className="bg-green-500 hover:bg-green-600">
-                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                            Let's Go!
-                        </Button>
-                    </DialogFooter>
-                </>
-            );
+                                </TableHeader>
+                                <TableBody>
+                                    {calculatedPlan?.map(week => (
+                                        <TableRow key={week.week}>
+                                            <TableCell className="font-medium">{week.week}</TableCell>
+                                            <TableCell className="text-right">{week.calories.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">{week.protein}</TableCell>
+                                            <TableCell className="text-right">{week.carbs}</TableCell>
+                                            <TableCell className="text-right">{week.fats}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <DialogFooter className="shrink-0">
+                            <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
+                            <Button onClick={savePlanData} disabled={isLoading} className="bg-green-500 hover:bg-green-600">
+                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                                Let's Go!
+                            </Button>
+                        </DialogFooter>
+                    </>
+                );
+            default:
+                return null;
         }
-        
-        if (step === 5) {
-            return (
-                <>
-                    <DialogHeader>
-                        <DialogTitle>Your Transformation At a Glance</DialogTitle>
-                        <DialogDescription>
-                            Here's a summary of your goal. Your personalized plan is designed for safe and sustainable progress.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex-1 flex flex-col items-center justify-center space-y-8">
-                        <div className="grid grid-cols-3 gap-4 text-center w-full max-w-md">
-                             <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><TrendingUp className="h-4 w-4" /> Start Weight</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.initialWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p></CardContent></Card>
-                             <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><Target className="h-4 w-4" /> Goal Weight</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.goalWeight}<span className="text-base font-medium text-muted-foreground"> lbs</span></p></CardContent></Card>
-                             <Card><CardHeader className="p-3 pb-0"><CardDescription className="flex items-center justify-center gap-2"><Calendar className="h-4 w-4" /> Timeline</CardDescription></CardHeader><CardContent className="p-3"><p className="text-3xl font-bold">{formData?.transformationTarget}<span className="text-base font-medium text-muted-foreground"> wks</span></p></CardContent></Card>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-lg">Your journey will involve an average change of</p>
-                            <p className="text-2xl font-bold text-primary">{Math.abs(averageWeeklyChange).toFixed(1)} lbs per week</p>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 text-green-700 dark:text-green-400 max-w-md text-sm text-center">
-                           <Check className="h-5 w-5 shrink-0" />
-                           <p>This plan is designed for a healthy rate of {goalType}, which is under our recommended maximum of 2.5 lbs per week.</p>
-                        </div>
-                    </div>
-                     <DialogFooter>
-                        <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>
-                        <Button onClick={() => setStep(6)} disabled={isLoading}>View My Plan <ArrowRight className="ml-2 h-5 w-5" /></Button>
-                    </DialogFooter>
-                </>
-            )
-        }
-        
-        return (
-            <>
-                <DialogHeader>
-                    <Progress value={(step / 5) * 100} className="w-full mb-4"/>
-                    <div className={cn(step !== 0 && 'hidden')}><DialogTitle className="text-3xl font-bold">Let's Build Your Plan</DialogTitle><DialogDescription className="text-lg text-muted-foreground pt-2">Taking this first step is the most important one.</DialogDescription></div>
-                    <div className={cn(step !== 1 && 'hidden')}><DialogTitle className="text-2xl">What's your current weight?</DialogTitle></div>
-                    <div className={cn(step !== 2 && 'hidden')}><DialogTitle className="text-2xl">What's your goal weight?</DialogTitle></div>
-                    <div className={cn(step !== 3 && 'hidden')}><DialogTitle className="text-2xl">How long is your transformation timeline?</DialogTitle></div>
-                    <div className={cn(step !== 4 && 'hidden')}><DialogTitle className="text-2xl">What's your 'Why'?</DialogTitle><DialogDescription>This is optional, but helps to keep you motivated.</DialogDescription></div>
-                </DialogHeader>
-                <Form {...form}>
-                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="flex flex-col items-center justify-center flex-1">
-                        <div className={cn("w-full h-full flex flex-col items-center justify-center", step === 0 ? 'block' : 'hidden')}></div>
-                        <div className={cn("w-full max-w-sm", step === 1 ? 'block' : 'hidden')}><FormField control={form.control} name="initialWeight" render={({ field }) => (<FormItem><FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 180" {...field} autoFocus /></FormControl><FormMessage className="text-center pt-2" /></FormItem>)} /></div>
-                        <div className={cn("w-full max-w-sm", step === 2 ? 'block' : 'hidden')}><FormField control={form.control} name="goalWeight" render={({ field }) => (<FormItem><FormControl><Input type="number" className="text-center text-2xl font-bold h-16" placeholder="e.g., 170" {...field} autoFocus /></FormControl><FormMessage className="text-center pt-2" /></FormItem>)} /></div>
-                        <div className={cn("w-full max-w-sm", step === 3 ? 'block' : 'hidden')}><FormField control={form.control} name="transformationTarget" render={({ field }) => (<FormItem><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="text-lg py-6"><SelectValue placeholder="Select an option..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="8">8 Weeks</SelectItem><SelectItem value="12">12 Weeks</SelectItem><SelectItem value="16">16 Weeks</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} /></div>
-                        <div className={cn("w-full max-w-sm", step === 4 ? 'block' : 'hidden')}><Textarea value={otherGoals} onChange={(e) => setOtherGoals(e.target.value)} placeholder="My goal is to have more energy and feel more confident..." className="min-h-[100px]" /></div>
-                    </form>
-                </Form>
-                <DialogFooter>
-                    {step > 0 && <Button variant="outline" onClick={handleBack} disabled={isLoading}>Back</Button>}
-                    <Button onClick={handleNext} disabled={isLoading} className={cn("w-full", step > 0 && "w-auto")}>
-                        {step === 0 ? "Start Setup" : (step === 4 ? "Calculate Plan" : "Next")}
-                        <ArrowRight className={cn("ml-2 h-5 w-5", step === 4 && "hidden")} />
-                    </Button>
-                </DialogFooter>
-            </>
-        )
     };
     
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStep(0); } }}>
-            <DialogContent className={cn("max-w-2xl flex flex-col", step === 6 ? "h-[85vh]" : (step === 5 ? "min-h-[500px]" : "h-auto"))}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); } }}>
+            <DialogContent className={cn("max-w-2xl flex flex-col", step === 6 ? "h-[85vh]" : (step === 5 ? "min-h-[550px]" : "min-h-[400px]"))}>
                {renderStepContent()}
             </DialogContent>
         </Dialog>
     );
 }
+
+    
