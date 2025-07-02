@@ -68,7 +68,7 @@ type FormData = z.infer<typeof schema>;
 const STEPS = [
     { id: 1, field: 'experience', title: "What's your experience level?", options: [{value: 'beginner', label: 'Beginner (<1yr)'}, {value: 'intermediate', label: 'Intermediate (1-3yrs)'}, {value: 'advanced', label: 'Advanced (3+yrs)'}] },
     { id: 2, field: 'frequency', title: "How many days a week can you train?", options: [{value: '3', label: '3 Days'}, {value: '4', label: '4 Days'}, {value: '5', label: '5 Days'}, {value: '6', label: '6 Days'}] },
-    { id: 3, field: 'goal', title: "What's your primary goal?", options: [{value: 'Build Muscle', label: 'Build Muscle'}, {value: 'Lose Body Fat', label: 'Lose Body Fat'}, {value: 'Get Toned & Defined', label: 'Get Toned & Defined'}] },
+    { id: 3, field: 'goal', title: "What's your primary goal?", options: [{value: 'Build Muscle', label: 'Build Muscle'}, {value: 'Lose Body Fat', label: 'Get Toned & Defined'}] },
 ];
 
 export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: ProgramGeneratorProps) {
@@ -83,8 +83,6 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
     });
 
     const { control, trigger, getValues, handleSubmit, formState: { errors } } = form;
-
-    const currentStepInfo = STEPS[step - 1];
     
     const handleFinalSubmit = async (values: FormData) => {
         setIsLoading(true);
@@ -94,7 +92,18 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
             if (!result || !result.name || !result.workouts) {
               throw new Error("Received invalid program structure from AI.");
             }
-            setGeneratedProgram(result);
+            // Fix for undefined progression
+            const programWithDefinedProgression = {
+                ...result,
+                workouts: result.workouts.map(workout => ({
+                    ...workout,
+                    exercises: workout.exercises.map(exercise => ({
+                        ...exercise,
+                        progression: exercise.progression || []
+                    }))
+                }))
+            };
+            setGeneratedProgram(programWithDefinedProgression);
             setStep(5); // Move to review step
         } catch (error) {
             console.error("Error generating program:", error);
@@ -116,6 +125,9 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
     };
 
     const handleNext = async () => {
+        const currentStepInfo = STEPS[step - 1];
+        if (!currentStepInfo) return; // Guard clause
+
         const isValid = await trigger(currentStepInfo.field as keyof FormData);
         if (!isValid) return;
 
@@ -134,7 +146,16 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
     const handleBack = () => {
         if (isLoading) return;
         if (step > 1) {
-            setStep(s => s - 1);
+            if (step === 5) { // If on review page
+                const experience = getValues('experience');
+                if (experience === 'beginner') {
+                    setStep(3); // Go back to last form step for beginner
+                } else {
+                    setStep(4); // Go back to 1RM step for others
+                }
+            } else {
+                setStep(s => s - 1);
+            }
         }
     };
     
@@ -169,6 +190,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
             setStep(1);
             setGeneratedProgram(null);
             setIsLoading(false);
+            form.reset();
         }, 300);
     }
 
@@ -295,7 +317,8 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
         }
         
         // Initial Form steps
-        if (step <= STEPS.length) {
+        const currentStepInfo = STEPS[step - 1];
+        if (step <= STEPS.length && currentStepInfo) {
             const fieldName = currentStepInfo.field as keyof FormData;
             return (
                 <div className="flex flex-col h-full">
@@ -352,5 +375,3 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
         </Dialog>
     )
 }
-
-    
