@@ -16,6 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import type { UserProfile } from '@/types';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -62,11 +63,19 @@ export default function SignupPage() {
       
       await sendEmailVerification(user);
 
-      // Create a minimal user profile
-      const userProfile = {
+      // Create a complete user profile with default values
+      const now = new Date();
+      const userProfile: UserProfile = {
         name: values.name,
-        signupDate: new Date().toISOString(),
+        age: 18,
+        gender: 'male',
+        initialWeight: 0,
+        goalWeight: 0,
+        transformationTarget: '',
+        targetDate: now.toISOString(),
+        signupDate: now.toISOString(),
         hasCompletedMacroSetup: false,
+        otherGoals: '',
       };
       
       const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
