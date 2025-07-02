@@ -56,16 +56,40 @@ export default function ActiveWorkoutPage() {
             if (foundWorkout) {
               const workoutWithPerformance = {
                 ...foundWorkout,
-                exercises: foundWorkout.exercises.map(ex => ({
-                  ...ex,
-                  performance: Array.from({ length: ex.sets as number }, (_, i) => ({
-                    id: `set-${ex.id}-${i}`,
-                    reps: ex.reps,
-                    weight: ex.weight,
-                    completed: false,
-                  })),
-                })),
+                exercises: foundWorkout.exercises.map(ex => {
+                  
+                  // Default to the base exercise values
+                  let weekSets = ex.sets as number;
+                  let weekReps = ex.reps;
+                  let weekWeight = ex.weight;
+
+                  // TODO: Implement week tracking. For now, assume it's always Week 1.
+                  if (ex.progression && ex.progression.length > 0) {
+                    const week1Progression = ex.progression.find(p => p.week === 1);
+                    if (week1Progression) {
+                        weekSets = week1Progression.sets;
+                        weekReps = week1Progression.reps;
+                        weekWeight = week1Progression.weight;
+                    }
+                  }
+                  
+                  const repValue = weekReps ? parseInt(String(weekReps).split('-')[0], 10) : '';
+
+                  return {
+                    ...ex,
+                    sets: weekSets,
+                    reps: weekReps,
+                    weight: weekWeight,
+                    performance: Array.from({ length: weekSets }, (_, i) => ({
+                      id: `set-${ex.id}-${i}`,
+                      reps: isNaN(repValue) ? '' : repValue,
+                      weight: weekWeight || '',
+                      completed: false,
+                    })),
+                  };
+                }),
               };
+
               setWorkout(workoutWithPerformance);
               setProgramName(foundProgramName);
 
@@ -79,7 +103,6 @@ export default function ActiveWorkoutPage() {
 
               if (!logSnapshot.empty) {
                 const allLogsForThisWorkout = logSnapshot.docs.map(doc => doc.data() as WorkoutLogEntry);
-                // Sort client-side to find the most recent
                 allLogsForThisWorkout.sort((a,b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
                 const lastLog = allLogsForThisWorkout[0];
                 setLastWorkout(lastLog.workoutSnapshot);
