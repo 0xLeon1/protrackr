@@ -45,7 +45,7 @@ const formSchema = z.object({
 type FormSchemaType = z.infer<typeof formSchema>;
 
 export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: NutritionPlanSetupProps) {
-    const { user, profile, macroPlan } = useAuth();
+    const { user, profile } = useAuth();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const [step, setStep] = useState(0);
@@ -73,53 +73,33 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         }
         if (!isOpen) {
             // Reset state when dialog closes
-            setStep(0);
-            setFormData(null);
+            setTimeout(() => {
+                setStep(0);
+                setFormData(null);
+                form.reset();
+            }, 300);
         }
     }, [isOpen, profile, form]);
-
-    const handleConfirmPlan = async () => {
-        if (!user) return;
-        setIsLoading(true);
-        try {
-            const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
-            await updateDoc(profileDocRef, { hasCompletedMacroSetup: true });
-            toast({ title: "Plan Confirmed!", description: "You're all set to start tracking." });
-            onPlanSet();
-        } catch (error) {
-            console.error("Error confirming plan:", error);
-            toast({ title: "Error", description: "Could not confirm your plan.", variant: "destructive" });
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
         
-        const { goalWeight, transformationTarget } = formData;
+        const { goalWeight, transformationTarget, initialWeight } = formData;
         const totalWeeks = parseInt(transformationTarget, 10);
-        const isCutting = goalWeight < formData.initialWeight;
+        const isCutting = goalWeight < initialWeight;
 
-        const startingCalories = goalWeight * 15;
+        // Use a more moderate calorie multiplier
+        const startingCalories = isCutting ? initialWeight * 12 : initialWeight * 13;
         
         const plan: WeeklyMacroGoal[] = [];
 
         for (let i = 0; i < totalWeeks; i++) {
             const week = i + 1;
-            const periods = Math.floor((week - 1) / 2);
-
-            let weeklyCalories;
-            if (isCutting) {
-                const minCalories = goalWeight * 10;
-                const currentCals = startingCalories - (periods * 200);
-                weeklyCalories = Math.max(minCalories, currentCals);
-            } else {
-                const maxCalories = goalWeight * 18;
-                const currentCals = startingCalories + (periods * 200);
-                weeklyCalories = Math.min(maxCalories, currentCals);
-            }
+            // Adjustments happen every week for a smoother progression
+            const weeklyAdjustment = (startingCalories - (goalWeight * (isCutting ? 10 : 15))) / totalWeeks;
             
+            const weeklyCalories = startingCalories - (i * weeklyAdjustment);
+
             const proteinGrams = Math.round(goalWeight * 1);
             const proteinCals = proteinGrams * 4;
             const fatCals = weeklyCalories * 0.25;
@@ -213,7 +193,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
             });
         } finally {
             setIsLoading(false);
-            setStep(0);
         }
     };
 
@@ -227,41 +206,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     }, [formData]);
     
     const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
-
-    if (isOpen && profile && !profile.hasCompletedMacroSetup && macroPlan && macroPlan.plan.length > 0) {
-        const firstWeek = macroPlan.plan[0];
-        const currentGoalType = profile.goalWeight < profile.initialWeight ? 'Fat Loss' : 'Muscle Gain';
-
-        return (
-            <Dialog open={isOpen} onOpenChange={onClose}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl">Your Transformation Plan is Ready!</DialogTitle>
-                        <DialogDescription>
-                          Here is the {macroPlan.plan.length}-week {currentGoalType} plan we've generated for you. Review and confirm to start your journey.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="text-center p-4 rounded-lg bg-muted">
-                            <p className="text-sm text-muted-foreground">Your plan will adjust over time. It starts with:</p>
-                            <p className="font-bold text-lg">{firstWeek.calories.toLocaleString()} kcal / day</p>
-                            <p className="text-sm text-muted-foreground">
-                                P: {firstWeek.protein}g, C: {firstWeek.carbs}g, F: {firstWeek.fats}g
-                            </p>
-                        </div>
-                        <p className="text-xs text-center text-muted-foreground">You can view the full week-by-week breakdown in the Macro Tracker on the Nutrition page.</p>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={onClose} disabled={isLoading}>Maybe Later</Button>
-                        <Button onClick={handleConfirmPlan} disabled={isLoading} className="bg-green-500 hover:bg-green-600 text-white">
-                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                            Confirm & Start Tracking
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        );
-    }
     
     const renderStepContent = () => {
         switch (step) {
