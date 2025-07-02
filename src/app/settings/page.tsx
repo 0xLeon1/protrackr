@@ -163,15 +163,15 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="initialWeight" className="text-right">Start Weight</Label>
-                    <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} disabled={hasActivePlan} className="col-span-2" />
+                    <Input id="initialWeight" type="number" value={editableProfile.initialWeight || ''} disabled={hasActivePlan} readOnly={hasActivePlan} className="col-span-2" />
                 </div>
                 <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="goalWeight" className="text-right">Goal Weight</Label>
-                    <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} disabled={hasActivePlan} className="col-span-2" />
+                    <Input id="goalWeight" type="number" value={editableProfile.goalWeight || ''} disabled={hasActivePlan} readOnly={hasActivePlan} className="col-span-2" />
                 </div>
                  <div className="grid grid-cols-3 items-center gap-4">
                     <Label className="text-right">Target Date</Label>
-                    <Input value={editableProfile.targetDate ? format(parseISO(editableProfile.targetDate), 'MMM d, yyyy') : 'Not Set'} disabled className="col-span-2 text-muted-foreground" />
+                    <Input value={editableProfile.targetDate ? format(parseISO(editableProfile.targetDate), 'MMM d, yyyy') : 'Not Set'} disabled readOnly className="col-span-2 text-muted-foreground" />
                 </div>
                 <div className="grid grid-cols-3 items-start gap-4">
                     <Label htmlFor="otherGoals" className="text-right pt-2">Your 'Why'</Label>
