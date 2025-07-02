@@ -100,20 +100,19 @@ const prompt = ai.definePrompt({
     *   **If experience is 'advanced':**
         *   Populate the 'progression' field for the **Barbell Bench Press, Barbell Squat, and Barbell Deadlift**, using their respective user-provided 1RMs for the calculations. The top-level 'sets', 'reps', and 'weight' for these exercises MUST match the values from Week 1 of the progression.
 
-4.  **12-Week Percentage Progression (Use for all 'progression' calculations):**
-    *   **Parsing Rule:** For formats like \`AxB\` (e.g., \`2x10\`), \`A\` is the value for the \`sets\` field and \`B\` is the value for the \`reps\` field (as a string). For Rep Max weeks (e.g., \`5 Rep Max\`), \`sets\` is \`1\` and \`reps\` is \`"5"\`.
-    *   W1: 2x10 @ 70%
-    *   W2: 2x10 @ 77%
-    *   W3: 5x5 @ 80%
-    *   W4: 5x4 @ 85%
-    *   W5: 5x3 @ 87.5%
-    *   W6: 5x1 @ 90%
-    *   W7: 5 Rep Max (Calculate weight as 85% of 1RM)
-    *   W8: 3 Rep Max (Calculate weight as 90% of 1RM)
-    *   W9: 3x1 @ weight from W8
-    *   W10: 1 Rep Max (Calculate weight as 95% of 1RM)
-    *   W11: 2x10 @ 70% (Deload)
-    *   W12: 2x10 @ 77% (Deload)
+4.  **12-Week Percentage Progression (Use for all 'progression' calculations):** For each week, use the specified sets, reps, and percentage to calculate the weight based on the user's 1RM.
+    *   **Week 1:** sets: 2, reps: "10", percentage: 70%
+    *   **Week 2:** sets: 2, reps: "10", percentage: 77%
+    *   **Week 3:** sets: 5, reps: "5", percentage: 80%
+    *   **Week 4:** sets: 5, reps: "4", percentage: 85%
+    *   **Week 5:** sets: 5, reps: "3", percentage: 87.5%
+    *   **Week 6:** sets: 5, reps: "1", percentage: 90%
+    *   **Week 7 (5 Rep Max):** sets: 1, reps: "5", percentage: 85%
+    *   **Week 8 (3 Rep Max):** sets: 1, reps: "3", percentage: 90%
+    *   **Week 9:** sets: 3, reps: "1", use weight from Week 8 (no percentage calculation needed).
+    *   **Week 10 (1 Rep Max):** sets: 1, reps: "1", percentage: 95%
+    *   **Week 11 (Deload):** sets: 2, reps: "10", percentage: 70%
+    *   **Week 12 (Deload):** sets: 2, reps: "10", percentage: 77%
 
 5.  **Create a creative and motivational name for the entire program.**`,
   config: {
