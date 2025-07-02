@@ -85,11 +85,13 @@ const prompt = ai.definePrompt({
 
 **Output Generation Rules:**
 
-1.  **Weight Fields (Very Important):**
-    *   For lifts that get a 'progression' plan (see rule #2), the top-level 'weight' field MUST be the calculated weight for WEEK 1.
+1.  **Rounding (Critical Rule): All calculated weight values in the final output MUST be rounded to the nearest 5 lbs. For example, 137.5 becomes 140, 132 becomes 130, and 133 becomes 135.**
+
+2.  **Weight Fields (Very Important):**
+    *   For lifts that get a 'progression' plan (see rule #3), the top-level 'weight' field MUST be the calculated weight for WEEK 1.
     *   For ALL OTHER exercises (all accessory lifts, non-progressing barbell lifts), the top-level 'weight' field MUST be 0. This is to let the user fill it in themselves.
 
-2.  **Progression Field (Follow very carefully):**
+3.  **Progression Field (Follow very carefully):**
     *   The 'progression' array should ONLY be populated for specific barbell lifts based on the user's experience level. For all other exercises, it MUST be empty or null.
     *   **If experience is 'beginner':** Do NOT populate the 'progression' field for ANY exercise. All exercises are progressed by the user "beating the logbook."
     *   **If experience is 'intermediate':**
@@ -98,7 +100,7 @@ const prompt = ai.definePrompt({
     *   **If experience is 'advanced':**
         *   Populate the 'progression' field for the **Barbell Bench Press, Barbell Squat, and Barbell Deadlift**, using their respective user-provided 1RMs for the calculations.
 
-3.  **12-Week Percentage Progression (Use for all 'progression' calculations):**
+4.  **12-Week Percentage Progression (Use for all 'progression' calculations):**
     *   **Parsing Rule:** For formats like \`AxB\` (e.g., \`2x10\`), \`A\` is the value for the \`sets\` field and \`B\` is the value for the \`reps\` field (as a string). For Rep Max weeks (e.g., \`5 Rep Max\`), \`sets\` is \`1\` and \`reps\` is \`"5"\`.
     *   W1: 2x10 @ 70%
     *   W2: 2x10 @ 77%
@@ -113,8 +115,7 @@ const prompt = ai.definePrompt({
     *   W11: 2x10 @ 70% (Deload)
     *   W12: 2x10 @ 77% (Deload)
 
-4.  **Create a creative and motivational name for the entire program.**
-5.  **Round all calculated weights to the nearest 5 lbs.**`,
+5.  **Create a creative and motivational name for the entire program.**`,
   config: {
     safetySettings: [
       {
