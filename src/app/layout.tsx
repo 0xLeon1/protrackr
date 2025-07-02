@@ -26,7 +26,7 @@ export default function RootLayout({
         <AuthProvider>
           <div className="relative flex flex-col min-h-screen bg-background">
             <Header />
-            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-20">
+            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-28">
               {children}
             </main>
             <BottomNav />

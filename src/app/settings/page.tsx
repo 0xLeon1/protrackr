@@ -101,7 +101,7 @@ export default function SettingsPage() {
                 </div>
                  <div className="grid grid-cols-3 items-center gap-4">
                     <Label htmlFor="gender" className="text-right">Gender</Label>
-                    <Select value={editableProfile.gender} onValueChange={(value) => handleProfileChange('gender', value)}>
+                    <Select value={editableProfile.gender || ''} onValueChange={(value) => handleProfileChange('gender', value)}>
                         <SelectTrigger className="col-span-2"><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="male">Male</SelectItem>
