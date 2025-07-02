@@ -46,7 +46,12 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
 
     const { control, trigger, getValues, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema),
-        mode: 'onChange'
+        mode: 'onChange',
+        defaultValues: {
+            experience: undefined,
+            frequency: undefined,
+            goal: undefined
+        }
     });
 
     const currentStepInfo = STEPS[step - 1];
@@ -138,7 +143,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                     className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-lg"
                                 >
                                     {currentStepInfo.options.map(option => (
-                                        <Label key={option.value} htmlFor={option.value} className="relative flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground has-[:checked]:border-primary">
+                                        <Label key={option.value} htmlFor={option.value} className="relative flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                                             <RadioGroupItem value={option.value} id={option.value} className="sr-only" />
                                             <span className="text-lg font-semibold">{option.label}</span>
                                         </Label>
