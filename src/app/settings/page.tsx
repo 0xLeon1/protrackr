@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Separator } from '@/components/ui/separator';
 
 export default function SettingsPage() {
   const { user, profile, loading, refreshData } = useAuth();
@@ -34,7 +35,8 @@ export default function SettingsPage() {
   const { toast } = useToast();
 
   const [editableProfile, setEditableProfile] = useState<Partial<UserProfile> | null>(null);
-  const [isResetting, setIsResetting] = useState(false);
+  const [isResettingPlan, setIsResettingPlan] = useState(false);
+  const [isResettingWorkouts, setIsResettingWorkouts] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -85,8 +87,8 @@ export default function SettingsPage() {
   };
   
   const handleResetPlan = async () => {
-    if (!user || !profile) return;
-    setIsResetting(true);
+    if (!user || !profile || !hasActivePlan) return;
+    setIsResettingPlan(true);
 
     try {
         const goalsDocRef = doc(db, 'users', user.uid, 'data', 'goals');
@@ -110,9 +112,48 @@ export default function SettingsPage() {
             variant: "destructive"
         });
     } finally {
-        setIsResetting(false);
+        setIsResettingPlan(false);
     }
   }
+  
+  const handleResetWorkoutData = async () => {
+    if (!user || !db) return;
+    setIsResettingWorkouts(true);
+
+    const collectionsToDelete = ['logs', 'cardio-logs', 'sleep-logs', 'checkins', 'bodyweight-logs'];
+
+    try {
+        const batch = writeBatch(db);
+        
+        for (const collectionName of collectionsToDelete) {
+            const collectionRef = collection(db, 'users', user.uid, collectionName);
+            const snapshot = await getDocs(collectionRef);
+            if (!snapshot.empty) {
+                snapshot.forEach(docToDelete => {
+                    batch.delete(docToDelete.ref);
+                });
+            }
+        }
+        
+        await batch.commit();
+
+        await refreshData();
+        toast({
+            title: "Activity Data Reset",
+            description: "All of your past workout, cardio, and other activity logs have been deleted.",
+        });
+    } catch (error) {
+        console.error("Error resetting workout data: ", error);
+        toast({
+            title: "Error",
+            description: "Could not reset your activity data. Please try again.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsResettingWorkouts(false);
+    }
+  }
+
 
   if (loading || !user || !editableProfile) {
     return (
@@ -188,44 +229,82 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
       
-      {hasActivePlan && (
-        <Card className="border-destructive">
+      <Card className="border-destructive">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <AlertTriangle className="text-destructive"/>
                     Danger Zone
                 </CardTitle>
                 <CardDescription>
-                    Resetting your plan is a permanent action and cannot be undone.
+                    These actions are permanent and will clear your historical data.
                 </CardDescription>
             </CardHeader>
-            <CardContent>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={isResetting}>
-                            {isResetting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                            Reset My Nutrition Plan
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This will permanently delete your current nutrition plan. You will need to
-                                go through the setup process again to create a new one. This action cannot be undone.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleResetPlan} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Yes, Reset My Plan
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+            <CardContent className="space-y-6">
+                <div>
+                    <h3 className="font-semibold">Nutrition Plan</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                        This will clear your current nutrition targets and macro plan, allowing you to set up a new one.
+                    </p>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" disabled={isResettingPlan || !hasActivePlan}>
+                                {isResettingPlan ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                Reset My Nutrition Plan
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete your current nutrition plan. You will need to
+                                    go through the setup process again to create a new one. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleResetPlan} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Yes, Reset My Plan
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                    {!hasActivePlan && (
+                        <p className="text-sm text-destructive mt-2">No active nutrition plan to reset.</p>
+                    )}
+                </div>
+                
+                <Separator/>
+
+                <div>
+                    <h3 className="font-semibold">Activity & Progress Data</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                        This will permanently delete all of your historical logs.
+                    </p>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" disabled={isResettingWorkouts}>
+                                {isResettingWorkouts ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                Reset All Activity Data
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete all of your past activity data, including workouts, cardio, sleep logs, daily check-ins, and body weight history. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleResetWorkoutData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Yes, Reset All Data
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
             </CardContent>
         </Card>
-      )}
 
     </div>
   );
