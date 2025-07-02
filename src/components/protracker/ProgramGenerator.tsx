@@ -134,7 +134,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                             render={({ field }) => (
                                 <RadioGroup
                                     onValueChange={field.onChange}
-                                    defaultValue={field.value}
+                                    value={field.value}
                                     className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-lg"
                                 >
                                     {currentStepInfo.options.map(option => (
