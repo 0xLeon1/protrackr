@@ -83,46 +83,68 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
 
     const calculatedPlan = useMemo<WeeklyMacroGoal[] | null>(() => {
         if (!formData || !profile) return null;
-
+    
         const { goalWeight, transformationTarget, initialWeight } = formData;
         const totalWeeks = parseInt(transformationTarget, 10);
         const isCutting = goalWeight < initialWeight;
-
-        const startingCalories = goalWeight * 15;
-        const minCalories = goalWeight * 10;
-        
+    
         const plan: WeeklyMacroGoal[] = [];
-
-        for (let i = 0; i < totalWeeks; i++) {
-            const week = i + 1;
-            const periods = Math.floor((week - 1) / 2); // Adjustments happen every 2 weeks
-
-            let weeklyCalories;
-            if (isCutting) {
-                // Drop calories by 200 every 2 weeks, but don't go below the floor.
-                const currentCals = startingCalories - (periods * 200);
-                weeklyCalories = Math.max(minCalories, currentCals);
-            } else { // Bulking
-                const maxCalories = goalWeight * 18;
-                const currentCals = startingCalories + (periods * 200);
-                weeklyCalories = Math.min(maxCalories, currentCals);
-            }
-            
+        const startCals = goalWeight * 15;
+    
+        // Define helper to generate the final plan entry
+        const createWeekEntry = (week: number, calories: number) => {
             const proteinGrams = Math.round(goalWeight * 1);
             const proteinCals = proteinGrams * 4;
-            const fatCals = weeklyCalories * 0.25;
+            const fatCals = calories * 0.25;
             const fatGrams = Math.round(fatCals / 9);
-            const carbCals = weeklyCalories - proteinCals - fatGrams;
+            const carbCals = calories - proteinCals - fatCals;
             const carbGrams = Math.round(carbCals / 4);
-
-            plan.push({
+            return {
                 week,
-                calories: Math.round(weeklyCalories),
+                calories: Math.round(calories),
                 protein: proteinGrams,
                 carbs: carbGrams,
                 fats: fatGrams,
-            });
+            };
+        };
+    
+        if (isCutting) {
+            const endCals = goalWeight * 10;
+            const totalCalorieDrop = startCals - endCals;
+            const numPeriods = totalWeeks / 2;
+            const periodsWithDrop = numPeriods > 1 ? numPeriods - 1 : 1;
+    
+            if (totalWeeks === 16) {
+                // Slower, back-loaded drop for 16 weeks
+                for (let i = 0; i < totalWeeks; i++) {
+                    const periodIndex = Math.floor(i / 2);
+                    const dropFraction = (periodIndex / periodsWithDrop) ** 2; // Quadratic drop
+                    const weeklyCalories = startCals - (totalCalorieDrop * dropFraction);
+                    plan.push(createWeekEntry(i + 1, weeklyCalories));
+                }
+            } else {
+                // Linear drop for 8 and 12 weeks
+                const dropPerPeriod = totalCalorieDrop / periodsWithDrop;
+                for (let i = 0; i < totalWeeks; i++) {
+                    const periodIndex = Math.floor(i / 2);
+                    const weeklyCalories = startCals - (periodIndex * dropPerPeriod);
+                    plan.push(createWeekEntry(i + 1, weeklyCalories));
+                }
+            }
+        } else { // Bulking logic
+            const maxCalories = goalWeight * 18;
+            const totalCalorieGain = maxCalories - startCals;
+            const numPeriods = totalWeeks / 2;
+            const periodsWithGain = numPeriods > 1 ? numPeriods - 1 : 1;
+            const gainPerPeriod = totalCalorieGain / periodsWithGain;
+    
+            for (let i = 0; i < totalWeeks; i++) {
+                const periodIndex = Math.floor(i / 2);
+                const weeklyCalories = startCals + (periodIndex * gainPerPeriod);
+                plan.push(createWeekEntry(i + 1, weeklyCalories));
+            }
         }
+        
         return plan;
     }, [formData, profile]);
 
@@ -351,5 +373,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         </Dialog>
     );
 }
+
+    
 
     
