@@ -95,10 +95,10 @@ const prompt = ai.definePrompt({
     *   The 'progression' array should ONLY be populated for specific barbell lifts based on the user's experience level. For all other exercises, it MUST be empty or null.
     *   **If experience is 'beginner':** Do NOT populate the 'progression' field for ANY exercise. All exercises are progressed by the user "beating the logbook."
     *   **If experience is 'intermediate':**
-        *   Populate the 'progression' field for the **Barbell Bench Press ONLY**, using the user's provided 'benchPress1RM' for the calculations.
+        *   Populate the 'progression' field for the **Barbell Bench Press ONLY**, using the user's provided 'benchPress1RM' for the calculations. The top-level 'sets', 'reps', and 'weight' for this exercise MUST match the values from Week 1 of the progression.
         *   The Barbell Squat should be included in the workout but will NOT get a progression plan. Leave its 'progression' field empty, set its top-level 'weight' to 0, and give it a higher rep range (e.g., '8-10' or '8-12').
     *   **If experience is 'advanced':**
-        *   Populate the 'progression' field for the **Barbell Bench Press, Barbell Squat, and Barbell Deadlift**, using their respective user-provided 1RMs for the calculations.
+        *   Populate the 'progression' field for the **Barbell Bench Press, Barbell Squat, and Barbell Deadlift**, using their respective user-provided 1RMs for the calculations. The top-level 'sets', 'reps', and 'weight' for these exercises MUST match the values from Week 1 of the progression.
 
 4.  **12-Week Percentage Progression (Use for all 'progression' calculations):**
     *   **Parsing Rule:** For formats like \`AxB\` (e.g., \`2x10\`), \`A\` is the value for the \`sets\` field and \`B\` is the value for the \`reps\` field (as a string). For Rep Max weeks (e.g., \`5 Rep Max\`), \`sets\` is \`1\` and \`reps\` is \`"5"\`.
