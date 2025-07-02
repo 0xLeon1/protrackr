@@ -9,10 +9,9 @@ import DailyCheckin from '@/components/protracker/DailyCheckin';
 import ConsistencyTracker from '@/components/protracker/ConsistencyTracker';
 import MacroRings from '@/components/protracker/MacroRings';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Unlock } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import NutritionPlanSetup from '@/components/protracker/NutritionPlanSetup';
 
@@ -141,18 +140,23 @@ export default function HomePage() {
             nutritionDays={consistencyData.nutritionDays}
           />
           {needsSetup ? (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Your Nutrition Plan</CardTitle>
-                    <CardDescription>Create your plan to unlock macro tracking and start your transformation.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button size="lg" className="w-full" onClick={() => setIsSetupOpen(true)}>
-                        <Zap className="mr-2 h-5 w-5"/>
-                        Set Up My Plan
+            <div className="relative rounded-lg overflow-hidden border">
+                {/* The content to be blurred */}
+                <div className="blur-sm pointer-events-none">
+                    <MacroRings 
+                        currentIntake={{ calories: 0, protein: 0, carbs: 0, fats: 0 }}
+                        goals={{ week: 1, calories: 2000, protein: 150, carbs: 200, fats: 67 }}
+                    />
+                </div>
+
+                {/* The overlay with the button */}
+                <div className="absolute inset-0 flex items-center justify-center bg-background/30">
+                    <Button size="lg" className="w-auto" onClick={() => setIsSetupOpen(true)}>
+                        <Unlock className="mr-2 h-5 w-5"/>
+                        Build Your Meal Plan
                     </Button>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
           ) : (
             currentGoals && <MacroRings currentIntake={currentIntake} goals={currentGoals} />
           )}
