@@ -15,6 +15,9 @@ const GenerateProgramInputSchema = z.object({
   experience: z.enum(['beginner', 'intermediate', 'advanced']),
   frequency: z.enum(['3', '4', '5', '6']),
   goal: z.enum(['Build Muscle', 'Lose Body Fat', 'Get Toned & Defined']),
+  benchPress1RM: z.number().optional().describe("User's estimated 1-Rep Max for Bench Press in lbs."),
+  squat1RM: z.number().optional().describe("User's estimated 1-Rep Max for Squat in lbs."),
+  deadlift1RM: z.number().optional().describe("User's estimated 1-Rep Max for Deadlift in lbs."),
 });
 export type GenerateProgramInput = z.infer<typeof GenerateProgramInputSchema>;
 
@@ -29,9 +32,9 @@ const ExerciseSchema = z.object({
   name: z.string().describe("The name of the exercise, e.g., 'Bench Press' or 'Squat'."),
   sets: z.number().int().min(1).max(10).describe("The number of sets for this exercise."),
   reps: z.string().describe("The target repetition range, e.g., '8-12' or '10'."),
-  weight: z.number().min(0).describe("A conservative starting weight in lbs. For bodyweight exercises, this should be 0."),
+  weight: z.number().min(0).describe("A conservative starting weight in lbs. For bodyweight exercises or exercises where the user sets the weight, this should be 0."),
   notes: z.string().optional().describe("Optional notes for the exercise, like 'Focus on form' or 'Rest 60 seconds'."),
-  progression: z.array(WeeklyProgressionSchema).optional().describe("An optional 12-week progression for main barbell lifts. This should not be populated for accessory lifts."),
+  progression: z.array(WeeklyProgressionSchema).optional().describe("An optional 12-week progression for main barbell lifts. This should not be populated for accessory lifts or for lifts that do not follow a percentage-based plan."),
 });
 
 const WorkoutSchema = z.object({
@@ -60,18 +63,15 @@ const prompt = ai.definePrompt({
 - **Experience Level:** {{{experience}}}
 - **Training Frequency:** {{{frequency}}} days per week
 - **Primary Goal:** {{{goal}}}
+{{#if benchPress1RM}}- Bench Press 1RM: {{{benchPress1RM}}} lbs{{/if}}
+{{#if squat1RM}}- Squat 1RM: {{{squat1RM}}} lbs{{/if}}
+{{#if deadlift1RM}}- Deadlift 1RM: {{{deadlift1RM}}} lbs{{/if}}
 
 **Definitions & Core Principles:**
-
-*   **Experience Levels & Estimated 1-Rep Max (1RM):**
-    *   **Beginner (Less than 1 year of training):** Use these estimated 1RMs for calculations: Bench Press: 135 lbs, Squat: 185 lbs.
-    *   **Intermediate (1-3 years of training):** Use these estimated 1RMs for calculations: Bench Press: 205 lbs, Squat: 275 lbs.
-    *   **Advanced (3+ years of training):** Use these estimated 1RMs for calculations: Bench Press: 275 lbs, Squat: 365 lbs.
-    *   **Do NOT ask the user for their 1RM.** Use these internal estimates for all percentage-based calculations.
-
-*   **Exercise Selection for Beginners:**
-    *   Strictly prioritize exercises using **machines or dumbbells**.
-    *   The only exception is the **Barbell Bench Press**, which is permitted. Avoid other barbell compound lifts like squats or deadlifts for beginners.
+*   **Experience Levels & Rules:**
+    *   **Beginner (Less than 1 year of training):** Focus on mastering form. The program MUST consist of machine and dumbbell exercises. The ONLY barbell exercise permitted is the Barbell Bench Press. ABSOLUTELY NO Barbell Squats or Barbell Deadlifts.
+    *   **Intermediate (1-3 years of training):** Ready for structured progression. The program can include Barbell Bench Press and Barbell Squats. ABSOLUTELY NO Barbell Deadlifts.
+    *   **Advanced (3+ years of training):** Can handle high volume and intensity. The program can include all major barbell lifts.
 
 **Workout Split Logic (Follow this strictly):**
 *   **3 days/week:** Three distinct **upper body focused** workout days. No dedicated leg day. (e.g., Push, Pull, Arms/Shoulders).
@@ -85,27 +85,33 @@ const prompt = ai.definePrompt({
 
 **Output Generation Rules:**
 
-1.  **Generate a FOUNDATIONAL week of workouts.** The 'workouts' array in your output should represent Week 1 of the plan.
-2.  **For MAIN Barbell Lifts (Bench Press, Squat, etc.):**
-    *   You MUST populate the 'progression' field for these exercises.
-    *   Calculate the weights for the entire 12-week cycle based on the specified percentages of the user's estimated 1RM.
-    *   The top-level 'sets', 'reps', and 'weight' fields for these exercises should reflect the values for Week 1.
-    *   **12-Week Percentage Progression:**
-        *   W1: 2x10 @ 70%
-        *   W2: 2x10 @ 77%
-        *   W3: 5x5 @ 80%
-        *   W4: 5x4 @ 85%
-        *   W5: 5x3 @ 87.5%
-        *   W6: 5x1 @ 90%
-        *   W7: 5 Rep Max (Use 85% of estimated 1RM for this weight)
-        *   W8: 3 Rep Max (Use 90% of estimated 1RM for this weight)
-        *   W9: 3x1 @ weight from W8
-        *   W10: 1 Rep Max (Use 95% of estimated 1RM for this weight)
-        *   W11: 2x10 @ 70% (Deload)
-        *   W12: 2x10 @ 77% (Deload)
-3.  **For ALL OTHER Accessory Lifts (Dumbbell Curls, Leg Press, etc.):**
-    *   Do **NOT** populate the 'progression' field. Leave it empty or null.
-    *   Populate the top-level 'sets', 'reps', and 'weight' fields with reasonable starting values. The user will progress on these by beating their logbook.
+1.  **Weight Fields (Very Important):**
+    *   For lifts that get a 'progression' plan (see rule #2), the top-level 'weight' field MUST be the calculated weight for WEEK 1.
+    *   For ALL OTHER exercises (all accessory lifts, non-progressing barbell lifts), the top-level 'weight' field MUST be 0. This is to let the user fill it in themselves.
+
+2.  **Progression Field (Follow very carefully):**
+    *   The 'progression' array should ONLY be populated for specific barbell lifts based on the user's experience level. For all other exercises, it MUST be empty or null.
+    *   **If experience is 'beginner':** Do NOT populate the 'progression' field for ANY exercise. All exercises are progressed by the user "beating the logbook."
+    *   **If experience is 'intermediate':**
+        *   Populate the 'progression' field for the **Barbell Bench Press ONLY**, using the user's provided 'benchPress1RM' for the calculations.
+        *   The Barbell Squat should be included in the workout but will NOT get a progression plan. Leave its 'progression' field empty, set its top-level 'weight' to 0, and give it a higher rep range (e.g., '8-10' or '8-12').
+    *   **If experience is 'advanced':**
+        *   Populate the 'progression' field for the **Barbell Bench Press, Barbell Squat, and Barbell Deadlift**, using their respective user-provided 1RMs for the calculations.
+
+3.  **12-Week Percentage Progression (Use for all 'progression' calculations):**
+    *   W1: 2x10 @ 70%
+    *   W2: 2x10 @ 77%
+    *   W3: 5x5 @ 80%
+    *   W4: 5x4 @ 85%
+    *   W5: 5x3 @ 87.5%
+    *   W6: 5x1 @ 90%
+    *   W7: 5 Rep Max (Calculate weight as 85% of 1RM)
+    *   W8: 3 Rep Max (Calculate weight as 90% of 1RM)
+    *   W9: 3x1 @ weight from W8
+    *   W10: 1 Rep Max (Calculate weight as 95% of 1RM)
+    *   W11: 2x10 @ 70% (Deload)
+    *   W12: 2x10 @ 77% (Deload)
+
 4.  **Create a creative and motivational name for the entire program.**
 5.  **Round all calculated weights to the nearest 5 lbs.**`,
   config: {

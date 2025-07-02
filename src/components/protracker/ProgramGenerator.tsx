@@ -5,19 +5,20 @@ import { useState, useMemo } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { generateProgram, GenerateProgramInput, GenerateProgramOutput } from '@/ai/flows/generate-program-flow';
+import { generateProgram, GenerateProgramOutput } from '@/ai/flows/generate-program-flow';
 import type { Program } from '@/types';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowRight, ArrowLeft, Wand2, Dumbbell, Check, RefreshCcw } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft, Wand2, Dumbbell, Check, RefreshCcw, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
+import { Input } from '../ui/input';
 
 interface ProgramGeneratorProps {
     isOpen: boolean;
@@ -29,11 +30,14 @@ const schema = z.object({
   experience: z.enum(['beginner', 'intermediate', 'advanced'], { required_error: "Please select your experience level." }),
   frequency: z.enum(['3', '4', '5', '6'], { required_error: "Please select how often you can train." }),
   goal: z.enum(['Build Muscle', 'Lose Body Fat', 'Get Toned & Defined'], { required_error: "Please select your primary goal." }),
+  benchPress1RM: z.coerce.number().optional(),
+  squat1RM: z.coerce.number().optional(),
+  deadlift1RM: z.coerce.number().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
 const STEPS = [
-    { id: 1, field: 'experience', title: "What's your experience level?", options: [{value: 'beginner', label: 'Beginner'}, {value: 'intermediate', label: 'Intermediate'}, {value: 'advanced', label: 'Advanced'}] },
+    { id: 1, field: 'experience', title: "What's your experience level?", options: [{value: 'beginner', label: 'Beginner (<1yr)'}, {value: 'intermediate', label: 'Intermediate (1-3yrs)'}, {value: 'advanced', label: 'Advanced (3+yrs)'}] },
     { id: 2, field: 'frequency', title: "How many days a week can you train?", options: [{value: '3', label: '3 Days'}, {value: '4', label: '4 Days'}, {value: '5', label: '5 Days'}, {value: '6', label: '6 Days'}] },
     { id: 3, field: 'goal', title: "What's your primary goal?", options: [{value: 'Build Muscle', label: 'Build Muscle'}, {value: 'Lose Body Fat', label: 'Lose Body Fat'}, {value: 'Get Toned & Defined', label: 'Get Toned & Defined'}] },
 ];
@@ -47,21 +51,23 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
     const { control, trigger, getValues, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema),
         mode: 'onChange',
-        defaultValues: {
-            experience: undefined,
-            frequency: undefined,
-            goal: undefined
-        }
     });
 
     const currentStepInfo = STEPS[step - 1];
 
     const handleNext = async () => {
         const isValid = await trigger(currentStepInfo.field as keyof FormData);
-        if (isValid && step < STEPS.length) {
+        if (!isValid) return;
+
+        if (step < STEPS.length) {
             setStep(s => s + 1);
-        } else if (isValid && step === STEPS.length) {
-            handleGenerateProgram();
+        } else {
+            const experience = getValues('experience');
+            if (experience === 'beginner') {
+                handleGenerateProgram();
+            } else {
+                setStep(4); // Move to 1RM input step
+            }
         }
     };
 
@@ -72,13 +78,22 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
     };
     
     const handleGenerateProgram = async () => {
+        let is1RMValid = true;
+        const experience = getValues('experience');
+        if (experience === 'intermediate') {
+            is1RMValid = await trigger(['benchPress1RM', 'squat1RM']);
+        } else if (experience === 'advanced') {
+            is1RMValid = await trigger(['benchPress1RM', 'squat1RM', 'deadlift1RM']);
+        }
+        if (!is1RMValid) return;
+
         setIsLoading(true);
         setGeneratedProgram(null);
         try {
             const values = getValues();
             const result = await generateProgram(values);
             setGeneratedProgram(result);
-            setStep(4); // Move to review step
+            setStep(5); // Move to review step
         } catch (error) {
             console.error("Error generating program:", error);
             toast({
@@ -86,7 +101,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                 description: 'The AI could not generate a program. Please try again.',
                 variant: 'destructive',
             });
-            setStep(3); // Reset to last step
+            setStep(4); // Reset to 1RM step if applicable
         } finally {
             setIsLoading(false);
         }
@@ -109,6 +124,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                     reps: e.reps,
                     weight: e.weight,
                     notes: e.notes || '',
+                    progression: e.progression,
                 }))
             }))
         };
@@ -124,6 +140,8 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
             setIsLoading(false);
         }, 300);
     }
+
+    const experience = getValues('experience');
     
     const renderContent = () => {
         // Priority 1: Loading state
@@ -136,9 +154,9 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                 </div>
             );
         }
-
-        // Priority 2: Result state
-        if (step === 4 && generatedProgram) {
+        
+        // Final review step
+        if (step === 5 && generatedProgram) {
             return (
                 <div className="flex flex-col h-full">
                     <CardHeader>
@@ -186,8 +204,69 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                 </div>
             );
         }
+
+        // 1RM Input Step
+        if (step === 4) {
+            return (
+                 <div className="flex flex-col h-full">
+                    <CardHeader>
+                        <Progress value={(step / (STEPS.length + 1)) * 100} className="w-full mb-4"/>
+                        <CardTitle className="text-2xl">Enter Your Max Lifts</CardTitle>
+                        <CardDescription>
+                            Provide your estimated 1-Rep Max (1RM) for the heaviest single rep you can lift. This will be used to calculate your weights.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col items-center justify-center">
+                        <div className="w-full max-w-sm space-y-4">
+                            <Controller
+                                name="benchPress1RM"
+                                control={control}
+                                rules={{ required: "This field is required" }}
+                                render={({ field }) => (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="benchPress1RM">Bench Press 1RM (lbs)</Label>
+                                        <Input id="benchPress1RM" type="number" placeholder="e.g. 225" {...field} />
+                                        {errors.benchPress1RM && <p className="text-destructive text-sm">{errors.benchPress1RM.message}</p>}
+                                    </div>
+                                )}
+                            />
+                             <Controller
+                                name="squat1RM"
+                                control={control}
+                                rules={{ required: "This field is required" }}
+                                render={({ field }) => (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="squat1RM">Squat 1RM (lbs)</Label>
+                                        <Input id="squat1RM" type="number" placeholder="e.g. 315" {...field} />
+                                        {errors.squat1RM && <p className="text-destructive text-sm">{errors.squat1RM.message}</p>}
+                                    </div>
+                                )}
+                            />
+                            {experience === 'advanced' && (
+                                <Controller
+                                    name="deadlift1RM"
+                                    control={control}
+                                    rules={{ required: "This field is required" }}
+                                    render={({ field }) => (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="deadlift1RM">Deadlift 1RM (lbs)</Label>
+                                            <Input id="deadlift1RM" type="number" placeholder="e.g. 405" {...field} />
+                                            {errors.deadlift1RM && <p className="text-destructive text-sm">{errors.deadlift1RM.message}</p>}
+                                        </div>
+                                    )}
+                                />
+                            )}
+                        </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                        <Button variant="outline" onClick={handleBack}><ArrowLeft className="mr-2" /> Back</Button>
+                        <Button onClick={handleGenerateProgram}>Generate Program <Wand2 className="ml-2" /></Button>
+                    </CardFooter>
+                 </div>
+            )
+        }
         
-        // Priority 3: Form steps
+        // Initial Form steps
         if (step <= STEPS.length) {
             const fieldName = currentStepInfo.field as keyof FormData;
             return (
@@ -204,10 +283,12 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                 <RadioGroup
                                     onValueChange={field.onChange}
                                     value={field.value}
-                                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full"
+                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full"
                                 >
                                     {currentStepInfo.options.map(option => (
-                                        <Label key={option.value} htmlFor={option.value} className="relative flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
+                                        <Label key={option.value} htmlFor={option.value} className={cn("relative flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        "[&:has([data-state=checked])]:border-primary"
+                                        )}>
                                             <RadioGroupItem value={option.value} id={option.value} className="sr-only" />
                                             <span className="text-lg font-semibold text-center">{option.label}</span>
                                         </Label>
@@ -220,8 +301,8 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                     <CardFooter className="flex justify-between">
                         <Button variant="outline" onClick={handleBack} disabled={step === 1}><ArrowLeft className="mr-2" /> Back</Button>
                         <Button onClick={handleNext}>
-                            {step === STEPS.length ? 'Generate Program' : 'Next'}
-                            {step < STEPS.length ? <ArrowRight className="ml-2" /> : <Wand2 className="ml-2" />}
+                            {step === STEPS.length ? 'Next' : 'Next'}
+                            <ArrowRight className="ml-2" />
                         </Button>
                     </CardFooter>
                 </div>
