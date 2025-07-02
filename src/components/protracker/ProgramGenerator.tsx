@@ -44,23 +44,16 @@ const schema = z.object({
             });
         }
     }
-    if (data.experience === 'intermediate') {
+    if (data.experience === 'intermediate' || data.experience === 'advanced') {
          if (!data.squat1RM) {
-             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Squat max is required for intermediates.",
-                path: ['squat1RM'],
-            });
-        }
-    }
-    if (data.experience === 'advanced') {
-        if (!data.squat1RM) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: "Squat max is required.",
                 path: ['squat1RM'],
             });
         }
+    }
+    if (data.experience === 'advanced') {
         if (!data.deadlift1RM) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -302,7 +295,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                     </div>
                                 )}
                             />
-                            {experience === 'advanced' && (
+                            {(experience === 'advanced') && (
                                 <FormField
                                     name="deadlift1RM"
                                     control={control}
@@ -343,7 +336,7 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                 <RadioGroup
                                     onValueChange={field.onChange}
                                     value={field.value}
-                                    className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full"
+                                    className="grid grid-cols-1 gap-4 w-full max-w-sm"
                                 >
                                     {currentStepInfo.options.map(option => (
                                         <Label key={option.value} htmlFor={option.value} className={cn("relative flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer",
