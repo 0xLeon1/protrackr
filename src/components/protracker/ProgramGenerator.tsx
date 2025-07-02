@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Progress } from '../ui/progress';
 import { Input } from '../ui/input';
+import { Form, FormField } from '../ui/form';
 
 interface ProgramGeneratorProps {
     isOpen: boolean;
@@ -30,10 +31,38 @@ const schema = z.object({
   experience: z.enum(['beginner', 'intermediate', 'advanced'], { required_error: "Please select your experience level." }),
   frequency: z.enum(['3', '4', '5', '6'], { required_error: "Please select how often you can train." }),
   goal: z.enum(['Build Muscle', 'Lose Body Fat', 'Get Toned & Defined'], { required_error: "Please select your primary goal." }),
-  benchPress1RM: z.coerce.number().optional(),
-  squat1RM: z.coerce.number().optional(),
-  deadlift1RM: z.coerce.number().optional(),
+  benchPress1RM: z.coerce.number().positive("1RM must be a positive number.").optional(),
+  squat1RM: z.coerce.number().positive("1RM must be a positive number.").optional(),
+  deadlift1RM: z.coerce.number().positive("1RM must be a positive number.").optional(),
+}).superRefine((data, ctx) => {
+    if (data.experience === 'intermediate' || data.experience === 'advanced') {
+        if (!data.benchPress1RM) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Bench press max is required.",
+                path: ['benchPress1RM'],
+            });
+        }
+        if (!data.squat1RM) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Squat max is required.",
+                path: ['squat1RM'],
+            });
+        }
+    }
+    if (data.experience === 'advanced') {
+        if (!data.deadlift1RM) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Deadlift max is required.",
+                path: ['deadlift1RM'],
+            });
+        }
+    }
 });
+
+
 type FormData = z.infer<typeof schema>;
 
 const STEPS = [
@@ -48,50 +77,23 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
     const [isLoading, setIsLoading] = useState(false);
     const [generatedProgram, setGeneratedProgram] = useState<GenerateProgramOutput | null>(null);
 
-    const { control, trigger, getValues, formState: { errors } } = useForm<FormData>({
+    const form = useForm<FormData>({
         resolver: zodResolver(schema),
         mode: 'onChange',
     });
 
+    const { control, trigger, getValues, handleSubmit, formState: { errors } } = form;
+
     const currentStepInfo = STEPS[step - 1];
-
-    const handleNext = async () => {
-        const isValid = await trigger(currentStepInfo.field as keyof FormData);
-        if (!isValid) return;
-
-        if (step < STEPS.length) {
-            setStep(s => s + 1);
-        } else {
-            const experience = getValues('experience');
-            if (experience === 'beginner') {
-                handleGenerateProgram();
-            } else {
-                setStep(4); // Move to 1RM input step
-            }
-        }
-    };
-
-    const handleBack = () => {
-        if (step > 1) {
-            setStep(s => s - 1);
-        }
-    };
     
-    const handleGenerateProgram = async () => {
-        let is1RMValid = true;
-        const experience = getValues('experience');
-        if (experience === 'intermediate') {
-            is1RMValid = await trigger(['benchPress1RM', 'squat1RM']);
-        } else if (experience === 'advanced') {
-            is1RMValid = await trigger(['benchPress1RM', 'squat1RM', 'deadlift1RM']);
-        }
-        if (!is1RMValid) return;
-
+    const handleFinalSubmit = async (values: FormData) => {
         setIsLoading(true);
         setGeneratedProgram(null);
         try {
-            const values = getValues();
             const result = await generateProgram(values);
+            if (!result || !result.name || !result.workouts) {
+              throw new Error("Received invalid program structure from AI.");
+            }
             setGeneratedProgram(result);
             setStep(5); // Move to review step
         } catch (error) {
@@ -111,8 +113,31 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
         } finally {
             setIsLoading(false);
         }
-    }
+    };
 
+    const handleNext = async () => {
+        const isValid = await trigger(currentStepInfo.field as keyof FormData);
+        if (!isValid) return;
+
+        if (step < STEPS.length) {
+            setStep(s => s + 1);
+        } else {
+            const experience = getValues('experience');
+            if (experience === 'beginner') {
+                handleSubmit(handleFinalSubmit)();
+            } else {
+                setStep(4); // Move to 1RM input step
+            }
+        }
+    };
+
+    const handleBack = () => {
+        if (isLoading) return;
+        if (step > 1) {
+            setStep(s => s - 1);
+        }
+    };
+    
     const handleSave = () => {
         if (!generatedProgram) return;
 
@@ -200,10 +225,10 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                         </Accordion>
                     </CardContent>
                      <CardFooter className="flex justify-between">
-                        <Button variant="outline" onClick={handleGenerateProgram} disabled={isLoading}>
+                        <Button type="button" variant="outline" onClick={() => handleSubmit(handleFinalSubmit)()} disabled={isLoading}>
                            <RefreshCcw className="mr-2"/> Regenerate
                         </Button>
-                        <Button onClick={handleSave} className="bg-green-500 hover:bg-green-600">
+                        <Button type="button" onClick={handleSave} className="bg-green-500 hover:bg-green-600">
                             <Check className="mr-2"/> Save Program
                         </Button>
                     </CardFooter>
@@ -224,10 +249,9 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col items-center justify-center">
                         <div className="w-full max-w-sm space-y-4">
-                            <Controller
+                            <FormField
                                 name="benchPress1RM"
                                 control={control}
-                                rules={{ required: "This field is required" }}
                                 render={({ field }) => (
                                     <div className="space-y-2">
                                         <Label htmlFor="benchPress1RM">Bench Press 1RM (lbs)</Label>
@@ -236,10 +260,9 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                     </div>
                                 )}
                             />
-                             <Controller
+                             <FormField
                                 name="squat1RM"
                                 control={control}
-                                rules={{ required: "This field is required" }}
                                 render={({ field }) => (
                                     <div className="space-y-2">
                                         <Label htmlFor="squat1RM">Squat 1RM (lbs)</Label>
@@ -249,10 +272,9 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                 )}
                             />
                             {experience === 'advanced' && (
-                                <Controller
+                                <FormField
                                     name="deadlift1RM"
                                     control={control}
-                                    rules={{ required: "This field is required" }}
                                     render={({ field }) => (
                                         <div className="space-y-2">
                                             <Label htmlFor="deadlift1RM">Deadlift 1RM (lbs)</Label>
@@ -265,8 +287,8 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                         </div>
                     </CardContent>
                     <CardFooter className="flex justify-between">
-                        <Button variant="outline" onClick={handleBack}><ArrowLeft className="mr-2" /> Back</Button>
-                        <Button onClick={handleGenerateProgram}>Generate Program <Wand2 className="ml-2" /></Button>
+                        <Button type="button" variant="outline" onClick={handleBack}><ArrowLeft className="mr-2" /> Back</Button>
+                        <Button type="submit">Generate Program <Wand2 className="ml-2" /></Button>
                     </CardFooter>
                  </div>
             )
@@ -305,9 +327,9 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                         {errors[fieldName] && <p className="text-destructive text-sm mt-4 text-center">{errors[fieldName]?.message}</p>}
                     </CardContent>
                     <CardFooter className="flex justify-between">
-                        <Button variant="outline" onClick={handleBack} disabled={step === 1}><ArrowLeft className="mr-2" /> Back</Button>
-                        <Button onClick={handleNext}>
-                            Next
+                        <Button type="button" variant="outline" onClick={handleBack} disabled={step === 1}><ArrowLeft className="mr-2" /> Back</Button>
+                        <Button type="button" onClick={handleNext}>
+                            {getValues('experience') === 'beginner' && step === 3 ? 'Generate Program' : 'Next'}
                             <ArrowRight className="ml-2" />
                         </Button>
                     </CardFooter>
@@ -321,8 +343,14 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
             <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
-                {renderContent()}
+                <Form {...form}>
+                    <form onSubmit={handleSubmit(handleFinalSubmit)} className="flex flex-col h-full">
+                        {renderContent()}
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     )
 }
+
+    
