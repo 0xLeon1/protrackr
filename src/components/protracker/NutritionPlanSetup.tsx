@@ -57,8 +57,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
       resolver: zodResolver(formSchema),
       mode: 'onChange',
       defaultValues: {
-        initialWeight: undefined,
-        goalWeight: undefined,
+        initialWeight: '',
+        goalWeight: '',
         transformationTarget: "12",
       },
     });
@@ -66,8 +66,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     useEffect(() => {
         if (isOpen && profile) {
             form.reset({
-                initialWeight: profile.initialWeight || undefined,
-                goalWeight: profile.goalWeight || undefined,
+                initialWeight: profile.initialWeight || '',
+                goalWeight: profile.goalWeight || '',
                 transformationTarget: profile.transformationTarget || "12",
             });
             setOtherGoals(profile.otherGoals || '');

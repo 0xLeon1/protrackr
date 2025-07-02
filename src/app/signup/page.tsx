@@ -90,6 +90,16 @@ export default function SignupPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(signupSchema),
     mode: 'onChange',
+    defaultValues: {
+      name: '',
+      age: undefined,
+      gender: undefined,
+      initialWeight: undefined,
+      goalWeight: undefined,
+      transformationTarget: '12',
+      email: '',
+      password: '',
+    },
   });
   
   const totalSteps = 7;
@@ -115,7 +125,7 @@ export default function SignupPage() {
 
   const handleBack = () => {
     if (step > 0) {
-      setStep(step - 1);
+      setStep(step + 1);
     }
   };
 
