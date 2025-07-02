@@ -17,6 +17,7 @@ interface AuthContextType {
   refreshData: () => Promise<void>;
   macroPlan: MacroPlan | null;
   currentGoals: WeeklyMacroGoal | null;
+  dataVersion: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentGoals, setCurrentGoals] = useState<WeeklyMacroGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0);
   
   const router = useRouter();
   const pathname = usePathname();
@@ -50,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userMacroPlan = goalsDoc.exists() ? goalsDoc.data() as MacroPlan : null;
         setMacroPlan(userMacroPlan);
         
-        if (userMacroPlan?.plan?.length) {
+        if (userMacroPlan?.plan?.length && userMacroPlan.startDate) {
             const weeksSinceStart = differenceInWeeks(new Date(), parseISO(userMacroPlan.startDate));
             const currentWeekIndex = Math.max(0, Math.min(weeksSinceStart, userMacroPlan.plan.length - 1));
             setCurrentGoals(userMacroPlan.plan[currentWeekIndex]);
@@ -70,6 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         await fetchUserData(user.uid);
         setLoading(false);
+        setDataVersion(v => v + 1);
     }
   }, [user, fetchUserData]);
 
@@ -113,7 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, refreshData, macroPlan, currentGoals }}>
+    <AuthContext.Provider value={{ user, profile, loading, isFirebaseConfigured, refreshData, macroPlan, currentGoals, dataVersion }}>
       {children}
     </AuthContext.Provider>
   );

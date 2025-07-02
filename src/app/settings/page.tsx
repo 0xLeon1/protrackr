@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, deleteDoc, updateDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, collection, getDocs, writeBatch, query, limit } from 'firebase/firestore';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,13 +30,14 @@ import {
 import { Separator } from '@/components/ui/separator';
 
 export default function SettingsPage() {
-  const { user, profile, loading, refreshData } = useAuth();
+  const { user, profile, loading, refreshData, dataVersion } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   const [editableProfile, setEditableProfile] = useState<Partial<UserProfile> | null>(null);
   const [isResettingPlan, setIsResettingPlan] = useState(false);
-  const [isResettingWorkouts, setIsResettingWorkouts] = useState(false);
+  const [isResettingActivity, setIsResettingActivity] = useState(false);
+  const [hasActivityData, setHasActivityData] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -49,6 +50,29 @@ export default function SettingsPage() {
       setEditableProfile(profile);
     }
   }, [profile]);
+  
+  useEffect(() => {
+    if (!user) {
+      setHasActivityData(false);
+      return;
+    }
+
+    const checkData = async () => {
+      const collectionsToCheck = ['logs', 'cardio-logs', 'sleep-logs', 'checkins', 'bodyweight-logs'];
+      for (const collectionName of collectionsToCheck) {
+        const q = query(collection(db, 'users', user.uid, collectionName), limit(1));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          setHasActivityData(true);
+          return;
+        }
+      }
+      setHasActivityData(false);
+    };
+
+    checkData();
+  }, [user, dataVersion]);
+
 
   const handleProfileChange = (field: keyof UserProfile, value: string | number) => {
     if (editableProfile) {
@@ -116,9 +140,9 @@ export default function SettingsPage() {
     }
   }
   
-  const handleResetWorkoutData = async () => {
+  const handleResetActivityData = async () => {
     if (!user || !db) return;
-    setIsResettingWorkouts(true);
+    setIsResettingActivity(true);
 
     const collectionsToDelete = ['logs', 'cardio-logs', 'sleep-logs', 'checkins', 'bodyweight-logs'];
 
@@ -150,7 +174,7 @@ export default function SettingsPage() {
             variant: "destructive"
         });
     } finally {
-        setIsResettingWorkouts(false);
+        setIsResettingActivity(false);
     }
   }
 
@@ -282,8 +306,8 @@ export default function SettingsPage() {
                     </p>
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <Button variant="destructive" disabled={isResettingWorkouts}>
-                                {isResettingWorkouts ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            <Button variant="destructive" disabled={isResettingActivity || !hasActivityData}>
+                                {isResettingActivity ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                                 Reset All Activity Data
                             </Button>
                         </AlertDialogTrigger>
@@ -296,12 +320,15 @@ export default function SettingsPage() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleResetWorkoutData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                <AlertDialogAction onClick={handleResetActivityData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                                     Yes, Reset All Data
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
+                    {!hasActivityData && (
+                        <p className="text-sm text-destructive mt-2">No activity data to reset.</p>
+                    )}
                 </div>
             </CardContent>
         </Card>
