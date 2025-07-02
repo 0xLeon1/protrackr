@@ -27,15 +27,15 @@ interface ProgramGeneratorProps {
 
 const schema = z.object({
   experience: z.enum(['beginner', 'intermediate', 'advanced'], { required_error: "Please select your experience level." }),
-  frequency: z.enum(['3', '4', '5'], { required_error: "Please select how often you can train." }),
-  goal: z.enum(['muscle gain', 'fat loss', 'general fitness'], { required_error: "Please select your primary goal." }),
+  frequency: z.enum(['3', '4', '5', '6'], { required_error: "Please select how often you can train." }),
+  goal: z.enum(['Build Muscle', 'Lose Body Fat', 'Get Toned & Defined'], { required_error: "Please select your primary goal." }),
 });
 type FormData = z.infer<typeof schema>;
 
 const STEPS = [
     { id: 1, field: 'experience', title: "What's your experience level?", options: [{value: 'beginner', label: 'Beginner'}, {value: 'intermediate', label: 'Intermediate'}, {value: 'advanced', label: 'Advanced'}] },
-    { id: 2, field: 'frequency', title: "How many days a week can you train?", options: [{value: '3', label: '3 Days'}, {value: '4', label: '4 Days'}, {value: '5', label: '5 Days'}] },
-    { id: 3, field: 'goal', title: "What's your primary goal?", options: [{value: 'muscle gain', label: 'Muscle Gain'}, {value: 'fat loss', label: 'Fat Loss'}, {value: 'general fitness', label: 'General Fitness'}] },
+    { id: 2, field: 'frequency', title: "How many days a week can you train?", options: [{value: '3', label: '3 Days'}, {value: '4', label: '4 Days'}, {value: '5', label: '5 Days'}, {value: '6', label: '6 Days'}] },
+    { id: 3, field: 'goal', title: "What's your primary goal?", options: [{value: 'Build Muscle', label: 'Build Muscle'}, {value: 'Lose Body Fat', label: 'Lose Body Fat'}, {value: 'Get Toned & Defined', label: 'Get Toned & Defined'}] },
 ];
 
 export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: ProgramGeneratorProps) {
@@ -140,12 +140,12 @@ export default function ProgramGenerator({ isOpen, onClose, onSaveProgram }: Pro
                                 <RadioGroup
                                     onValueChange={field.onChange}
                                     value={field.value}
-                                    className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-lg"
+                                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full"
                                 >
                                     {currentStepInfo.options.map(option => (
                                         <Label key={option.value} htmlFor={option.value} className="relative flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary">
                                             <RadioGroupItem value={option.value} id={option.value} className="sr-only" />
-                                            <span className="text-lg font-semibold">{option.label}</span>
+                                            <span className="text-lg font-semibold text-center">{option.label}</span>
                                         </Label>
                                     ))}
                                 </RadioGroup>
