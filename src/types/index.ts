@@ -6,6 +6,13 @@ export type SetPerformance = {
   completed: boolean;
 };
 
+export type WeeklyProgression = {
+  week: number;
+  sets: number;
+  reps: string;
+  weight: number;
+};
+
 export type Exercise = {
   id:string;
   name: string;
@@ -14,6 +21,7 @@ export type Exercise = {
   weight: number | '';
   notes: string;
   performance?: SetPerformance[];
+  progression?: WeeklyProgression[];
 };
 
 export type Workout = {
