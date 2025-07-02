@@ -57,8 +57,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
       resolver: zodResolver(formSchema),
       mode: 'onChange',
       defaultValues: {
-        initialWeight: '',
-        goalWeight: '',
+        initialWeight: undefined,
+        goalWeight: undefined,
         transformationTarget: "12",
       },
     });
@@ -66,8 +66,8 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     useEffect(() => {
         if (isOpen && profile) {
             form.reset({
-                initialWeight: profile.initialWeight || '',
-                goalWeight: profile.goalWeight || '',
+                initialWeight: profile.initialWeight || undefined,
+                goalWeight: profile.goalWeight || undefined,
                 transformationTarget: profile.transformationTarget || "12",
             });
             setOtherGoals(profile.otherGoals || '');
@@ -220,10 +220,21 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
         }
     };
 
+    const averageWeeklyChange = useMemo(() => {
+        if (!formData) return 0;
+        const { initialWeight, goalWeight, transformationTarget } = formData;
+        const totalChange = goalWeight - initialWeight;
+        const weeks = parseInt(transformationTarget, 10);
+        if (weeks === 0) return 0;
+        return totalChange / weeks;
+    }, [formData]);
+    
+    const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
+
     // If a plan exists but isn't confirmed, show the confirmation view
     if (isOpen && profile && !profile.hasCompletedMacroSetup && macroPlan && macroPlan.plan.length > 0) {
         const firstWeek = macroPlan.plan[0];
-        const goalType = profile.goalWeight < profile.initialWeight ? 'Fat Loss' : 'Muscle Gain';
+        const currentGoalType = profile.goalWeight < profile.initialWeight ? 'Fat Loss' : 'Muscle Gain';
 
         return (
             <Dialog open={isOpen} onOpenChange={onClose}>
@@ -231,7 +242,7 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
                     <DialogHeader>
                         <DialogTitle className="text-2xl">Your Transformation Plan is Ready!</DialogTitle>
                         <DialogDescription>
-                          Here is the {macroPlan.plan.length}-week {goalType} plan we've generated for you. Review and confirm to start your journey.
+                          Here is the {macroPlan.plan.length}-week {currentGoalType} plan we've generated for you. Review and confirm to start your journey.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -257,16 +268,6 @@ export default function NutritionPlanSetup({ isOpen, onClose, onPlanSet }: Nutri
     }
 
     // --- Fallback to Plan Creation Form ---
-    const averageWeeklyChange = useMemo(() => {
-        if (!formData) return 0;
-        const { initialWeight, goalWeight, transformationTarget } = formData;
-        const totalChange = goalWeight - initialWeight;
-        const weeks = parseInt(transformationTarget, 10);
-        if (weeks === 0) return 0;
-        return totalChange / weeks;
-    }, [formData]);
-    
-    const goalType = formData && formData.goalWeight < formData.initialWeight ? 'Fat Loss' : 'Muscle Gain';
     
     const renderStepContent = () => {
         if (step === 6) { // Final confirmation step of creation
